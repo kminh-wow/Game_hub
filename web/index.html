@@ -29,7 +29,16 @@
       <span id="turn-indicator"></span>
       <span id="walls-left"></span>
     </div>
-    <div id="board-wrap"></div>
+    <div id="game-layout">
+      <div id="board-wrap"></div>
+      <div id="chat-panel">
+        <div id="chat-log"></div>
+        <div class="chat-input-row">
+          <input id="chat-input" maxlength="300" placeholder="메시지 입력">
+          <button id="chat-send">전송</button>
+        </div>
+      </div>
+    </div>
     <p id="game-error" class="error"></p>
   </section>
 

@@ -24,6 +24,7 @@ function buildBoardSkeleton() {
   cellEls = [];
   hWallEls = [];
   vWallEls = [];
+  el("chat-log").innerHTML = "";
 
   for (let r = 0; r < 9; r++) {
     cellEls.push([]);
@@ -84,8 +85,18 @@ function positionPawn(p, r, c) {
   pawn.style.top = `${r * (CELL + GAP) + (CELL - size) / 2}px`;
 }
 
+function appendChatMessage(kind, text) {
+  const log = el("chat-log");
+  const msg = document.createElement("div");
+  msg.className = `chat-msg ${kind}`;
+  msg.textContent = text;
+  log.appendChild(msg);
+  log.scrollTop = log.scrollHeight;
+}
+
 function render(state) {
   currentState = state;
+  el("chat-panel").classList.toggle("hidden", state.mode === "ai");
 
   for (const p of [1, 2]) {
     const [r, c] = state.pawns[String(p)];
@@ -140,6 +151,7 @@ function resetToMenu() {
   currentState = null;
   el("menu-error").textContent = "";
   el("join-code").value = "";
+  el("chat-log").innerHTML = "";
   showScreen("menu");
 }
 
@@ -164,6 +176,10 @@ Net.on("state", (msg) => {
 Net.on("error", (msg) => {
   const target = el("game").classList.contains("hidden") ? "menu-error" : "game-error";
   el(target).textContent = msg.message;
+});
+
+Net.on("chat", (msg) => {
+  appendChatMessage(msg.player === myPlayer ? "me" : "opponent", msg.text);
 });
 
 Net.on("opponent_left", () => {
@@ -211,6 +227,19 @@ el("btn-ai").addEventListener("click", async () => {
 
 el("btn-restart").addEventListener("click", () => {
   location.reload();
+});
+
+function sendChat() {
+  const input = el("chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+  Net.send({ type: "chat", text });
+  input.value = "";
+}
+
+el("chat-send").addEventListener("click", sendChat);
+el("chat-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") sendChat();
 });
 
 showScreen("menu");

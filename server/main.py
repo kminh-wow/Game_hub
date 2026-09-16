@@ -94,6 +94,16 @@ async def websocket_endpoint(ws: WebSocket):
                     await maybe_run_ai(room)
                     await room.broadcast(state_message(room))
 
+            elif msg_type == "chat":
+                entry = manager.lookup(ws)
+                if entry is None:
+                    await ws.send_json({"type": "error", "message": "게임에 참가하지 않았습니다."})
+                    continue
+                room, player = entry
+                text = str(data.get("text", "")).strip()[:300]
+                if text:
+                    await room.broadcast({"type": "chat", "player": player, "text": text})
+
             else:
                 await ws.send_json({"type": "error", "message": f"알 수 없는 메시지 타입: {msg_type}"})
 
