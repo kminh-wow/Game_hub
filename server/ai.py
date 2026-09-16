@@ -18,9 +18,11 @@ DEFAULT_DIFFICULTY = "medium"
 # wall_margin: how far past the pawns' bounding box wall candidates reach
 #   (None = consider every legal wall on the board).
 # lookahead: whether to simulate the opponent's best reply before deciding.
-# blunder_rate: chance of playing a uniformly random legal action instead.
+# blunder_rate: chance of playing a random legal *pawn move* instead of the
+#   evaluated best action (kept to pawn moves so a blunder still looks like
+#   plausible play, not a wall dropped in an unrelated corner).
 _PRESETS = {
-    "easy":   {"top_k": 1,  "wall_margin": 1,    "lookahead": False, "blunder_rate": 0.3},
+    "easy":   {"top_k": 1,  "wall_margin": 2,    "lookahead": False, "blunder_rate": 0.15},
     "medium": {"top_k": 8,  "wall_margin": 2,    "lookahead": True,  "blunder_rate": 0.0},
     "hard":   {"top_k": 16, "wall_margin": None, "lookahead": True,  "blunder_rate": 0.0},
 }
@@ -87,7 +89,8 @@ def choose_move(state: game.GameState, player: int, difficulty: str = DEFAULT_DI
         return None
 
     if random.random() < cfg["blunder_rate"]:
-        return random.choice(actions)
+        pawn_moves = [a for a in actions if a[0] == "move"]
+        return random.choice(pawn_moves or actions)
 
     scored = []
     for action in actions:
