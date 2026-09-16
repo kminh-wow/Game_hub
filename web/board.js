@@ -156,7 +156,7 @@ Net.on("joined", (msg) => {
 });
 
 Net.on("state", (msg) => {
-  buildBoardSkeleton();
+  if (!cellEls.length) buildBoardSkeleton();
   showScreen("game");
   render(msg);
 });

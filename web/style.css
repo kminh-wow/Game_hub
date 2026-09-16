@@ -76,6 +76,7 @@ button:hover { background: #1f5590; }
   background: var(--wall-slot);
   border-radius: 3px;
   cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 .wall-slot:hover { background: var(--wall-slot-hover); }
 .wall-slot.placed {
@@ -88,6 +89,7 @@ button:hover { background: #1f5590; }
   position: absolute;
   border-radius: 50%;
   box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  transition: left 0.25s ease, top 0.25s ease;
 }
 .pawn.p1 { background: var(--pawn1); }
 .pawn.p2 { background: var(--pawn2); }
