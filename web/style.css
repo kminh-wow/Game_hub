@@ -8,6 +8,10 @@
   --wall-placed: #7a3b2e;
   --pawn1: #2b6cb0;
   --pawn2: #c53030;
+  --eval-best: #a855f7;
+  --eval-good: #38a169;
+  --eval-ok: #d69e2e;
+  --eval-bad: #c53030;
 }
 
 * { box-sizing: border-box; }
@@ -56,6 +60,19 @@ button:hover { background: #1f5590; }
   font-size: 16px;
   margin-bottom: 12px;
 }
+
+#algo-info {
+  width: min(562px, 90vw);
+  background: white;
+  border: 1px solid #e2d8c5;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #444;
+}
+#algo-info summary { cursor: pointer; font-weight: 600; color: #2a2a2a; }
+#algo-info p { margin: 8px 0 0; }
 
 #game-layout {
   display: flex;
@@ -142,6 +159,10 @@ button:hover { background: #1f5590; }
   border-radius: 4px;
 }
 .cell.movable { cursor: pointer; box-shadow: inset 0 0 0 3px #38a169; }
+.cell.movable.eval-best { box-shadow: inset 0 0 0 3px var(--eval-best); }
+.cell.movable.eval-good { box-shadow: inset 0 0 0 3px var(--eval-good); }
+.cell.movable.eval-ok { box-shadow: inset 0 0 0 3px var(--eval-ok); }
+.cell.movable.eval-bad { box-shadow: inset 0 0 0 3px var(--eval-bad); }
 
 .wall-slot {
   position: absolute;
@@ -156,6 +177,14 @@ button:hover { background: #1f5590; }
   cursor: default;
 }
 .wall-slot.disabled { pointer-events: none; background: transparent; }
+.wall-slot.eval-best { background: color-mix(in srgb, var(--eval-best) 55%, transparent); }
+.wall-slot.eval-good { background: color-mix(in srgb, var(--eval-good) 55%, transparent); }
+.wall-slot.eval-ok { background: color-mix(in srgb, var(--eval-ok) 55%, transparent); }
+.wall-slot.eval-bad { background: color-mix(in srgb, var(--eval-bad) 55%, transparent); }
+.wall-slot.eval-best:hover,
+.wall-slot.eval-good:hover,
+.wall-slot.eval-ok:hover,
+.wall-slot.eval-bad:hover { filter: brightness(1.15); }
 
 .pawn {
   position: absolute;
@@ -180,3 +209,25 @@ button:hover { background: #1f5590; }
   border-radius: 12px;
   text-align: center;
 }
+
+#hover-tip {
+  position: fixed;
+  z-index: 50;
+  max-width: 240px;
+  background: #2a2a2a;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+#hover-tip .tip-label {
+  font-weight: 700;
+  margin-bottom: 4px;
+  display: block;
+}
+#hover-tip.eval-best .tip-label { color: #d8b4fe; }
+#hover-tip.eval-good .tip-label { color: #9ae6b4; }
+#hover-tip.eval-ok .tip-label { color: #f6e05e; }
+#hover-tip.eval-bad .tip-label { color: #feb2b2; }

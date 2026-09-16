@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
-from . import ai, game
+from . import ai, analysis, game
 from .rooms import RoomManager
 
 app = FastAPI()
@@ -25,12 +25,18 @@ def state_message(room, msg_type: str = "state") -> dict:
         payload["legalMoves"] = [list(m) for m in game.legal_pawn_moves(room.state, room.state.turn)]
     else:
         payload["legalMoves"] = []
+
+    if room.mode == "learn" and room.state.winner is None and room.state.turn == 1:
+        payload["analysis"] = analysis.analyze_actions(room.state, 1)
+    else:
+        payload["analysis"] = []
+
     return payload
 
 
 async def maybe_run_ai(room):
-    """If it's the AI's turn in an AI room, compute and apply its move."""
-    while room.mode == "ai" and room.state.winner is None and room.state.turn == 2:
+    """If it's the AI's turn in an AI/learn room, compute and apply its move."""
+    while room.mode in ("ai", "learn") and room.state.winner is None and room.state.turn == 2:
         action = ai.choose_move(room.state, 2)
         if action is None:
             break
@@ -68,6 +74,11 @@ async def websocket_endpoint(ws: WebSocket):
                 await ws.send_json({"type": "room_created", "code": room.code, "player": 1, "mode": "ai"})
                 await ws.send_json(state_message(room))
 
+            elif msg_type == "start_learn_game":
+                room = manager.create_learn_room(ws)
+                await ws.send_json({"type": "room_created", "code": room.code, "player": 1, "mode": "learn"})
+                await ws.send_json(state_message(room))
+
             elif msg_type in ("move", "place_wall"):
                 entry = manager.lookup(ws)
                 if entry is None:
@@ -89,7 +100,7 @@ async def websocket_endpoint(ws: WebSocket):
 
                 await room.broadcast(state_message(room))
 
-                if room.mode == "ai" and room.state.winner is None and room.state.turn == 2:
+                if room.mode in ("ai", "learn") and room.state.winner is None and room.state.turn == 2:
                     await asyncio.sleep(AI_THINK_DELAY_SECONDS)
                     await maybe_run_ai(room)
                     await room.broadcast(state_message(room))

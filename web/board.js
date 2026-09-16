@@ -2,14 +2,60 @@ const CELL = 50;
 const GAP = 14;
 const BOARD_PX = 9 * CELL + 8 * GAP;
 
+const EVAL_CLASSES = ["eval-best", "eval-good", "eval-ok", "eval-bad"];
+const LABEL_CLASS = {
+  "최선의 수": "eval-best",
+  "좋은 수": "eval-good",
+  "괜찮은 수": "eval-ok",
+  "안좋은 수": "eval-bad",
+};
+
 let myPlayer = null;
 let currentState = null;
 let cellEls = [];
 let hWallEls = [];
 let vWallEls = [];
 let pawnEls = {};
+let moveAnalysis = new Map();
+let wallAnalysis = new Map();
 
 const el = (id) => document.getElementById(id);
+
+function showTip(entry, x, y) {
+  if (!entry) return;
+  const tip = el("hover-tip");
+  tip.className = LABEL_CLASS[entry.label];
+  tip.innerHTML = "";
+  const label = document.createElement("span");
+  label.className = "tip-label";
+  label.textContent = entry.label;
+  tip.appendChild(label);
+  for (const reason of entry.reasons) {
+    const line = document.createElement("div");
+    line.textContent = reason;
+    tip.appendChild(line);
+  }
+  tip.style.left = `${x + 14}px`;
+  tip.style.top = `${y + 14}px`;
+}
+
+function hideTip() {
+  el("hover-tip").classList.add("hidden");
+}
+
+function attachHoverAnalysis(node, getEntry) {
+  node.addEventListener("mouseenter", (e) => {
+    if (!currentState || currentState.turn !== myPlayer) return;
+    showTip(getEntry(), e.clientX, e.clientY);
+  });
+  node.addEventListener("mousemove", (e) => {
+    const tip = el("hover-tip");
+    if (tip.classList.contains("hidden")) return;
+    tip.style.left = `${e.clientX + 14}px`;
+    tip.style.top = `${e.clientY + 14}px`;
+  });
+  node.addEventListener("mouseleave", hideTip);
+}
 
 function showScreen(name) {
   ["menu", "waiting", "game"].forEach((s) => el(s).classList.toggle("hidden", s !== name));
@@ -36,6 +82,7 @@ function buildBoardSkeleton() {
       cell.style.width = `${CELL}px`;
       cell.style.height = `${CELL}px`;
       cell.addEventListener("click", () => handleCellClick(r, c));
+      attachHoverAnalysis(cell, () => moveAnalysis.get(`${r},${c}`));
       wrap.appendChild(cell);
       cellEls[r].push(cell);
     }
@@ -52,6 +99,7 @@ function buildBoardSkeleton() {
       h.style.width = `${2 * CELL + GAP}px`;
       h.style.height = `${GAP}px`;
       h.addEventListener("click", () => handleWallClick(r, c, "H"));
+      attachHoverAnalysis(h, () => wallAnalysis.get(`${r},${c},H`));
       wrap.appendChild(h);
       hWallEls[r].push(h);
 
@@ -62,6 +110,7 @@ function buildBoardSkeleton() {
       v.style.width = `${GAP}px`;
       v.style.height = `${2 * CELL + GAP}px`;
       v.addEventListener("click", () => handleWallClick(r, c, "V"));
+      attachHoverAnalysis(v, () => wallAnalysis.get(`${r},${c},V`));
       wrap.appendChild(v);
       vWallEls[r].push(v);
     }
@@ -96,15 +145,20 @@ function appendChatMessage(kind, text) {
 
 function render(state) {
   currentState = state;
-  el("chat-panel").classList.toggle("hidden", state.mode === "ai");
+  el("chat-panel").classList.toggle("hidden", state.mode !== "pvp");
+  el("algo-info").classList.toggle("hidden", state.mode !== "learn");
+  if (state.mode !== "learn" || state.turn !== myPlayer) hideTip();
 
   for (const p of [1, 2]) {
     const [r, c] = state.pawns[String(p)];
     positionPawn(p, r, c);
   }
 
+  moveAnalysis = new Map();
+  wallAnalysis = new Map();
+
   for (let r = 0; r < 9; r++) {
-    for (let c = 0; c < 9; c++) cellEls[r][c].classList.remove("movable");
+    for (let c = 0; c < 9; c++) cellEls[r][c].classList.remove("movable", ...EVAL_CLASSES);
   }
   if (state.turn === myPlayer) {
     for (const [r, c] of state.legalMoves) cellEls[r][c].classList.add("movable");
@@ -112,13 +166,25 @@ function render(state) {
 
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
-      hWallEls[r][c].classList.remove("placed");
-      vWallEls[r][c].classList.remove("placed");
+      hWallEls[r][c].classList.remove("placed", ...EVAL_CLASSES);
+      vWallEls[r][c].classList.remove("placed", ...EVAL_CLASSES);
     }
   }
   for (const w of state.walls) {
     const target = w.orientation === "H" ? hWallEls[w.r][w.c] : vWallEls[w.r][w.c];
     target.classList.add("placed");
+  }
+
+  for (const entry of state.analysis || []) {
+    const cls = LABEL_CLASS[entry.label];
+    if (entry.kind === "move") {
+      moveAnalysis.set(`${entry.to[0]},${entry.to[1]}`, entry);
+      cellEls[entry.to[0]][entry.to[1]].classList.add(cls);
+    } else {
+      wallAnalysis.set(`${entry.r},${entry.c},${entry.orientation}`, entry);
+      const target = entry.orientation === "H" ? hWallEls[entry.r][entry.c] : vWallEls[entry.r][entry.c];
+      target.classList.add(cls);
+    }
   }
 
   const turnText = state.turn === myPlayer ? "당신의 차례입니다" : "상대의 차례를 기다리는 중...";
@@ -152,12 +218,13 @@ function resetToMenu() {
   el("menu-error").textContent = "";
   el("join-code").value = "";
   el("chat-log").innerHTML = "";
+  hideTip();
   showScreen("menu");
 }
 
 Net.on("room_created", (msg) => {
   myPlayer = msg.player;
-  if (msg.mode !== "ai") {
+  if (msg.mode !== "ai" && msg.mode !== "learn") {
     el("waiting-code").textContent = msg.code;
     showScreen("waiting");
   }
@@ -220,6 +287,16 @@ el("btn-ai").addEventListener("click", async () => {
   try {
     await Net.connect();
     Net.send({ type: "start_ai_game" });
+  } catch {
+    el("menu-error").textContent = "서버에 연결할 수 없습니다.";
+  }
+});
+
+el("btn-learn").addEventListener("click", async () => {
+  el("menu-error").textContent = "";
+  try {
+    await Net.connect();
+    Net.send({ type: "start_learn_game" });
   } catch {
     el("menu-error").textContent = "서버에 연결할 수 없습니다.";
   }
