@@ -44,10 +44,21 @@ function hideTip() {
   el("hover-tip").classList.add("hidden");
 }
 
+function showTrace(entry) {
+  if (!entry) return;
+  el("trace-content").textContent = entry.trace.join("\n");
+}
+
+function resetTrace() {
+  el("trace-content").textContent = "칸이나 벽에 마우스를 올려보세요";
+}
+
 function attachHoverAnalysis(node, getEntry) {
   node.addEventListener("mouseenter", (e) => {
     if (!currentState || currentState.turn !== myPlayer) return;
-    showTip(getEntry(), e.clientX, e.clientY);
+    const entry = getEntry();
+    showTip(entry, e.clientX, e.clientY);
+    showTrace(entry);
   });
   node.addEventListener("mousemove", (e) => {
     const tip = el("hover-tip");
@@ -55,7 +66,10 @@ function attachHoverAnalysis(node, getEntry) {
     tip.style.left = `${e.clientX + 14}px`;
     tip.style.top = `${e.clientY + 14}px`;
   });
-  node.addEventListener("mouseleave", hideTip);
+  node.addEventListener("mouseleave", () => {
+    hideTip();
+    resetTrace();
+  });
 }
 
 function showScreen(name) {
@@ -148,7 +162,11 @@ function render(state) {
   currentState = state;
   el("chat-panel").classList.toggle("hidden", state.mode !== "pvp");
   el("algo-info").classList.toggle("hidden", state.mode !== "learn");
-  if (state.mode !== "learn" || state.turn !== myPlayer) hideTip();
+  el("trace-panel").classList.toggle("hidden", state.mode !== "learn");
+  if (state.mode !== "learn" || state.turn !== myPlayer) {
+    hideTip();
+    resetTrace();
+  }
 
   for (const p of [1, 2]) {
     const [r, c] = state.pawns[String(p)];
@@ -222,6 +240,7 @@ function resetToMenu() {
   el("join-code").value = "";
   el("chat-log").innerHTML = "";
   hideTip();
+  resetTrace();
   showScreen("menu");
 }
 

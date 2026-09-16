@@ -2,8 +2,9 @@
 
 Scores every legal action available to a player the same way the AI
 evaluates its own candidates (see ai.py) and turns that score into a
-human-readable label and reasons, so a learner can hover a cell or wall
-slot and see why it's a good or bad idea.
+human-readable label, plain-language reasons, and a step-by-step
+"pseudocode" trace of the BFS + scoring calculation, so a learner can
+hover a cell or wall slot and see exactly how the number was produced.
 """
 from __future__ import annotations
 
@@ -24,10 +25,7 @@ def _label_for(gap: float) -> str:
     return "안좋은 수"
 
 
-def _reasons(before: game.GameState, after: game.GameState, player: int, is_wall: bool) -> list[str]:
-    opp = game.other(player)
-    my_before, my_after = game.shortest_path_len(before, player), game.shortest_path_len(after, player)
-    opp_before, opp_after = game.shortest_path_len(before, opp), game.shortest_path_len(after, opp)
+def _reasons(my_before, my_after, opp_before, opp_after, before, after, player, is_wall) -> list[str]:
     reasons = []
 
     if after.winner == player:
@@ -51,29 +49,55 @@ def _reasons(before: game.GameState, after: game.GameState, player: int, is_wall
     return reasons
 
 
+def _trace(action_desc, my_before, my_after, opp_before, opp_after, before, after, player, score) -> list[str]:
+    opp = game.other(player)
+    return [
+        "[ 현재 상태 ]",
+        f"BFS(내 위치={list(before.pawns[player])}, 목표행={game.GOAL_ROW[player]}) = {my_before}칸",
+        f"BFS(상대 위치={list(before.pawns[opp])}, 목표행={game.GOAL_ROW[opp]}) = {opp_before}칸",
+        "",
+        f"[ {action_desc} 이후 ]",
+        f"BFS(내 위치={list(after.pawns[player])}, 목표행={game.GOAL_ROW[player]}) = {my_after}칸",
+        f"BFS(상대 위치={list(after.pawns[opp])}, 목표행={game.GOAL_ROW[opp]}) = {opp_after}칸",
+        "",
+        "score = (상대거리 − 내거리) × 10 + (내 벽 − 상대 벽) × 0.5",
+        f"      = ({opp_after} − {my_after}) × 10"
+        f" + ({after.walls_left[player]} − {after.walls_left[opp]}) × 0.5",
+        f"      = {score:.1f}",
+    ]
+
+
 def analyze_actions(state: game.GameState, player: int) -> list[dict]:
+    opp = game.other(player)
+    my_before = game.shortest_path_len(state, player)
+    opp_before = game.shortest_path_len(state, opp)
+
     entries = []
+
+    def add_entry(kind, payload, nxt, action_desc):
+        my_after = game.shortest_path_len(nxt, player)
+        opp_after = game.shortest_path_len(nxt, opp)
+        score = ai._score(nxt, player)
+        entries.append({
+            "kind": kind,
+            **payload,
+            "score": score,
+            "reasons": _reasons(my_before, my_after, opp_before, opp_after, state, nxt, player, kind == "wall"),
+            "trace": _trace(action_desc, my_before, my_after, opp_before, opp_after, state, nxt, player, score),
+        })
+
     for to in game.legal_pawn_moves(state, player):
         nxt = state.clone()
         game.apply_move(nxt, player, to)
-        entries.append({
-            "kind": "move",
-            "to": list(to),
-            "score": ai._score(nxt, player),
-            "reasons": _reasons(state, nxt, player, is_wall=False),
-        })
+        add_entry("move", {"to": list(to)}, nxt, f"({to[0]}, {to[1]})로 이동")
 
     for r, c, orientation in game.legal_wall_placements(state, player):
         nxt = state.clone()
         game.apply_wall(nxt, player, r, c, orientation)
-        entries.append({
-            "kind": "wall",
-            "r": r,
-            "c": c,
-            "orientation": orientation,
-            "score": ai._score(nxt, player),
-            "reasons": _reasons(state, nxt, player, is_wall=True),
-        })
+        add_entry(
+            "wall", {"r": r, "c": c, "orientation": orientation}, nxt,
+            f"({r}, {c}) {orientation} 벽 설치",
+        )
 
     if not entries:
         return entries

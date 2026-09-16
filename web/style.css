@@ -110,6 +110,37 @@ button:hover { background: #1f5590; }
 }
 #chat-panel.hidden { display: none !important; }
 
+#trace-panel {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  height: 562px;
+  background: #1e1e1e;
+  border: 1px solid #e2d8c5;
+  border-radius: 10px;
+  overflow: hidden;
+}
+#trace-panel.hidden { display: none !important; }
+#trace-title {
+  padding: 10px 14px;
+  font-weight: 600;
+  color: #eee;
+  background: #2a2a2a;
+  border-bottom: 1px solid #3a3a3a;
+}
+#trace-content {
+  flex: 1;
+  margin: 0;
+  padding: 14px;
+  overflow-y: auto;
+  color: #d4f7d4;
+  font-family: "Consolas", "SFMono-Regular", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 #chat-log {
   flex: 1;
   overflow-y: auto;
