@@ -15,7 +15,12 @@
       <input id="join-code" maxlength="6" placeholder="방 코드 입력">
       <button id="btn-join">코드로 참가</button>
     </div>
-    <button id="btn-ai">AI와 대결</button>
+    <div class="ai-row">
+      <span>AI와 대결</span>
+      <button class="btn-ai-diff" data-difficulty="easy">하</button>
+      <button class="btn-ai-diff" data-difficulty="medium">중</button>
+      <button class="btn-ai-diff" data-difficulty="hard">상</button>
+    </div>
     <button id="btn-learn">학습 모드</button>
     <p id="menu-error" class="error"></p>
   </section>
@@ -29,6 +34,7 @@
     <div id="hud">
       <span id="turn-indicator"></span>
       <span id="walls-left"></span>
+      <span id="difficulty-indicator"></span>
     </div>
     <details id="algo-info" class="hidden">
       <summary>🧠 이 평가는 어떻게 계산되나요?</summary>

@@ -21,6 +21,7 @@ def state_message(room, msg_type: str = "state") -> dict:
     payload = room.state.to_dict()
     payload["type"] = msg_type
     payload["mode"] = room.mode
+    payload["difficulty"] = room.difficulty
     if room.state.winner is None:
         payload["legalMoves"] = [list(m) for m in game.legal_pawn_moves(room.state, room.state.turn)]
     else:
@@ -37,7 +38,7 @@ def state_message(room, msg_type: str = "state") -> dict:
 async def maybe_run_ai(room):
     """If it's the AI's turn in an AI/learn room, compute and apply its move."""
     while room.mode in ("ai", "learn") and room.state.winner is None and room.state.turn == 2:
-        action = ai.choose_move(room.state, 2)
+        action = ai.choose_move(room.state, 2, difficulty=room.difficulty)
         if action is None:
             break
         kind, payload = action
@@ -70,8 +71,17 @@ async def websocket_endpoint(ws: WebSocket):
                 await room.broadcast(state_message(room))
 
             elif msg_type == "start_ai_game":
-                room = manager.create_ai_room(ws)
-                await ws.send_json({"type": "room_created", "code": room.code, "player": 1, "mode": "ai"})
+                difficulty = data.get("difficulty")
+                if difficulty not in ai.DIFFICULTIES:
+                    difficulty = ai.DEFAULT_DIFFICULTY
+                room = manager.create_ai_room(ws, difficulty=difficulty)
+                await ws.send_json({
+                    "type": "room_created",
+                    "code": room.code,
+                    "player": 1,
+                    "mode": "ai",
+                    "difficulty": difficulty,
+                })
                 await ws.send_json(state_message(room))
 
             elif msg_type == "start_learn_game":

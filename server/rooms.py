@@ -13,9 +13,10 @@ CODE_ALPHABET = string.ascii_uppercase + string.digits
 
 
 class Room:
-    def __init__(self, code: str, mode: str):
+    def __init__(self, code: str, mode: str, difficulty: str = "medium"):
         self.code = code
         self.mode = mode  # "pvp", "ai", or "learn"
+        self.difficulty = difficulty  # "easy", "medium", or "hard" (ai/learn rooms)
         self.sockets: dict[int, WebSocket] = {}
         self.state = game.GameState()
 
@@ -65,16 +66,16 @@ class RoomManager:
         self.socket_room[ws] = (code, 2)
         return room
 
-    def _create_solo_room(self, ws: WebSocket, mode: str) -> Room:
+    def _create_solo_room(self, ws: WebSocket, mode: str, difficulty: str = "medium") -> Room:
         code = self._new_code()
-        room = Room(code, mode=mode)
+        room = Room(code, mode=mode, difficulty=difficulty)
         room.sockets[1] = ws
         self.rooms[code] = room
         self.socket_room[ws] = (code, 1)
         return room
 
-    def create_ai_room(self, ws: WebSocket) -> Room:
-        return self._create_solo_room(ws, mode="ai")
+    def create_ai_room(self, ws: WebSocket, difficulty: str = "medium") -> Room:
+        return self._create_solo_room(ws, mode="ai", difficulty=difficulty)
 
     def create_learn_room(self, ws: WebSocket) -> Room:
         return self._create_solo_room(ws, mode="learn")

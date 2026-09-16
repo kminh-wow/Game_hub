@@ -9,6 +9,7 @@ const LABEL_CLASS = {
   "괜찮은 수": "eval-ok",
   "안좋은 수": "eval-bad",
 };
+const DIFFICULTY_LABEL = { easy: "하", medium: "중", hard: "상" };
 
 let myPlayer = null;
 let currentState = null;
@@ -190,6 +191,8 @@ function render(state) {
   const turnText = state.turn === myPlayer ? "당신의 차례입니다" : "상대의 차례를 기다리는 중...";
   el("turn-indicator").textContent = state.winner ? "" : turnText;
   el("walls-left").textContent = `남은 벽 — 나: ${state.wallsLeft[myPlayer]} / 상대: ${state.wallsLeft[myPlayer === 1 ? 2 : 1]}`;
+  el("difficulty-indicator").textContent =
+    state.mode === "ai" || state.mode === "learn" ? `난이도: ${DIFFICULTY_LABEL[state.difficulty] || state.difficulty}` : "";
 
   if (state.winner) {
     const won = state.winner === myPlayer;
@@ -282,14 +285,16 @@ el("btn-join").addEventListener("click", async () => {
   }
 });
 
-el("btn-ai").addEventListener("click", async () => {
-  el("menu-error").textContent = "";
-  try {
-    await Net.connect();
-    Net.send({ type: "start_ai_game" });
-  } catch {
-    el("menu-error").textContent = "서버에 연결할 수 없습니다.";
-  }
+document.querySelectorAll(".btn-ai-diff").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    el("menu-error").textContent = "";
+    try {
+      await Net.connect();
+      Net.send({ type: "start_ai_game", difficulty: btn.dataset.difficulty });
+    } catch {
+      el("menu-error").textContent = "서버에 연결할 수 없습니다.";
+    }
+  });
 });
 
 el("btn-learn").addEventListener("click", async () => {
