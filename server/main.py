@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -10,6 +11,8 @@ from .rooms import RoomManager
 
 app = FastAPI()
 manager = RoomManager()
+
+AI_THINK_DELAY_SECONDS = 1
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
@@ -84,8 +87,12 @@ async def websocket_endpoint(ws: WebSocket):
                     await ws.send_json({"type": "error", "message": err})
                     continue
 
-                await maybe_run_ai(room)
                 await room.broadcast(state_message(room))
+
+                if room.mode == "ai" and room.state.winner is None and room.state.turn == 2:
+                    await asyncio.sleep(AI_THINK_DELAY_SECONDS)
+                    await maybe_run_ai(room)
+                    await room.broadcast(state_message(room))
 
             else:
                 await ws.send_json({"type": "error", "message": f"알 수 없는 메시지 타입: {msg_type}"})
