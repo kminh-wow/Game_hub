@@ -53,6 +53,33 @@
       </p>
     </details>
     <div id="game-layout">
+      <div id="pseudocode-panel" class="hidden">
+        <div class="panel-title">알고리즘 원형</div>
+        <pre id="pseudocode-content"># 1) 후보 수 하나를 평가한다
+evaluate(state, action, player):
+    next = apply(state, action)
+    opp  = other(player)
+
+    my_dist  = BFS(next, player → player의 목표행)
+    opp_dist = BFS(next, opp → opp의 목표행)
+
+    score  = (opp_dist - my_dist) * 10
+    score += next.walls_left[player] * 0.5
+    score -= next.walls_left[opp]    * 0.5
+    return score
+
+# 2) 이번 턴 가능한 모든 수를 평가해서
+#    라벨을 매긴다
+actions = 가능한 모든 이동 + 벽 배치
+best = max(evaluate(a) for a in actions)
+
+for a in actions:
+    gap = best - evaluate(a)
+    if   gap <= 0.01: label = "최선의 수"
+    elif gap <= 9:    label = "좋은 수"
+    elif gap <= 19:   label = "괜찮은 수"
+    else:             label = "안좋은 수"</pre>
+      </div>
       <div id="board-wrap"></div>
       <div id="chat-panel">
         <div id="chat-log"></div>
@@ -62,7 +89,7 @@
         </div>
       </div>
       <div id="trace-panel" class="hidden">
-        <div id="trace-title">계산 과정</div>
+        <div class="panel-title">계산 과정</div>
         <pre id="trace-content">칸이나 벽에 마우스를 올려보세요</pre>
       </div>
     </div>

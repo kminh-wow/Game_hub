@@ -140,6 +140,25 @@ function buildBoardSkeleton() {
     wrap.appendChild(pawn);
     pawnEls[p] = pawn;
   }
+
+  const coordLabels = document.createElement("div");
+  coordLabels.id = "coord-labels";
+  coordLabels.classList.add("hidden");
+  for (let c = 0; c < 9; c++) {
+    const lbl = document.createElement("div");
+    lbl.className = "coord-label col-label";
+    lbl.textContent = c;
+    lbl.style.left = `${c * (CELL + GAP) + CELL / 2}px`;
+    coordLabels.appendChild(lbl);
+  }
+  for (let r = 0; r < 9; r++) {
+    const lbl = document.createElement("div");
+    lbl.className = "coord-label row-label";
+    lbl.textContent = r;
+    lbl.style.top = `${r * (CELL + GAP) + CELL / 2}px`;
+    coordLabels.appendChild(lbl);
+  }
+  wrap.appendChild(coordLabels);
 }
 
 function positionPawn(p, r, c) {
@@ -163,6 +182,8 @@ function render(state) {
   el("chat-panel").classList.toggle("hidden", state.mode !== "pvp");
   el("algo-info").classList.toggle("hidden", state.mode !== "learn");
   el("trace-panel").classList.toggle("hidden", state.mode !== "learn");
+  el("pseudocode-panel").classList.toggle("hidden", state.mode !== "learn");
+  el("coord-labels").classList.toggle("hidden", state.mode !== "learn");
   if (state.mode !== "learn" || state.turn !== myPlayer) {
     hideTip();
     resetTrace();
