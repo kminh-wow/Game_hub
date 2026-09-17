@@ -1,18 +1,11 @@
-# Reverse proxy example for putting Quoridor behind nginx with TLS (wss://).
-# Get a certificate first, e.g. via: sudo certbot --nginx -d your-domain.com
+# Reverse proxy for putting Quoridor on port 80 (no domain needed —
+# this is what's actually deployed: /etc/nginx/sites-available/default).
+# Requires uvicorn already running on 127.0.0.1:8000.
 
 server {
-    listen 80;
-    server_name your-domain.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    server_name your-domain.com;
-
-    ssl_certificate     /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -23,3 +16,22 @@ server {
         proxy_read_timeout 3600s;
     }
 }
+
+# --- Optional upgrade path: once you have a real domain, add HTTPS (wss://)
+# with certbot instead of the plain-HTTP block above:
+#   sudo certbot --nginx -d your-domain.com
+# which rewrites this file into something like:
+#
+# server {
+#     listen 80;
+#     server_name your-domain.com;
+#     return 301 https://$host$request_uri;
+# }
+#
+# server {
+#     listen 443 ssl;
+#     server_name your-domain.com;
+#     ssl_certificate     /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+#     location / { proxy_pass http://127.0.0.1:8000; ... same proxy headers as above ... }
+# }

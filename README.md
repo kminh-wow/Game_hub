@@ -34,8 +34,8 @@ uvicorn server.main:app --reload
    sudo systemctl enable --now quoridor
    ```
    (파일 안의 `User`/`WorkingDirectory`/venv 경로를 실제 배포 경로에 맞게 수정)
-4. 보안 그룹에서 8000번 포트(또는 nginx를 쓸 경우 80/443)를 열어준다.
-5. 도메인과 HTTPS(wss)가 필요하면 `deploy/nginx.conf.example`을 참고해 nginx 리버스 프록시 + Let's Encrypt(certbot)를 구성한다.
+4. 보안 그룹에서 8000번 포트(또는 nginx를 쓸 경우 80)를 열어준다.
+5. 포트 번호 없이 IP만으로 접속되게 하려면 `deploy/nginx.conf.example`을 `/etc/nginx/sites-available/default`에 적용해 80번 포트를 8000번으로 리버스 프록시한다. 도메인/HTTPS(wss)가 필요해지면 그 파일 하단 주석의 certbot 절차를 따른다.
 
 ## 프로젝트 구조
 
