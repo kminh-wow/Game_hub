@@ -221,7 +221,7 @@ button:hover { background: #1f5590; }
   border-radius: 4px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
-.cell.movable { cursor: pointer; box-shadow: inset 0 0 0 3px #22d3ee; }
+.cell.movable { cursor: pointer; box-shadow: inset 0 0 0 3px #38a169; }
 .cell.movable.eval-best { box-shadow: inset 0 0 0 3px var(--eval-best); }
 .cell.movable.eval-good { box-shadow: inset 0 0 0 3px var(--eval-good); }
 .cell.movable.eval-ok { box-shadow: inset 0 0 0 3px var(--eval-ok); }
