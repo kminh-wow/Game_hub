@@ -108,24 +108,22 @@ function buildBoardSkeleton() {
     vWallEls.push([]);
     for (let c = 0; c < 8; c++) {
       const h = document.createElement("div");
-      h.className = "wall-slot h-wall";
+      h.className = "wall-slot";
       h.style.left = `${c * (CELL + GAP)}px`;
       h.style.top = `${r * (CELL + GAP) + CELL}px`;
       h.style.width = `${2 * CELL + GAP}px`;
       h.style.height = `${GAP}px`;
-      h.appendChild(makeWallTexture());
       h.addEventListener("click", () => handleWallClick(r, c, "H"));
       attachHoverAnalysis(h, () => wallAnalysis.get(`${r},${c},H`));
       wrap.appendChild(h);
       hWallEls[r].push(h);
 
       const v = document.createElement("div");
-      v.className = "wall-slot v-wall";
+      v.className = "wall-slot";
       v.style.left = `${c * (CELL + GAP) + CELL}px`;
       v.style.top = `${r * (CELL + GAP)}px`;
       v.style.width = `${GAP}px`;
       v.style.height = `${2 * CELL + GAP}px`;
-      v.appendChild(makeWallTexture());
       v.addEventListener("click", () => handleWallClick(r, c, "V"));
       attachHoverAnalysis(v, () => wallAnalysis.get(`${r},${c},V`));
       wrap.appendChild(v);
@@ -137,8 +135,8 @@ function buildBoardSkeleton() {
   for (const p of [1, 2]) {
     const pawn = document.createElement("div");
     pawn.className = `pawn p${p}`;
-    pawn.style.width = `${CELL * 0.8}px`;
-    pawn.style.height = `${CELL * 0.8}px`;
+    pawn.style.width = `${CELL * 0.6}px`;
+    pawn.style.height = `${CELL * 0.6}px`;
     wrap.appendChild(pawn);
     pawnEls[p] = pawn;
   }
@@ -163,17 +161,9 @@ function buildBoardSkeleton() {
   wrap.appendChild(coordLabels);
 }
 
-function makeWallTexture() {
-  const tex = document.createElement("div");
-  tex.className = "wall-texture";
-  tex.style.width = `${2 * CELL + GAP}px`;
-  tex.style.height = `${GAP}px`;
-  return tex;
-}
-
 function positionPawn(p, r, c) {
   const pawn = pawnEls[p];
-  const size = CELL * 0.8;
+  const size = CELL * 0.6;
   pawn.style.left = `${c * (CELL + GAP) + (CELL - size) / 2}px`;
   pawn.style.top = `${r * (CELL + GAP) + (CELL - size) / 2}px`;
 }

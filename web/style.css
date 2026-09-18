@@ -93,7 +93,7 @@ button:hover { background: #1f5590; }
 
 #board-wrap {
   position: relative;
-  background: var(--board-bg) url('assets/quoridor-board-512.png') center/cover no-repeat;
+  background: var(--board-bg);
   padding: 12px;
   border-radius: 10px;
   margin: 22px 0 0 22px;
@@ -217,9 +217,8 @@ button:hover { background: #1f5590; }
 
 .cell {
   position: absolute;
-  background: var(--cell-bg) url('assets/quoridor-cell-512.png') center/cover no-repeat;
+  background: var(--cell-bg);
   border-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 .cell.movable { cursor: pointer; box-shadow: inset 0 0 0 3px #38a169; }
 .cell.movable.eval-best { box-shadow: inset 0 0 0 3px var(--eval-best); }
@@ -236,20 +235,9 @@ button:hover { background: #1f5590; }
 }
 .wall-slot:hover { background: var(--wall-slot-hover); }
 .wall-slot.placed {
-  background: transparent;
+  background: var(--wall-placed);
   cursor: default;
 }
-.wall-texture {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  background: url('assets/quoridor-wall-512.png') center/cover no-repeat;
-  opacity: 0;
-  pointer-events: none;
-}
-.wall-slot.placed .wall-texture { opacity: 1; }
-.wall-slot.h-wall .wall-texture { transform: translate(-50%, -50%); }
-.wall-slot.v-wall .wall-texture { transform: translate(-50%, -50%) rotate(90deg); }
 .wall-slot.disabled { pointer-events: none; background: transparent; }
 .wall-slot.eval-best { background: color-mix(in srgb, var(--eval-best) 55%, transparent); }
 .wall-slot.eval-good { background: color-mix(in srgb, var(--eval-good) 55%, transparent); }
@@ -262,13 +250,12 @@ button:hover { background: #1f5590; }
 
 .pawn {
   position: absolute;
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
   transition: left 0.25s ease, top 0.25s ease;
 }
-.pawn.p1 { background-image: url('assets/quoridor-pawn-blue-512.png'); }
-.pawn.p2 { background-image: url('assets/quoridor-pawn-red-512.png'); }
+.pawn.p1 { background: var(--pawn1); }
+.pawn.p2 { background: var(--pawn2); }
 
 #result-modal {
   position: fixed;
