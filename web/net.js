@@ -1,9 +1,12 @@
 const Net = (() => {
   let ws = null;
+  let connecting = null;
   const handlers = {};
 
   function connect() {
-    return new Promise((resolve, reject) => {
+    if (ws?.readyState === WebSocket.OPEN) return Promise.resolve();
+    if (connecting) return connecting;
+    connecting = new Promise((resolve, reject) => {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}/ws`);
       ws.onopen = () => resolve();
@@ -14,10 +17,12 @@ const Net = (() => {
         if (fn) fn(msg);
       };
       ws.onclose = () => {
+        reject(new Error('Connection closed'));
         const fn = handlers["disconnected"];
         if (fn) fn();
       };
-    });
+    }).finally(() => { connecting = null; });
+    return connecting;
   }
 
   function on(type, fn) {

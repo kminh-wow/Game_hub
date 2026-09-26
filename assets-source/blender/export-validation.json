@@ -1,0 +1,33 @@
+{
+  "board_base": {
+    "bytes": 40460,
+    "meshes": 1,
+    "skins": 0,
+    "animations": []
+  },
+  "tile": {
+    "bytes": 14652,
+    "meshes": 1,
+    "skins": 0,
+    "animations": []
+  },
+  "wall": {
+    "bytes": 40876,
+    "meshes": 1,
+    "skins": 0,
+    "animations": []
+  },
+  "pawn": {
+    "bytes": 321560,
+    "meshes": 1,
+    "skins": 1,
+    "animations": [
+      "Idle",
+      "Jump",
+      "Lose",
+      "PlaceWall",
+      "Walk",
+      "Win"
+    ]
+  }
+}

@@ -80,7 +80,18 @@ for a in actions:
     elif gap <= 19:   label = "괜찮은 수"
     else:             label = "안좋은 수"</pre>
       </div>
-      <div id="board-wrap"></div>
+      <div id="board-panel">
+        <div id="board-controls" aria-label="보드 조작">
+          <button id="mode-move" aria-pressed="true">말 이동</button>
+          <button id="mode-wall" aria-pressed="false">벽 설치</button>
+          <button id="rotate-wall" disabled>가로 ↔ 세로 (R)</button>
+          <button id="reset-camera">시점 초기화</button>
+        </div>
+        <p id="board-help">빛나는 칸을 누르면 이동합니다. 빨강: 1P · 파랑: 2P</p>
+        <p>드래그: 회전 · 휠/두 손가락: 확대·축소</p>
+        <div id="board-wrap" aria-label="3D 코리도 보드"></div>
+        <p id="board-status" role="status">3D 모델을 불러오는 중...</p>
+      </div>
       <div id="chat-panel">
         <div id="chat-log"></div>
         <div class="chat-input-row">
@@ -106,6 +117,9 @@ for a in actions:
   </div>
 
   <script src="net.js"></script>
-  <script src="board.js"></script>
+  <script type="importmap">
+    {"imports":{"three":"./vendor/three/build/three.module.js","three/addons/":"./vendor/three/examples/jsm/"}}
+  </script>
+  <script type="module" src="board.js"></script>
 </body>
 </html>
