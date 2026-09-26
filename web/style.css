@@ -293,3 +293,24 @@ button:hover { background: #1f5590; }
 #hover-tip.eval-good .tip-label { color: #9ae6b4; }
 #hover-tip.eval-ok .tip-label { color: #f6e05e; }
 #hover-tip.eval-bad .tip-label { color: #feb2b2; }
+
+body { margin: 0; background: #eef3f1; color: #193c42; padding: 20px; }
+#game { width: 100%; }
+#hud { flex-wrap: wrap; justify-content: center; gap: 12px; }
+#game-layout { width: 100%; }
+#board-panel { width: min(820px, 100%); min-width: 0; }
+#board-wrap { width: 100%; height: min(68vw, 650px); min-height: 320px; margin: 0; padding: 0; overflow: hidden; background: #e8efed; border: 1px solid #ceded8; border-radius: 18px; }
+#board-wrap canvas { display: block; width: 100%; height: 100%; touch-action: manipulation; }
+#board-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+#board-controls button { background: #57716f; }
+#board-controls button[aria-pressed="true"] { background: #087e70; box-shadow: 0 0 0 2px #56ceaf; }
+button:disabled { opacity: .5; cursor: default; }
+#board-help, #board-status { font-size: 13px; color: #46635f; }
+#result-modal { z-index: 100; }
+@media (max-width: 600px) {
+  body { padding: 12px; }
+  #board-wrap { height: 105vw; min-height: 340px; }
+  #hud { font-size: 14px; }
+  #chat-panel, #trace-panel, #pseudocode-panel { width: 100%; height: 260px; }
+  #board-panel { order: -1; }
+}

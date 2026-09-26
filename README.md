@@ -6,8 +6,12 @@ FastAPI(WebSocket) + 순수 HTML/CSS/JS로 만든 Quoridor 웹 게임.
 
 ## 로컬 실행
 
+3D 화면은 `web/assets/models/`의 Blender GLB와 `web/vendor/three/`의 Three.js 0.180.0을 사용한다. 런타임 CDN 연결은 필요 없다. 말 이동 모드에서 초록 칸을 클릭하고, 벽 설치 모드에서 위치를 클릭한다. `R` 또는 방향 버튼으로 벽을 회전한다. 서버가 승인한 행동에 걷기·점프·벽 설치·승패 애니메이션이 연결되어 있다.
+
+Three.js 파일을 다시 준비할 때만 `npm ci`와 `npm run vendor`를 실행한다. 배포할 때 `web/vendor/`와 `web/assets/`도 포함한다.
+
 ```bash
-cd game-project
+cd quo
 python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -r server/requirements.txt
@@ -15,6 +19,12 @@ uvicorn server.main:app --reload
 ```
 
 브라우저에서 `http://127.0.0.1:8000` 접속. 온라인 대전을 테스트하려면 브라우저 탭 두 개를 열어 한쪽은 "새 게임 만들기", 다른 쪽은 발급된 코드로 "코드로 참가"를 누르면 된다.
+
+### 3D 연결 검증 (2026-09-26)
+
+브라우저에서 GLB 로딩, 이동 클릭, 중복 입력 차단, 걷기·점프 상태 큐, 벽 설치 성공/거절, 학습 표시, 모바일 레이아웃, 승리 동작과 결과 창을 모의 서버 메시지로 검증했다. 실제 FastAPI 서버의 AI·온라인 대전 통합 테스트는 서버 의존성 설치가 승인되지 않아 미실행이다.
+
+화면 테스트는 `node tools/preview.mjs`로 정적 서버를 띄우고 Playwright가 설치된 환경에서 `node tools/test-3d.cjs`로 실행한다. 필요하면 `PLAYWRIGHT_MODULE` 환경 변수에 Playwright 패키지 경로를 지정한다. 정적 미리보기 서버에는 게임 서버가 없으므로 실제 플레이는 위 Uvicorn 명령으로 실행해야 한다.
 
 ## 게임 규칙 요약
 

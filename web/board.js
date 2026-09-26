@@ -1,8 +1,5 @@
-const CELL = 50;
-const GAP = 14;
-const BOARD_PX = 9 * CELL + 8 * GAP;
+import { Board3D } from './board3d.js';
 
-const EVAL_CLASSES = ["eval-best", "eval-good", "eval-ok", "eval-bad"];
 const LABEL_CLASS = {
   "최선의 수": "eval-best",
   "좋은 수": "eval-good",
@@ -13,12 +10,12 @@ const DIFFICULTY_LABEL = { easy: "하", medium: "중", hard: "상" };
 
 let myPlayer = null;
 let currentState = null;
-let cellEls = [];
-let hWallEls = [];
-let vWallEls = [];
-let pawnEls = {};
-let moveAnalysis = new Map();
-let wallAnalysis = new Map();
+let board;
+let pending = false;
+let processing = false;
+let session = 0;
+let queue = [];
+let orientation = "H";
 
 const el = (id) => document.getElementById(id);
 
@@ -53,119 +50,34 @@ function resetTrace() {
   el("trace-content").textContent = "칸이나 벽에 마우스를 올려보세요";
 }
 
-function attachHoverAnalysis(node, getEntry) {
-  node.addEventListener("mouseenter", (e) => {
-    if (!currentState || currentState.turn !== myPlayer) return;
-    const entry = getEntry();
-    showTip(entry, e.clientX, e.clientY);
-    showTrace(entry);
-  });
-  node.addEventListener("mousemove", (e) => {
-    const tip = el("hover-tip");
-    if (tip.classList.contains("hidden")) return;
-    tip.style.left = `${e.clientX + 14}px`;
-    tip.style.top = `${e.clientY + 14}px`;
-  });
-  node.addEventListener("mouseleave", () => {
-    hideTip();
-    resetTrace();
-  });
-}
-
 function showScreen(name) {
   ["menu", "waiting", "game"].forEach((s) => el(s).classList.toggle("hidden", s !== name));
   if (name !== "game") el("result-modal").classList.add("hidden");
 }
 
-function buildBoardSkeleton() {
-  const wrap = el("board-wrap");
-  wrap.style.width = `${BOARD_PX}px`;
-  wrap.style.height = `${BOARD_PX}px`;
-  wrap.innerHTML = "";
-  cellEls = [];
-  hWallEls = [];
-  vWallEls = [];
-  el("chat-log").innerHTML = "";
-
-  for (let r = 0; r < 9; r++) {
-    cellEls.push([]);
-    for (let c = 0; c < 9; c++) {
-      const cell = document.createElement("div");
-      cell.className = "cell";
-      cell.style.left = `${c * (CELL + GAP)}px`;
-      cell.style.top = `${r * (CELL + GAP)}px`;
-      cell.style.width = `${CELL}px`;
-      cell.style.height = `${CELL}px`;
-      cell.addEventListener("click", () => handleCellClick(r, c));
-      attachHoverAnalysis(cell, () => moveAnalysis.get(`${r},${c}`));
-      wrap.appendChild(cell);
-      cellEls[r].push(cell);
-    }
-  }
-
-  for (let r = 0; r < 8; r++) {
-    hWallEls.push([]);
-    vWallEls.push([]);
-    for (let c = 0; c < 8; c++) {
-      const h = document.createElement("div");
-      h.className = "wall-slot";
-      h.style.left = `${c * (CELL + GAP)}px`;
-      h.style.top = `${r * (CELL + GAP) + CELL}px`;
-      h.style.width = `${2 * CELL + GAP}px`;
-      h.style.height = `${GAP}px`;
-      h.addEventListener("click", () => handleWallClick(r, c, "H"));
-      attachHoverAnalysis(h, () => wallAnalysis.get(`${r},${c},H`));
-      wrap.appendChild(h);
-      hWallEls[r].push(h);
-
-      const v = document.createElement("div");
-      v.className = "wall-slot";
-      v.style.left = `${c * (CELL + GAP) + CELL}px`;
-      v.style.top = `${r * (CELL + GAP)}px`;
-      v.style.width = `${GAP}px`;
-      v.style.height = `${2 * CELL + GAP}px`;
-      v.addEventListener("click", () => handleWallClick(r, c, "V"));
-      attachHoverAnalysis(v, () => wallAnalysis.get(`${r},${c},V`));
-      wrap.appendChild(v);
-      vWallEls[r].push(v);
-    }
-  }
-
-  pawnEls = {};
-  for (const p of [1, 2]) {
-    const pawn = document.createElement("div");
-    pawn.className = `pawn p${p}`;
-    pawn.style.width = `${CELL * 0.6}px`;
-    pawn.style.height = `${CELL * 0.6}px`;
-    wrap.appendChild(pawn);
-    pawnEls[p] = pawn;
-  }
-
-  const coordLabels = document.createElement("div");
-  coordLabels.id = "coord-labels";
-  coordLabels.classList.add("hidden");
-  for (let c = 0; c < 9; c++) {
-    const lbl = document.createElement("div");
-    lbl.className = "coord-label col-label";
-    lbl.textContent = c;
-    lbl.style.left = `${c * (CELL + GAP) + CELL / 2}px`;
-    coordLabels.appendChild(lbl);
-  }
-  for (let r = 0; r < 9; r++) {
-    const lbl = document.createElement("div");
-    lbl.className = "coord-label row-label";
-    lbl.textContent = r;
-    lbl.style.top = `${r * (CELL + GAP) + CELL / 2}px`;
-    coordLabels.appendChild(lbl);
-  }
-  wrap.appendChild(coordLabels);
+function updateInput() {
+  board?.setInteractive(!pending && !processing && currentState?.turn === myPlayer && !currentState?.winner);
 }
 
-function positionPawn(p, r, c) {
-  const pawn = pawnEls[p];
-  const size = CELL * 0.6;
-  pawn.style.left = `${c * (CELL + GAP) + (CELL - size) / 2}px`;
-  pawn.style.top = `${r * (CELL + GAP) + (CELL - size) / 2}px`;
+async function consumeStates() {
+  if (processing) return;
+  processing = true; updateInput();
+  const token = session;
+  try {
+    await board.ready;
+    while (queue.length && token === session) {
+      const state = queue.shift();
+      await board.apply(state, myPlayer);
+      if (token !== session) return;
+      render(state);
+    }
+  } catch (error) {
+    console.error(error);
+    el('board-status').textContent = '3D 화면을 불러오지 못했습니다. 새로고침해 다시 시도하세요.';
+    queue = [];
+  } finally {
+    if (token === session) { processing = false; updateInput(); }
+  }
 }
 
 function appendChatMessage(kind, text) {
@@ -183,50 +95,7 @@ function render(state) {
   el("algo-info").classList.toggle("hidden", state.mode !== "learn");
   el("trace-panel").classList.toggle("hidden", state.mode !== "learn");
   el("pseudocode-panel").classList.toggle("hidden", state.mode !== "learn");
-  el("coord-labels").classList.toggle("hidden", state.mode !== "learn");
-  if (state.mode !== "learn" || state.turn !== myPlayer) {
-    hideTip();
-    resetTrace();
-  }
-
-  for (const p of [1, 2]) {
-    const [r, c] = state.pawns[String(p)];
-    positionPawn(p, r, c);
-  }
-
-  moveAnalysis = new Map();
-  wallAnalysis = new Map();
-
-  for (let r = 0; r < 9; r++) {
-    for (let c = 0; c < 9; c++) cellEls[r][c].classList.remove("movable", ...EVAL_CLASSES);
-  }
-  if (state.turn === myPlayer) {
-    for (const [r, c] of state.legalMoves) cellEls[r][c].classList.add("movable");
-  }
-
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
-      hWallEls[r][c].classList.remove("placed", ...EVAL_CLASSES);
-      vWallEls[r][c].classList.remove("placed", ...EVAL_CLASSES);
-    }
-  }
-  for (const w of state.walls) {
-    const target = w.orientation === "H" ? hWallEls[w.r][w.c] : vWallEls[w.r][w.c];
-    target.classList.add("placed");
-  }
-
-  for (const entry of state.analysis || []) {
-    const cls = LABEL_CLASS[entry.label];
-    if (entry.kind === "move") {
-      moveAnalysis.set(`${entry.to[0]},${entry.to[1]}`, entry);
-      cellEls[entry.to[0]][entry.to[1]].classList.add(cls);
-    } else {
-      wallAnalysis.set(`${entry.r},${entry.c},${entry.orientation}`, entry);
-      const target = entry.orientation === "H" ? hWallEls[entry.r][entry.c] : vWallEls[entry.r][entry.c];
-      target.classList.add(cls);
-    }
-  }
-
+  hideTip(); resetTrace();
   const turnText = state.turn === myPlayer ? "당신의 차례입니다" : "상대의 차례를 기다리는 중...";
   el("turn-indicator").textContent = state.winner ? "" : turnText;
   el("walls-left").textContent = `남은 벽 — 나: ${state.wallsLeft[myPlayer]} / 상대: ${state.wallsLeft[myPlayer === 1 ? 2 : 1]}`;
@@ -241,20 +110,23 @@ function render(state) {
 }
 
 function handleCellClick(r, c) {
-  if (!currentState || currentState.turn !== myPlayer || currentState.winner) return;
+  if (!currentState || pending || processing || currentState.turn !== myPlayer || currentState.winner) return;
   const isLegal = currentState.legalMoves.some(([lr, lc]) => lr === r && lc === c);
   if (!isLegal) return;
   el("game-error").textContent = "";
+  pending = true; updateInput();
   Net.send({ type: "move", to: [r, c] });
 }
 
 function handleWallClick(r, c, orientation) {
-  if (!currentState || currentState.turn !== myPlayer || currentState.winner) return;
+  if (!currentState || pending || processing || currentState.turn !== myPlayer || currentState.winner) return;
   el("game-error").textContent = "";
+  pending = true; updateInput();
   Net.send({ type: "place_wall", r, c, orientation });
 }
 
 function resetToMenu() {
+  session++; queue = []; pending = false; processing = false; board?.reset();
   myPlayer = null;
   currentState = null;
   el("menu-error").textContent = "";
@@ -278,12 +150,14 @@ Net.on("joined", (msg) => {
 });
 
 Net.on("state", (msg) => {
-  if (!cellEls.length) buildBoardSkeleton();
+  pending = false;
   showScreen("game");
-  render(msg);
+  queue.push(msg);
+  consumeStates();
 });
 
 Net.on("error", (msg) => {
+  pending = false; updateInput();
   const target = el("game").classList.contains("hidden") ? "menu-error" : "game-error";
   el(target).textContent = msg.message;
 });
@@ -365,3 +239,32 @@ el("chat-input").addEventListener("keydown", (e) => {
 });
 
 showScreen("menu");
+
+function setMode(mode) {
+  board.setMode(mode, orientation);
+  el('mode-move').setAttribute('aria-pressed', mode === 'move');
+  el('mode-wall').setAttribute('aria-pressed', mode === 'wall');
+  el('rotate-wall').disabled = mode !== 'wall';
+  el('board-help').textContent = mode === 'move' ? '빛나는 칸을 누르면 이동합니다. 빨강: 1P · 파랑: 2P' : '설치할 위치를 누르세요. R 또는 방향 버튼으로 회전합니다. 설치 가능 여부는 서버가 확인합니다.';
+}
+function rotateWall() {
+  if (board.mode !== 'wall') return;
+  orientation = orientation === 'H' ? 'V' : 'H'; board.setMode('wall', orientation);
+  el('rotate-wall').textContent = (orientation === 'H' ? '가로' : '세로') + ' ↔ 전환 (R)';
+}
+try {
+  board = new Board3D(el('board-wrap'), {
+    move: handleCellClick, wall: handleWallClick,
+    hover: (entry, x, y) => { hideTip(); resetTrace(); if (entry) { showTip(entry, x, y); showTrace(entry); } }
+  });
+  board.ready.then(() => { el('board-status').textContent = '3D 준비 완료'; }).catch(error => {
+    console.error(error); el('board-status').textContent = '모델을 불러오지 못했습니다. 새로고침해 다시 시도하세요.';
+  });
+  el('mode-move').onclick = () => setMode('move'); el('mode-wall').onclick = () => setMode('wall');
+  el('rotate-wall').onclick = rotateWall;
+  el('reset-camera').onclick = () => board.resetCamera();
+  document.addEventListener('keydown', e => { if (e.key.toLowerCase() === 'r' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) rotateWall(); });
+} catch (error) {
+  console.error(error); el('menu-error').textContent = '3D 그래픽을 시작하지 못했습니다. WebGL을 지원하는 브라우저를 사용하세요.';
+  document.querySelectorAll('#menu button').forEach(b => b.disabled = true);
+}
