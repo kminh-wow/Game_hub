@@ -20,6 +20,27 @@ uvicorn app.main:app --reload
 pytest
 ```
 
+## 서버 배포 (EC2 등 Linux)
+
+Amazon Linux와 Ubuntu에서 동작합니다. systemd 서비스로 등록되므로 SSH 접속을 끊어도 계속 실행되고, 재부팅하면 자동으로 다시 시작합니다.
+
+```bash
+git clone https://github.com/kminh-wow/word-chain-online.git
+cd word-chain-online
+bash deploy/setup.sh              # 기본 80번 포트. 다른 포트를 쓰려면: PORT=8000 bash deploy/setup.sh
+```
+
+전체 사전은 git에 없으므로 내 PC에서 따로 올리고 서버를 재시작합니다.
+
+```bash
+scp -i 키.pem data/words.txt <user>@<서버IP>:~/word-chain-online/data/
+ssh -i 키.pem <user>@<서버IP> sudo systemctl restart word-chain-online
+```
+
+- 코드 업데이트: `bash deploy/update.sh` (git pull 후 재시작)
+- 로그 보기: `sudo journalctl -u word-chain-online -f`
+- 게임 상태가 메모리에 있으므로 **워커는 1개로만** 실행합니다. 재시작하면 진행 중인 방은 모두 사라집니다.
+
 ## 게임 규칙
 
 - 방장이 방을 만들고, 나머지 참가자가 모두 **준비**하면 방장이 게임을 시작합니다. 2~8명이 참가할 수 있습니다.
