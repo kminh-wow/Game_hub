@@ -36,7 +36,8 @@ def dictionary_paths() -> list[Path]:
 dictionary = Dictionary.load(*dictionary_paths())
 server = GameServer(dictionary)
 
-app = FastAPI(title="Word Chain Online")
+# 게임 화면 외의 자동 문서 페이지(/docs, /redoc, /openapi.json)는 노출하지 않는다.
+app = FastAPI(title="Word Chain Online", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
