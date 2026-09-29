@@ -64,12 +64,13 @@ class Dictionary:
         self._start_words = sorted(short or playable or self.words)
 
     @classmethod
-    def load(cls, path: Path) -> Dictionary:
-        """한 줄에 한 단어(공백 구분도 허용). '#' 뒤는 주석."""
+    def load(cls, *paths: Path) -> Dictionary:
+        """한 줄에 한 단어(공백 구분도 허용). '#' 뒤는 주석. 여러 파일은 합친다."""
         words: list[str] = []
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                words.extend(line.split("#", 1)[0].split())
+        for path in paths:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    words.extend(line.split("#", 1)[0].split())
         return cls(words)
 
     def __len__(self) -> int:
