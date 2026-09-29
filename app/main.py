@@ -25,7 +25,15 @@ def resolve_words_path() -> Path:
     return full if full.exists() else DATA_DIR / "sample_words.txt"
 
 
-dictionary = Dictionary.load(resolve_words_path())
+def dictionary_paths() -> list[Path]:
+    paths = [resolve_words_path()]
+    extra = DATA_DIR / "extra_words.txt"
+    if extra.exists():
+        paths.append(extra)
+    return paths
+
+
+dictionary = Dictionary.load(*dictionary_paths())
 server = GameServer(dictionary)
 
 app = FastAPI(title="Word Chain Online")
