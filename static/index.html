@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>끝말잇기 온라인</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- 로그인 -->
+  <section id="screen-login" class="screen">
+    <div class="login-card">
+      <h1>끝말잇기 <span>온라인</span></h1>
+      <p class="muted">친구들과 실시간으로 단어를 이어 보세요</p>
+      <form id="login-form">
+        <input id="login-name" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="off" required>
+        <button type="submit">입장</button>
+      </form>
+      <p id="login-error" class="error"></p>
+    </div>
+  </section>
+
+  <!-- 로비 -->
+  <section id="screen-lobby" class="screen hidden">
+    <header class="topbar">
+      <h2>로비</h2>
+      <span class="muted">접속: <b id="me-name"></b> · 사전 <span id="word-count"></span>단어</span>
+    </header>
+    <div class="layout">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h3>방 목록</h3>
+          <button id="btn-open-create">방 만들기</button>
+        </div>
+        <form id="create-form" class="create-form hidden">
+          <input id="create-title" maxlength="30" placeholder="방 제목" autocomplete="off">
+          <label>인원
+            <select id="create-max">
+              <option>2</option><option>3</option><option selected>4</option>
+              <option>5</option><option>6</option><option>7</option><option>8</option>
+            </select>
+          </label>
+          <button type="submit">만들기</button>
+          <button type="button" id="btn-cancel-create" class="ghost">취소</button>
+        </form>
+        <ul id="room-list" class="room-list"></ul>
+      </div>
+      <div class="panel side">
+        <h3>접속자 <span id="user-count" class="muted"></span></h3>
+        <ul id="user-list" class="user-list"></ul>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="lobby-chat-log" class="chat-log"></ul>
+      <form id="lobby-chat-form" class="chat-form">
+        <input id="lobby-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 방 -->
+  <section id="screen-room" class="screen hidden">
+    <header class="topbar">
+      <h2 id="room-title"></h2>
+      <span id="room-info" class="muted"></span>
+      <button id="btn-leave" class="ghost">나가기</button>
+    </header>
+    <div class="layout">
+      <div class="panel side">
+        <h3>참가자</h3>
+        <ul id="player-list" class="player-list"></ul>
+      </div>
+
+      <div class="panel grow">
+        <!-- 대기 화면 -->
+        <div id="waiting-view">
+          <h3>게임 설정</h3>
+          <form id="settings-form" class="settings">
+            <label>라운드 <input type="number" name="rounds" min="1" max="10"></label>
+            <label>턴 시간(초) <input type="number" name="turn_time" min="5" max="30"></label>
+            <label>라운드 시간(초) <input type="number" name="round_time" min="30" max="300" step="10"></label>
+            <label>최대 인원 <input type="number" name="max_players" min="2" max="8"></label>
+            <label class="check"><input type="checkbox" name="no_killer"> 한방단어 금지</label>
+          </form>
+          <p id="settings-note" class="muted"></p>
+          <button id="btn-ready" class="big"></button>
+        </div>
+
+        <!-- 게임 화면 -->
+        <div id="game-view" class="hidden">
+          <div class="game-top">
+            <span id="round-info"></span>
+            <span id="turn-info"></span>
+          </div>
+          <div class="word-stage">
+            <div id="last-word" class="last-word"></div>
+            <div class="need"><span class="muted">다음 글자</span> <b id="need-chars"></b></div>
+          </div>
+          <div class="bar-row"><span>턴</span><div class="bar"><div id="turn-bar"></div></div><span id="turn-sec"></span></div>
+          <div class="bar-row"><span>라운드</span><div class="bar"><div id="round-bar" class="round"></div></div><span id="round-sec"></span></div>
+          <p id="game-status" class="game-status"></p>
+          <ol id="chain-list" class="chain-list"></ol>
+        </div>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="room-chat-log" class="chat-log"></ul>
+      <form id="room-chat-form" class="chat-form">
+        <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 결과 -->
+  <div id="result-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3>게임 결과</h3>
+      <ol id="result-list" class="result-list"></ol>
+      <button id="btn-close-result">확인</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
