@@ -112,12 +112,14 @@ wordchain/
 
 ### 사전 불러오기
 
-서버는 메인 사전과 보충 사전을 합쳐서 불러옵니다.
+서버는 메인 사전, 끄투 단어, 보충 사전을 합쳐서 불러오고, 어인정 단어는 따로 불러옵니다(방 설정 `injeong`으로 허용 여부를 정함).
 
 - **메인 사전**은 다음 순서로 찾습니다.
   1. `WORDS_FILE` 환경변수에 지정한 경로
   2. `wordchain/data/words.txt`
   3. `wordchain/data/sample_words.txt`
+- **끄투 일반 단어**: `wordchain/data/kkutu_words.txt` (git에서 제외, 아래 스크립트로 생성)
+- **끄투 어인정 단어**: `wordchain/data/kkutu_injeong.txt` (git에서 제외)
 - **보충 사전**은 `wordchain/data/extra_words.txt`입니다.
 
 파일 형식은 한 줄에 한 단어이고, 공백으로 구분해도 됩니다. `#` 뒤는 주석입니다. 한글이 아니거나 한 글자인 단어는 불러올 때 제외됩니다.
@@ -140,6 +142,19 @@ python wordchain/scripts/build_dictionary.py "C:\경로\전체 내려받기_표�
 - 동음이의어 번호 `(02)`와 구분 기호 `-`, `^`를 떼고, 두 글자 이상 순수 한글만 남깁니다.
 
 사전 데이터는 국립국어원의 이용 조건을 따릅니다.
+
+### 끄투 단어 가져오기
+
+```bash
+python wordchain/scripts/import_kkutu.py            # GitHub 에서 db.sql(약 42MB)을 받아서 처리
+python wordchain/scripts/import_kkutu.py db.sql     # 이미 받은 파일로 처리
+```
+
+- [KKuTu](https://github.com/JJoriping/KKuTu)의 `db.sql`에서 `kkutu_ko` 표를 읽습니다.
+- 끄투 기본 끝말잇기 규칙과 같게, 품사(`type`)가 끄투의 `KOR_GROUP`에 드는 단어만 씁니다. 동사·형용사처럼 활용하는 말은 뺍니다.
+- `flag & 2`(어인정)인 단어는 `kkutu_injeong.txt`로 따로 저장합니다.
+- 뜻풀이(`mean`)는 가져오지 않습니다. KKuTu 레포가 GPL v3이므로 결과 파일은 git에 넣지 않습니다.
+- `deploy/setup.sh`와 `deploy/update.sh`는 `kkutu_words.txt`가 없으면 이 스크립트를 자동으로 실행합니다.
 
 ### WebSocket 프로토콜
 
