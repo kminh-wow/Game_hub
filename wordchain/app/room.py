@@ -26,6 +26,7 @@ class RoomSettings:
     turn_time: int = 15    # 한 턴 제한 시간(초)
     round_time: int = 90   # 라운드 전체 시간(초)
     no_killer: bool = False
+    injeong: bool = True   # 어인정 단어(끄투 사용자 등록 단어) 허용
 
     def copy(self) -> RoomSettings:
         return replace(self)
@@ -145,8 +146,9 @@ class Room:
         for key, (lo, hi) in SETTING_LIMITS.items():
             if key in data and (value := _clamp_int(data[key], lo, hi)) is not None:
                 setattr(self.settings, key, value)
-        if "no_killer" in data:
-            self.settings.no_killer = bool(data["no_killer"])
+        for key in ("no_killer", "injeong"):
+            if key in data:
+                setattr(self.settings, key, bool(data[key]))
         if "max_players" in data:
             value = _clamp_int(data["max_players"], max(MIN_PLAYERS, len(self.players)), MAX_PLAYERS)
             if value is not None:

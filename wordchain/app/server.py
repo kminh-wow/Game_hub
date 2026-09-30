@@ -70,6 +70,7 @@ class GameServer:
             "type": "welcome",
             "player": player.public(),
             "word_count": len(self.dictionary),
+            "injeong_count": len(self.dictionary.injeong),
         })
         await self.broadcast_lobby()
         return player

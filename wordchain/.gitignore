@@ -8,3 +8,5 @@ venv/
 data/words.txt
 data/raw/
 *.db
+data/kkutu_words.txt
+data/kkutu_injeong.txt
