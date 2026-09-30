@@ -13,6 +13,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import MutableHeaders
 
 from quoridor.server.main import app as quoridor_app
 from wordchain.app.main import app as wordchain_app
@@ -25,6 +26,32 @@ GAMES = {
 }
 
 app = FastAPI(title="Game Hub", docs_url=None, redoc_url=None, openapi_url=None)
+
+
+class RevalidateMiddleware:
+    """모든 HTTP 응답에 Cache-Control: no-cache 를 붙인다.
+
+    브라우저가 예전 JS/HTML 을 캐시해 두고 새 버전을 안 쓰는 일을 막는다.
+    바뀌지 않은 파일은 ETag 로 304 만 받으므로 다시 내려받지는 않는다.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_header(message):
+            if message["type"] == "http.response.start":
+                MutableHeaders(scope=message)["Cache-Control"] = "no-cache"
+            await send(message)
+
+        await self.app(scope, receive, send_with_header)
+
+
+app.add_middleware(RevalidateMiddleware)
 
 
 def _redirect_to(path: str):

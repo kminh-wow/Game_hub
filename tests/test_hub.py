@@ -56,3 +56,10 @@ def test_quoridor_websocket(client):
         ws.send_json({"type": "create_room"})
         msg = ws.receive_json()
         assert msg["type"] == "room_created"
+
+
+def test_responses_are_revalidated(client):
+    r = client.get("/wordchain/static/app.js")
+    assert r.headers["cache-control"] == "no-cache"
+    etag = r.headers["etag"]
+    assert client.get("/wordchain/static/app.js", headers={"If-None-Match": etag}).status_code == 304
