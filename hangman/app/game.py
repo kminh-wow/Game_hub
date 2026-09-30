@@ -1,5 +1,8 @@
 """행맨 한 판: 방에 들어온 순서대로 돌아가며 출제하고, 나머지가 차례대로 추측한다.
 
+추측하는 사람마다 교수대가 따로 있다. 틀리면 자기 교수대에만 한 획이 그려지고,
+교수대가 완성되면 그 라운드에서 탈락(차례에서 빠짐)한다.
+
 라운드 진행:  setting(출제) → guessing(추측) → break(정답 공개) → 다음 라운드
 """
 from __future__ import annotations
@@ -19,7 +22,8 @@ ROUND_BREAK = 4.0      # 정답 공개 후 다음 라운드까지(초)
 CANCEL_BREAK = 2.0     # 출제자가 나가서 라운드를 취소했을 때
 LETTER_SCORE = 10      # 맞힌 글자 1개당
 SOLVE_BONUS = 30       # 단어를 통째로 맞히면 (남은 빈칸 × LETTER_SCORE) + 보너스
-HANG_BONUS = 50        # 교수대가 완성되면 출제자에게
+HANG_PENALTY = 20      # 내 교수대가 완성되면(탈락) 깎이는 점수
+HANG_BONUS = 20        # 교수대가 완성된 사람 1명당 출제자가 받는 점수
 MAX_HINT = 40
 
 
@@ -52,7 +56,9 @@ class Game:
         self.revealed: set[str] = set()
         self.wrong_letters: list[str] = []
         self.wrong_words: list[str] = []
-        self.strikes = 0
+        self.strikes: dict[str, int] = {}   # 추측자별 틀린 횟수
+        self.hanged: list[str] = []         # 교수대가 완성돼 탈락한 추측자 (탈락 순서)
+        self.setter_gain = 0
         self.turns = 0
         self.solver: Player | None = None
 
@@ -70,6 +76,12 @@ class Game:
     def total_rounds(self) -> int:
         remaining = sum(self.settings.cycles - self.set_counts[p.id] for p in self.order)
         return self.round + max(remaining, 0)
+
+    def _alive(self, i: int) -> bool:
+        return i != self.setter_idx and self.order[i].id not in self.hanged
+
+    def alive_guessers(self) -> list[Player]:
+        return [p for i, p in enumerate(self.order) if self._alive(i)]
 
     def solved(self) -> bool:
         return all(c in self.revealed for c in self.word)
@@ -91,7 +103,8 @@ class Game:
             "pattern": self.pattern() if self.word else [],
             "wrong_letters": self.wrong_letters,
             "wrong_words": self.wrong_words,
-            "strikes": self.strikes,
+            "strikes": {p.id: self.strikes.get(p.id, 0) for p in self.order},
+            "hanged": self.hanged,
             "lives": self.settings.lives,
             "hint": self.hint if (self.hint_shown or show_word) and self.hint else None,
             "hint_letter": self.hint_letter,
@@ -188,15 +201,16 @@ class Game:
         self._advance_guesser()
         await self._start_turn()
 
-    def _advance_guesser(self) -> None:
-        """다음 추측자: 들어온 순서대로, 출제자는 건너뛴다."""
+    def _advance_guesser(self) -> bool:
+        """다음 추측자: 들어온 순서대로, 출제자와 탈락자는 건너뛴다. 남은 사람이 없으면 False."""
         n = len(self.order)
         i = self.guesser_idx if self.guesser_idx is not None else self.setter_idx
         for _ in range(n):
             i = (i + 1) % n
-            if i != self.setter_idx:
+            if self._alive(i):
                 self.guesser_idx = i
-                return
+                return True
+        return False
 
     async def _start_turn(self) -> None:
         if not self.hint_shown and self.turns >= self.settings.hint_turn:
@@ -220,8 +234,7 @@ class Game:
     async def _on_turn_timeout(self) -> None:
         self.turns += 1
         self.events.append({"kind": "timeout", "player_id": self.guesser.id})
-        self._advance_guesser()
-        await self._start_turn()
+        await self._next_guesser()
 
     async def guess(self, player: Player, text: str) -> str | None:
         if self.phase != "guessing" or player is not self.guesser:
@@ -246,7 +259,6 @@ class Game:
                     await self._start_turn()   # 맞히면 같은 사람이 한 번 더
                 return None
             self.wrong_letters.append(g)
-            self.strikes += 1
             self.events.append({"kind": "letter_fail", "player_id": player.id, "letter": g})
         else:
             if g in self.wrong_words:
@@ -261,28 +273,45 @@ class Game:
                 await self._end_round(solver=player)
                 return None
             self.wrong_words.append(g)
-            self.strikes += 1
             self.events.append({"kind": "word_fail", "player_id": player.id, "word": g})
 
-        if self.strikes >= self.settings.lives:
-            await self._end_round(solver=None)
-        else:
-            self._advance_guesser()
-            await self._start_turn()
+        self._strike(player)
+        await self._next_guesser()
         return None
+
+    def _strike(self, player: Player) -> None:
+        """틀린 추측: 그 사람 교수대에만 한 획. 완성되면 탈락, 감점, 출제자 가점."""
+        self.strikes[player.id] = self.strikes.get(player.id, 0) + 1
+        self.events[-1]["strikes"] = self.strikes[player.id]
+        if self.strikes[player.id] >= self.settings.lives:
+            self.hanged.append(player.id)
+            self.scores[player.id] -= HANG_PENALTY
+            self.scores[self.setter.id] += HANG_BONUS
+            self.setter_gain += HANG_BONUS
+            self.events.append({
+                "kind": "hanged",
+                "player_id": player.id,
+                "penalty": HANG_PENALTY,
+                "setter_id": self.setter.id,
+                "setter_gain": HANG_BONUS,
+            })
+
+    async def _next_guesser(self) -> None:
+        if self._advance_guesser():
+            await self._start_turn()
+        else:
+            await self._end_round(solver=None)   # 모두 탈락
 
     async def _end_round(self, solver: Player | None) -> None:
         self._cancel_timer()
         self.phase = "break"
         self.solver = solver
-        if solver is None:
-            self.scores[self.setter.id] += HANG_BONUS
         self.events.append({
             "kind": "round_end",
             "word": self.word,
             "solver_id": solver.id if solver else None,
             "setter_id": self.setter.id,
-            "setter_gain": 0 if solver else HANG_BONUS,
+            "setter_gain": self.setter_gain,
         })
         self._start_timer(ROUND_BREAK, self._next_round)
         await self.broadcast_state()
@@ -337,9 +366,11 @@ class Game:
         self.setter_idx %= n
         if was_guesser:
             self.guesser_idx = (idx - 1) % n
-            self._advance_guesser()
-            await self._start_turn()
+            await self._next_guesser()
             return
         if self.guesser_idx is not None:
             self.guesser_idx %= n
+        if self.phase == "guessing" and not self.alive_guessers():
+            await self._end_round(solver=None)
+            return
         await self.broadcast_state()

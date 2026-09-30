@@ -206,7 +206,7 @@ function showEvent(ev) {
       cls = "ok";
       break;
     case "letter_fail":
-      text = `${who}: ${ev.letter} 없어요.`;
+      text = `${who}: ${ev.letter} 없어요. (${ev.strikes}번째 실수)`;
       cls = "fail";
       break;
     case "word_ok":
@@ -214,7 +214,11 @@ function showEvent(ev) {
       cls = "ok";
       break;
     case "word_fail":
-      text = `${who}: ${ev.word} 아니에요.`;
+      text = `${who}: ${ev.word} 아니에요. (${ev.strikes}번째 실수)`;
+      cls = "fail";
+      break;
+    case "hanged":
+      text = `${who}님의 교수대가 완성됐어요! -${ev.penalty} (출제자 ${playerName(ev.setter_id)}님 +${ev.setter_gain})`;
       cls = "fail";
       break;
     case "timeout":
@@ -229,7 +233,7 @@ function showEvent(ev) {
     case "round_end":
       text = ev.solver_id
         ? `정답은 ${ev.word}! ${playerName(ev.solver_id)}님이 맞혔어요.`
-        : `교수대 완성! 정답은 ${ev.word}. 출제자 ${playerName(ev.setter_id)}님 +${ev.setter_gain}`;
+        : `모두 탈락! 정답은 ${ev.word}. 출제자 ${playerName(ev.setter_id)}님은 이번 라운드 +${ev.setter_gain}`;
       cls = ev.solver_id ? "ok" : "fail";
       break;
     case "round_cancel":
@@ -299,6 +303,7 @@ function renderRoom() {
       if (p.id === room.host_id) tags.push("방장");
       if (isMe(p.id)) tags.push("나");
       if (game && game.setter_id === p.id) tags.push("출제자");
+      if (game && game.hanged.includes(p.id)) tags.push("탈락");
       const right = game
         ? el("span", { className: "score", textContent: game.scores[p.id] ?? 0 })
         : el("span", { className: "ready", textContent: p.id === room.host_id ? "" : p.ready ? "준비 완료" : "" });
@@ -350,10 +355,7 @@ function renderGame(g) {
     : g.phase === "guessing" ? `${playerName(g.guesser_id)}님 차례`
     : "정답 공개";
 
-  // 교수대: 목숨 수와 상관없이 6부분(머리·몸·팔2·다리2)을 비율대로 그린다.
-  const parts = [...document.querySelectorAll(".gallows .part")];
-  const shown = g.strikes === 0 ? 0 : Math.ceil((g.strikes * parts.length) / g.lives);
-  parts.forEach((part, i) => part.classList.toggle("on", i < shown));
+  renderGallows(g);
 
   // 빈칸 단어. 출제자와 정답 공개 때는 전체 단어가 온다.
   const letters = g.word ? [...g.word] : g.pattern;
@@ -375,7 +377,7 @@ function renderGame(g) {
   $("#hint-line").innerHTML = hintText;
 
   const wrong = [...g.wrong_letters, ...g.wrong_words];
-  $("#wrong-line").textContent = wrong.length ? `틀림 ${g.strikes}/${g.lives}: ${wrong.join(" ")}` : `목숨 ${g.lives}`;
+  $("#wrong-line").textContent = wrong.length ? `없는 글자: ${wrong.join(" ")}` : `각자 목숨 ${g.lives}`;
 
   // 출제자 입력칸 / 추측 키보드 / 구경 문구
   const mySet = isMySet();
@@ -393,6 +395,39 @@ function renderGame(g) {
   renderKeyboard(g, myGuess);
   $("#word-guess-input").disabled = !myGuess;
   $("#word-guess button").disabled = !myGuess;
+}
+
+// 교수대 SVG. 목숨 수와 상관없이 6부분(머리·몸·팔2·다리2)을 비율대로 그린다.
+const GALLOWS_SVG = `<svg class="gallows" viewBox="0 0 170 190" aria-hidden="true">
+  <line class="frame" x1="10" y1="180" x2="110" y2="180" /><line class="frame" x1="40" y1="180" x2="40" y2="10" />
+  <line class="frame" x1="40" y1="10" x2="120" y2="10" /><line class="frame" x1="120" y1="10" x2="120" y2="35" />
+  <circle class="part" cx="120" cy="52" r="17" /><line class="part" x1="120" y1="69" x2="120" y2="120" />
+  <line class="part" x1="120" y1="82" x2="97" y2="105" /><line class="part" x1="120" y1="82" x2="143" y2="105" />
+  <line class="part" x1="120" y1="120" x2="100" y2="155" /><line class="part" x1="120" y1="120" x2="140" y2="155" />
+</svg>`;
+
+function renderGallows(g) {
+  const list = $("#gallows-list");
+  const guessers = g.order.filter((id) => id !== g.setter_id);
+  list.classList.toggle("hidden", g.phase === "setting");
+  list.replaceChildren(
+    ...guessers.map((id) => {
+      const strikes = g.strikes[id] || 0;
+      const dead = g.hanged.includes(id);
+      const li = el("li", {
+        className: [dead && "dead", id === g.guesser_id && "turn", isMe(id) && "me"].filter(Boolean).join(" "),
+      });
+      li.innerHTML = GALLOWS_SVG;
+      const parts = li.querySelectorAll(".part");
+      const shown = strikes === 0 ? 0 : Math.ceil((strikes * parts.length) / g.lives);
+      parts.forEach((part, i) => part.classList.toggle("on", i < shown));
+      li.append(
+        el("div", { className: "name", textContent: playerName(id) + (isMe(id) ? " (나)" : "") }),
+        el("div", { className: "count", textContent: dead ? "탈락" : `${strikes} / ${g.lives}` })
+      );
+      return li;
+    })
+  );
 }
 
 function renderKeyboard(g, enabled) {
