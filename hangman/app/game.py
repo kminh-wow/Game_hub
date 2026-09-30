@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 from .words import MAX_LEN, MIN_LEN, WORD_RE, normalize
 
 if TYPE_CHECKING:
-    from .models import Player
+    from common.multiplayer import Player
     from .room import Room
 
 SET_TIME = 60          # 출제 제한 시간(초). 넘기면 쉬운 단어를 자동 출제

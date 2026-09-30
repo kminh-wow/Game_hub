@@ -5,6 +5,9 @@
     /quoridor/   쿼리도
     /pacman/     팩맨
     /hangman/    행맨
+    /omok/       오목
+    /yacht/      요트 다이스
+    /common/     게임들이 함께 쓰는 프론트엔드 파일 (lobby.js 등)
 
 게임 상태가 각 앱의 메모리에 있으므로 uvicorn 워커는 반드시 1개로 실행한다.
 """
@@ -18,17 +21,22 @@ from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import MutableHeaders
 
 from hangman.app.main import app as hangman_app
+from omok.app.main import app as omok_app
+from yacht.app.main import app as yacht_app
 from pacman.app import app as pacman_app
 from quoridor.server.main import app as quoridor_app
 from wordchain.app.main import app as wordchain_app
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+COMMON_WEB_DIR = Path(__file__).resolve().parent.parent / "common" / "web"
 
 GAMES = {
     "wordchain": wordchain_app,
     "quoridor": quoridor_app,
     "pacman": pacman_app,
     "hangman": hangman_app,
+    "omok": omok_app,
+    "yacht": yacht_app,
 }
 
 app = FastAPI(title="Game Hub", docs_url=None, redoc_url=None, openapi_url=None)
@@ -71,4 +79,5 @@ for name, game_app in GAMES.items():
     app.add_api_route(f"/{name}", _redirect_to(f"/{name}/"), include_in_schema=False)
     app.mount(f"/{name}", game_app)
 
+app.mount("/common", StaticFiles(directory=COMMON_WEB_DIR), name="common")
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="hub")

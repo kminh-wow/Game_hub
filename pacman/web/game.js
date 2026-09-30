@@ -2,7 +2,7 @@
 import {
   PAC_START, HOUSE_EXIT, HOUSE_CENTER, OPPOSITE,
   isOpen, createPellets, createEntity, position, step, reverse, nextTile,
-  chooseGhostDir, ghostTarget, modeAt, inTunnel,
+  chooseGhostDir, ghostTarget, modeAt, inTunnel, MODE_SCHEDULE,
 } from "./logic.js";
 
 import { createRenderer } from "./renderer.js?v=magenta-stars";
@@ -11,7 +11,17 @@ const DOT_SCORE = 10;
 const POWER_SCORE = 50;
 const GHOST_SCORES = [200, 400, 800, 1600];
 const EXTRA_LIFE_SCORE = 10000;
-const START_LIVES = 3;
+
+// 난이도. "중상"이 처음 만든 기본값이다.
+//   ghost: 유령 속도(팩맨 기본 속도 대비), fright: 1레벨 겁먹는 시간(초), lives: 목숨,
+//   randomTurn: 갈림길에서 엉뚱한 길로 갈 확률, schedule: 흩어지기/쫓기 시간표, release: 집에서 나오는 조건 배율
+const DIFFICULTIES = {
+  easy:    { label: "쉬움",   ghost: 0.60, fright: 10, lives: 5, randomTurn: 0.30, schedule: [10, 15, 10, 15, 8, 15, 8, Infinity], release: 2 },
+  normal:  { label: "보통",   ghost: 0.68, fright: 8,  lives: 4, randomTurn: 0.15, schedule: [8, 20, 8, 20, 6, 20, 6, Infinity], release: 1.5 },
+  midhigh: { label: "중상",   ghost: 0.75, fright: 6,  lives: 3, randomTurn: 0,    schedule: MODE_SCHEDULE, release: 1 },
+  hard:    { label: "어려움", ghost: 0.85, fright: 4,  lives: 3, randomTurn: 0,    schedule: [5, 25, 5, 25, 3, 25, 3, Infinity], release: 0.6 },
+};
+const DIFFICULTY_KEYS = Object.keys(DIFFICULTIES);
 
 const GHOSTS = [
   // name, 색, 시작 위치, 시작 상태, 집에서 나오는 조건(먹은 점 수 / 경과 초)
@@ -27,6 +37,7 @@ const $score = document.getElementById("score");
 const $high = document.getElementById("high");
 const $lives = document.getElementById("lives");
 const $level = document.getElementById("level");
+const $difficulty = document.getElementById("difficulty-label");
 
 // ---- 상태 ----
 
@@ -35,11 +46,31 @@ let pac;           // 팩맨
 let ghosts;        // 유령 4마리
 let want = null;   // 입력된 방향 (다음 갈림길에서 꺾을 방향)
 
+let difficulty = (() => {
+  try {
+    const saved = localStorage.getItem("pacman-difficulty");
+    if (saved in DIFFICULTIES) return saved;
+  } catch {}
+  return "midhigh";
+})();
+const diff = () => DIFFICULTIES[difficulty];
+
+// 최고 점수는 난이도별로 따로 저장한다. (난이도가 생기기 전 기록은 "중상"으로 본다)
 function loadHigh() {
-  try { return Number(localStorage.getItem("pacman-high")) || 0; } catch { return 0; }
+  try {
+    const v = localStorage.getItem(`pacman-high-${difficulty}`) ?? (difficulty === "midhigh" ? localStorage.getItem("pacman-high") : null);
+    return Number(v) || 0;
+  } catch { return 0; }
 }
 function saveHigh(v) {
-  try { localStorage.setItem("pacman-high", String(v)); } catch {}
+  try { localStorage.setItem(`pacman-high-${difficulty}`, String(v)); } catch {}
+}
+
+function setDifficulty(key) {
+  if (!(key in DIFFICULTIES) || (game.phase !== "start" && game.phase !== "over")) return;
+  difficulty = key;
+  try { localStorage.setItem("pacman-difficulty", key); } catch {}
+  newGame();
 }
 
 function newGame() {
@@ -48,7 +79,7 @@ function newGame() {
     phaseTime: 0,
     score: 0,
     high: loadHigh(),
-    lives: START_LIVES,
+    lives: diff().lives,
     level: 1,
     pellets: createPellets(),
     dotsEaten: 0,        // 이번 목숨에서 먹은 점 (유령 집 출발 조건)
@@ -69,6 +100,8 @@ function resetActors() {
   ghosts = GHOSTS.map((g) => ({
     ...createEntity(g.start.x, g.start.y, g.state === "normal" ? "left" : null),
     ...g,
+    dots: g.dots * diff().release,
+    time: g.time * diff().release,
     frightened: false,
   }));
   game.dotsEaten = 0;
@@ -88,7 +121,7 @@ function speedFactor() {
 }
 
 function frightDuration() {
-  return Math.max(1, 7 - game.level);
+  return Math.max(1, diff().fright - (game.level - 1));
 }
 
 function addScore(n) {
@@ -146,7 +179,7 @@ function updatePlaying(dt) {
     if (game.frightLeft === 0) ghosts.forEach((g) => (g.frightened = false));
   } else {
     game.modeTime += dt;
-    const mode = modeAt(game.modeTime);
+    const mode = modeAt(game.modeTime, diff().schedule);
     if (mode !== game.mode) {
       game.mode = mode;
       ghosts.forEach((g) => g.state === "normal" && reverse(g));
@@ -232,7 +265,7 @@ function updateGhost(g, dt) {
     return;
   }
 
-  let speed = base * 0.75;
+  let speed = base * diff().ghost;
   if (g.state === "eaten") speed = base * 2;
   else if (g.frightened) speed = base * 0.5;
   else if (inTunnel(g)) speed = base * 0.4;
@@ -253,7 +286,9 @@ function updateGhost(g, dt) {
       self: { x: e.x, y: e.y },
       blinky: { x: blinky.x, y: blinky.y },
     });
-    return chooseGhostDir(e, target);
+    // 쉬운 난이도에서는 가끔 엉뚱한 길로 간다.
+    const wander = diff().randomTurn > 0 && Math.random() < diff().randomTurn;
+    return chooseGhostDir(e, target, wander ? Math.random : null);
   });
 }
 
@@ -282,6 +317,12 @@ function draw(dt) {
   $high.textContent = game.high;
   $lives.textContent = "●".repeat(Math.max(game.lives, 0));
   $level.textContent = game.level;
+  $difficulty.textContent = diff().label;
+  const choosing = game.phase === "start" || game.phase === "over";
+  for (const btn of document.querySelectorAll("#difficulty button")) {
+    btn.disabled = !choosing;
+    btn.classList.toggle("on", btn.dataset.level === difficulty);
+  }
 }
 // ---- 입력 ----
 
@@ -311,6 +352,7 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault();
   }
   if ((e.key === "p" || e.key === "P") && game.phase === "playing") game.paused = !game.paused;
+  if (e.key >= "1" && e.key <= "4") setDifficulty(DIFFICULTY_KEYS[Number(e.key) - 1]);
 });
 
 // 모바일: 화면을 쓸어서 방향 입력, 탭으로 시작
@@ -331,6 +373,13 @@ canvas.addEventListener("touchend", (e) => {
   }
   want = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
 });
+
+for (const btn of document.querySelectorAll("#difficulty button")) {
+  btn.addEventListener("click", () => {
+    setDifficulty(btn.dataset.level);
+    btn.blur();   // 버튼에 포커스가 남아 스페이스가 버튼을 누르지 않게
+  });
+}
 
 // ---- 루프 ----
 
@@ -354,4 +403,4 @@ createRenderer(canvas).then((view) => {
 });
 
 // 테스트·디버그용
-window.__pacman = { get game() { return game; }, get pac() { return pac; }, get ghosts() { return ghosts; } };
+window.__pacman = { get difficulty() { return difficulty; }, get game() { return game; }, get pac() { return pac; }, get ghosts() { return ghosts; } };

@@ -108,7 +108,7 @@ const handlers = {
   welcome(msg) {
     state.me = msg.player;
     $("#me-name").textContent = msg.player.name;
-    $("#word-count").textContent = msg.word_count.toLocaleString();
+    $("#word-count").textContent = msg.word_count.toLocaleString() + (msg.injeong_count ? ` (+어인정 ${msg.injeong_count.toLocaleString()})` : "");
     $("#login-error").textContent = "";
     try { localStorage.setItem("wco-name", msg.player.name); } catch {}
     show("lobby");
@@ -475,6 +475,7 @@ $("#settings-form").onchange = () => {
       round_time: Number(form.round_time.value),
       max_players: Number(form.max_players.value),
       no_killer: form.no_killer.checked,
+      injeong: form.injeong.checked,
     },
   });
 };

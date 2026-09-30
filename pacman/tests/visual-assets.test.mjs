@@ -40,7 +40,7 @@ test('Power pickup, pause, expiry and restart pass correct states to the new ren
     localStorage:{getItem:()=>null,setItem:()=>{}},
     requestAnimationFrame:()=>{},
     window:{addEventListener:()=>{}},
-    document:{getElementById:id=>{
+    document:{querySelectorAll:()=>[],getElementById:id=>{
       if(!nodes.has(id))nodes.set(id,{textContent:'',addEventListener:()=>{}});
       return nodes.get(id);
     }},
@@ -61,4 +61,13 @@ test('Power pickup, pause, expiry and restart pass correct states to the new ren
   assert.equal(lastDraw.phase,'ready');
   assert.equal(lastDraw.power,0);
   assert.equal(nodes.get('score').textContent,0);
+  for (const [key, lives, duration] of [['easy',5,10],['normal',4,8],['midhigh',3,6],['hard',3,4]]) {
+    vm.runInContext(`setPhase('over'); setDifficulty('${key}'); draw(.016)`,context);
+    assert.equal(context.window.__pacman.game.lives,lives);
+    assert.equal(context.window.__pacman.difficulty,key);
+    vm.runInContext('setPhase("playing"); eatAt(1,3); draw(.016)',context);
+    assert.equal(lastDraw.power,duration,'Difficulty power duration reaches 3D renderer');
+    vm.runInContext("setDifficulty('easy')",context);
+    assert.equal(context.window.__pacman.difficulty,key,'Cannot change difficulty during play');
+  }
 });

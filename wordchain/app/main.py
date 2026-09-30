@@ -1,17 +1,13 @@
-"""FastAPI 앱: 정적 프론트엔드 서빙과 게임용 WebSocket 엔드포인트."""
+"""끝말잇기 FastAPI 앱. 접속·로비·방 관리는 common.multiplayer 를 쓴다."""
 from __future__ import annotations
 
-import asyncio
-import json
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from common.multiplayer import GameServer, Player, create_app
 
 from .dictionary import Dictionary
-from .server import CLOSE_INVALID_NAME, GameServer, valid_name
+from .room import Room
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
@@ -27,57 +23,30 @@ def resolve_words_path() -> Path:
 
 
 def dictionary_paths() -> list[Path]:
+    """메인 사전 + 끄투 일반 단어(scripts/import_kkutu.py 로 생성) + 보충 사전."""
     paths = [resolve_words_path()]
-    extra = DATA_DIR / "extra_words.txt"
-    if extra.exists():
-        paths.append(extra)
+    for name in ("kkutu_words.txt", "extra_words.txt"):
+        if (DATA_DIR / name).exists():
+            paths.append(DATA_DIR / name)
     return paths
 
 
-dictionary = Dictionary.load(*dictionary_paths())
-server = GameServer(dictionary)
-
-# 게임 화면 외의 자동 문서 페이지(/docs, /redoc, /openapi.json)는 노출하지 않는다.
-app = FastAPI(title="Word Chain Online", docs_url=None, redoc_url=None, openapi_url=None)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+def injeong_paths() -> list[Path]:
+    path = DATA_DIR / "kkutu_injeong.txt"
+    return [path] if path.exists() else []
 
 
-@app.get("/")
-async def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+dictionary = Dictionary.load(*dictionary_paths(), injeong_paths=injeong_paths())
 
 
-@app.get("/api/health")
-async def health() -> dict:
-    return {
-        "status": "ok",
-        "words": len(dictionary),
-        "players": len(server.players),
-        "rooms": len(server.rooms),
-    }
+async def submit_word(room: Room, player: Player, msg: dict) -> None:
+    await room.submit(player, str(msg.get("word", "")))
 
 
-@app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket) -> None:
-    await ws.accept()
-    name = ws.query_params.get("name", "").strip()
-    if not valid_name(name):
-        await ws.close(code=CLOSE_INVALID_NAME, reason="invalid name")
-        return
-
-    player = await server.connect(ws, name, ws.query_params.get("token", ""))
-    if player is None:
-        return
-    try:
-        while True:
-            raw = await ws.receive_text()
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            await server.handle(player, msg)
-    except WebSocketDisconnect:
-        pass
-    finally:
-        # 연결 작업이 취소되더라도(서버 종료 등) 퇴장 정리는 끝까지 한다.
-        await asyncio.shield(server.disconnect(player))
+server = GameServer(
+    Room,
+    ctx=dictionary,
+    actions={"submit_word": submit_word},
+    welcome_info=lambda: {"word_count": len(dictionary), "injeong_count": len(dictionary.injeong)},
+)
+app = create_app(server, STATIC_DIR, "Word Chain Online", health_info=lambda: {"words": len(dictionary)})

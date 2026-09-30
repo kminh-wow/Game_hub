@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>팩맨</title>
-  <link rel="stylesheet" href="style.css?v=large-board-stars">
+  <link rel="stylesheet" href="style.css?v=difficulty-3d">
   <script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js","three/addons/":"./vendor/three/examples/jsm/"}}</script>
 </head>
 <body>
@@ -19,6 +19,14 @@
     <span>최고 <b id="high">0</b></span>
     <span>레벨 <b id="level">1</b></span>
     <span>목숨 <b id="lives"></b></span>
+    <span>난이도 <b id="difficulty-label"></b></span>
+  </div>
+
+  <div id="difficulty" class="difficulty" aria-label="난이도">
+    <button data-level="easy">1 쉬움</button>
+    <button data-level="normal">2 보통</button>
+    <button data-level="midhigh">3 중상</button>
+    <button data-level="hard">4 어려움</button>
   </div>
 
   <div class="board-wrap">
@@ -26,9 +34,9 @@
     <div id="message" role="status">게임을 불러오는 중</div>
   </div>
 
-  <p class="help">방향키 / WASD: 이동 · Enter: 시작 · P: 일시정지 · 모바일: 화면을 쓸어서 이동</p>
+  <p class="help">방향키 / WASD: 이동 · Enter: 시작 · P: 일시정지 · 1~4: 난이도 (시작 전) · 모바일: 화면을 쓸어서 이동</p>
   </main>
 
-  <script type="module" src="game.js?v=magenta-stars"></script>
+  <script type="module" src="game.js?v=difficulty-3d"></script>
 </body>
 </html>
