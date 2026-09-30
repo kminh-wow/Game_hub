@@ -4,6 +4,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 git pull --ff-only
 .venv/bin/pip install -q -r requirements.txt
-sudo systemctl restart word-chain-online
+sudo systemctl restart game-hub
 sleep 2
-systemctl --no-pager status word-chain-online | head -5
+systemctl --no-pager status game-hub | head -5
