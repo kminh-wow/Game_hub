@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from .dictionary import HANGUL_WORD, next_chars
 
 if TYPE_CHECKING:
-    from .models import Player
+    from common.multiplayer import Player
     from .room import Room
 
 ROUND_BREAK = 3.0     # 라운드 사이 쉬는 시간(초)
