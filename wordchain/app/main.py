@@ -1,6 +1,7 @@
 """FastAPI 앱: 정적 프론트엔드 서빙과 게임용 WebSocket 엔드포인트."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -78,4 +79,5 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        await server.disconnect(player)
+        # 연결 작업이 취소되더라도(서버 종료 등) 퇴장 정리는 끝까지 한다.
+        await asyncio.shield(server.disconnect(player))
