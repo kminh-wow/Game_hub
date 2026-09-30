@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quoridor Online</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Quoridor</h1>
+
+  <section id="menu" class="screen">
+    <button id="btn-create">새 게임 만들기</button>
+    <div class="join-row">
+      <input id="join-code" maxlength="6" placeholder="방 코드 입력">
+      <button id="btn-join">코드로 참가</button>
+    </div>
+    <div class="ai-row">
+      <span>AI와 대결</span>
+      <button class="btn-ai-diff" data-difficulty="easy">하</button>
+      <button class="btn-ai-diff" data-difficulty="medium">중</button>
+      <button class="btn-ai-diff" data-difficulty="hard">상</button>
+    </div>
+    <button id="btn-learn">학습 모드</button>
+    <p id="menu-error" class="error"></p>
+  </section>
+
+  <section id="waiting" class="screen hidden">
+    <p>방 코드: <span id="waiting-code"></span></p>
+    <p>상대를 기다리는 중...</p>
+  </section>
+
+  <section id="game" class="screen hidden">
+    <div id="hud">
+      <span id="turn-indicator"></span>
+      <span id="walls-left"></span>
+      <span id="difficulty-indicator"></span>
+    </div>
+    <details id="algo-info" class="hidden">
+      <summary>🧠 이 평가는 어떻게 계산되나요?</summary>
+      <p>
+        각 플레이어가 목표 줄까지 최단 몇 칸인지 <strong>BFS(너비 우선 탐색)</strong>로 계산합니다.
+        <strong>내 최단거리는 줄이고 상대 최단거리는 늘리는 수</strong>일수록 좋은 수로 평가돼요.
+      </p>
+      <p>
+        점수 = (상대 최단거리 − 내 최단거리) × 10 + (내 남은 벽 − 상대 남은 벽) × 0.5<br>
+        이 점수가 이번 턴에 둘 수 있는 모든 수 중 가장 높은 수(최선의 수) 대비 얼마나 낮은지에 따라
+        <strong>최선의 수 / 좋은 수 / 괜찮은 수 / 안좋은 수</strong>로 표시합니다.
+      </p>
+      <p>
+        지금 대결 중인 AI도 같은 점수로 후보를 추린 뒤, 상대의 최선의 응수까지 한 수 더 내다보는
+        얕은 minimax 탐색으로 수를 고릅니다.
+      </p>
+    </details>
+    <div id="game-layout">
+      <div id="pseudocode-panel" class="hidden">
+        <div class="panel-title">알고리즘 원형</div>
+        <pre id="pseudocode-content"># 1) 후보 수 하나를 평가한다
+evaluate(state, action, player):
+    next = apply(state, action)
+    opp  = other(player)
+
+    my_dist  = BFS(next, player → player의 목표행)
+    opp_dist = BFS(next, opp → opp의 목표행)
+
+    score  = (opp_dist - my_dist) * 10
+    score += next.walls_left[player] * 0.5
+    score -= next.walls_left[opp]    * 0.5
+    return score
+
+# 2) 이번 턴 가능한 모든 수를 평가해서
+#    라벨을 매긴다
+actions = 가능한 모든 이동 + 벽 배치
+best = max(evaluate(a) for a in actions)
+
+for a in actions:
+    gap = best - evaluate(a)
+    if   gap <= 0.01: label = "최선의 수"
+    elif gap <= 9:    label = "좋은 수"
+    elif gap <= 19:   label = "괜찮은 수"
+    else:             label = "안좋은 수"</pre>
+      </div>
+      <div id="board-panel">
+        <div id="board-controls" aria-label="보드 조작">
+          <button id="mode-move" aria-pressed="true">말 이동</button>
+          <button id="mode-wall" aria-pressed="false">벽 설치</button>
+          <button id="rotate-wall" disabled>가로 ↔ 세로 (R)</button>
+          <button id="reset-camera">시점 초기화</button>
+        </div>
+        <p id="board-help">빛나는 칸을 누르면 이동합니다. 빨강: 1P · 파랑: 2P</p>
+        <p>드래그: 회전 · 휠/두 손가락: 확대·축소</p>
+        <div id="board-wrap" aria-label="3D 코리도 보드"></div>
+        <p id="board-status" role="status">3D 모델을 불러오는 중...</p>
+      </div>
+      <div id="chat-panel">
+        <div id="chat-log"></div>
+        <div class="chat-input-row">
+          <input id="chat-input" maxlength="300" placeholder="메시지 입력">
+          <button id="chat-send">전송</button>
+        </div>
+      </div>
+      <div id="trace-panel" class="hidden">
+        <div class="panel-title">계산 과정</div>
+        <pre id="trace-content">칸이나 벽에 마우스를 올려보세요</pre>
+      </div>
+    </div>
+    <p id="game-error" class="error"></p>
+  </section>
+
+  <div id="hover-tip" class="hidden"></div>
+
+  <div id="result-modal" class="hidden">
+    <div class="modal-box">
+      <p id="result-text"></p>
+      <button id="btn-restart">메뉴로</button>
+    </div>
+  </div>
+
+  <script src="net.js"></script>
+  <script type="importmap">
+    {"imports":{"three":"./vendor/three/build/three.module.js","three/addons/":"./vendor/three/examples/jsm/"}}
+  </script>
+  <script type="module" src="board.js"></script>
+</body>
+</html>

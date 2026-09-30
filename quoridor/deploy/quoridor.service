@@ -1,0 +1,15 @@
+[Unit]
+Description=Quoridor game server
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/game-project
+Environment="PATH=/home/ec2-user/game-project/.venv/bin"
+ExecStart=/home/ec2-user/game-project/.venv/bin/uvicorn server.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
