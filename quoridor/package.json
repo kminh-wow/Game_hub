@@ -1,0 +1,7 @@
+{
+  "name": "quoridor-3d",
+  "private": true,
+  "type": "module",
+  "scripts": { "vendor": "node tools/vendor-three.mjs" },
+  "dependencies": { "three": "0.180.0" }
+}
