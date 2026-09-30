@@ -397,37 +397,77 @@ function renderGame(g) {
   $("#word-guess button").disabled = !myGuess;
 }
 
-// 교수대 SVG. 목숨 수와 상관없이 6부분(머리·몸·팔2·다리2)을 비율대로 그린다.
+// Each life advances the six strokes fractionally, including games with 4–10 lives.
 const GALLOWS_SVG = `<svg class="gallows" viewBox="0 0 170 190" aria-hidden="true">
-  <line class="frame" x1="10" y1="180" x2="110" y2="180" /><line class="frame" x1="40" y1="180" x2="40" y2="10" />
-  <line class="frame" x1="40" y1="10" x2="120" y2="10" /><line class="frame" x1="120" y1="10" x2="120" y2="35" />
-  <circle class="part" cx="120" cy="52" r="17" /><line class="part" x1="120" y1="69" x2="120" y2="120" />
-  <line class="part" x1="120" y1="82" x2="97" y2="105" /><line class="part" x1="120" y1="82" x2="143" y2="105" />
-  <line class="part" x1="120" y1="120" x2="100" y2="155" /><line class="part" x1="120" y1="120" x2="140" y2="155" />
+  <path class="frame" d="M18 178 Q60 176 102 178 M42 177 Q40 94 42 16 Q80 14 120 16 M43 46 L72 16" />
+  <path class="rope" d="M120 16 Q118 25 120 35" />
+  <g class="figure">
+    <path class="part" pathLength="1" d="M120 35 C143 34 144 70 120 70 C97 70 96 36 120 35" />
+    <path class="part" pathLength="1" d="M120 70 Q117 95 120 120" />
+    <path class="part" pathLength="1" d="M119 82 Q107 92 96 106" />
+    <path class="part" pathLength="1" d="M120 82 Q134 92 144 103" />
+    <path class="part" pathLength="1" d="M120 120 Q110 136 101 155" />
+    <path class="part" pathLength="1" d="M120 120 Q130 139 141 153" />
+  </g>
 </svg>`;
 
 function renderGallows(g) {
   const list = $("#gallows-list");
   const guessers = g.order.filter((id) => id !== g.setter_id);
+  const roundKey = `${g.round}:${g.setter_id}`;
   list.classList.toggle("hidden", g.phase === "setting");
-  list.replaceChildren(
-    ...guessers.map((id) => {
-      const strikes = g.strikes[id] || 0;
-      const dead = g.hanged.includes(id);
-      const li = el("li", {
-        className: [dead && "dead", id === g.guesser_id && "turn", isMe(id) && "me"].filter(Boolean).join(" "),
-      });
+  if (list.dataset.round !== roundKey || g.phase === "setting") {
+    list.replaceChildren();
+    list.dataset.round = roundKey;
+  }
+  const existing = new Map([...list.children].map((li) => [li.dataset.player, li]));
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  guessers.forEach((id, index) => {
+    const strikes = g.strikes[id] || 0;
+    const dead = g.hanged.includes(id);
+    let li = existing.get(String(id));
+    const fresh = !li;
+    if (fresh) {
+      li = el("li");
+      li.dataset.player = id;
       li.innerHTML = GALLOWS_SVG;
-      const parts = li.querySelectorAll(".part");
-      const shown = strikes === 0 ? 0 : Math.ceil((strikes * parts.length) / g.lives);
-      parts.forEach((part, i) => part.classList.toggle("on", i < shown));
-      li.append(
-        el("div", { className: "name", textContent: playerName(id) + (isMe(id) ? " (나)" : "") }),
-        el("div", { className: "count", textContent: dead ? "탈락" : `${strikes} / ${g.lives}` })
-      );
-      return li;
-    })
-  );
+      li.append(el("div", { className: "name" }), el("div", { className: "count" }));
+    }
+    existing.delete(String(id));
+    const wasDead = li.classList.contains("dead");
+    li.className = [dead && "dead", id === g.guesser_id && g.phase === "guessing" && "turn", isMe(id) && "me"].filter(Boolean).join(" ");
+    const parts = li.querySelectorAll(".part");
+    const progress = Math.min(parts.length, strikes * parts.length / g.lives);
+    parts.forEach((part, i) => {
+      const amount = Math.max(0, Math.min(1, progress - i));
+      const previous = Number(part.dataset.amount || 0);
+      part.dataset.amount = amount;
+      part.style.strokeDashoffset = String(1 - amount);
+      part.style.visibility = amount ? "visible" : "hidden";
+      if (!fresh && amount !== previous) {
+        part.getAnimations().forEach((animation) => animation.cancel());
+        if (!reducedMotion && amount > previous) {
+          part.animate([
+            { strokeDashoffset: 1 - previous, stroke: "#e0474c" },
+            { strokeDashoffset: 1 - amount, stroke: "#e0474c", offset: .65 },
+            { strokeDashoffset: 1 - amount, stroke: "#343d54" },
+          ], { duration: 600, easing: "ease-out" });
+        }
+      }
+    });
+    if (!fresh && dead && !wasDead && !reducedMotion) {
+      li.querySelector(".figure").animate([
+        { transform: "rotate(0deg)" }, { transform: "rotate(5deg)" },
+        { transform: "rotate(-3deg)" }, { transform: "rotate(1deg)" },
+        { transform: "rotate(0deg)" },
+      ], { duration: 850, delay: 400, easing: "ease-in-out" });
+    }
+    li.querySelector(".name").textContent = playerName(id) + (isMe(id) ? " (나)" : "");
+    li.querySelector(".count").textContent = dead ? "탈락" : `${strikes} / ${g.lives}`;
+    li.setAttribute("aria-label", `${playerName(id)}, ${dead ? "탈락" : `실수 ${strikes}회, 총 ${g.lives}회`}`);
+    if (list.children[index] !== li) list.insertBefore(li, list.children[index] || null);
+  });
+  existing.forEach((li) => li.remove());
 }
 
 function renderKeyboard(g, enabled) {
