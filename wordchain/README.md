@@ -1,0 +1,143 @@
+# 끝말잇기 온라인 (Word Chain Online)
+
+끄투(KKuTu) 스타일의 실시간 멀티플레이 끝말잇기 게임입니다.
+FastAPI와 WebSocket으로 서버를 만들었고, 프론트엔드는 순수 HTML/CSS/JS입니다.
+
+## 실행
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
+uvicorn app.main:app --reload
+```
+
+브라우저에서 http://127.0.0.1:8000 을 여세요. 창을 여러 개 띄우면 혼자서도 멀티플레이를 테스트할 수 있습니다.
+
+테스트는 이렇게 실행합니다.
+
+```bash
+pytest
+```
+
+## 서버 배포 (EC2 등 Linux)
+
+Amazon Linux와 Ubuntu에서 동작합니다. systemd 서비스로 등록되므로 SSH 접속을 끊어도 계속 실행되고, 재부팅하면 자동으로 다시 시작합니다.
+
+```bash
+git clone https://github.com/kminh-wow/word-chain-online.git
+cd word-chain-online
+bash deploy/setup.sh              # 기본 80번 포트. 다른 포트를 쓰려면: PORT=8000 bash deploy/setup.sh
+```
+
+전체 사전은 git에 없으므로 내 PC에서 따로 올리고 서버를 재시작합니다.
+
+```bash
+scp -i 키.pem data/words.txt <user>@<서버IP>:~/word-chain-online/data/
+ssh -i 키.pem <user>@<서버IP> sudo systemctl restart word-chain-online
+```
+
+- 코드 업데이트: `bash deploy/update.sh` (git pull 후 재시작)
+- 로그 보기: `sudo journalctl -u word-chain-online -f`
+- 게임 상태가 메모리에 있으므로 **워커는 1개로만** 실행합니다. 재시작하면 진행 중인 방은 모두 사라집니다.
+
+## 게임 규칙
+
+- 방장이 방을 만들고, 나머지 참가자가 모두 **준비**하면 방장이 게임을 시작합니다. 2~8명이 참가할 수 있습니다.
+- 라운드마다 무작위 **제시어**가 나오고, 첫 사람은 제시어의 끝 글자로 시작하는 단어를 입력합니다.
+- **두음법칙**이 적용됩니다: 력→역, 라→나, 녀→여 등.
+- 한 라운드 안에서 같은 단어는 다시 쓸 수 없습니다.
+- 턴 제한 시간 안에 잇지 못하면 **-50점**을 받고 라운드가 끝납니다. 진 사람이 다음 라운드를 시작합니다.
+- 점수는 `글자 수 × 10`에 빨리 입력할수록 붙는 보너스(최대 2배)를 더해 계산합니다.
+- 라운드 시간은 모든 턴이 공유합니다. 라운드 시간이 줄어들면 턴 시간도 짧아집니다.
+- 방 설정: 라운드 수, 턴 시간, 라운드 시간, 최대 인원, **한방단어 금지**.
+- 내 차례에 채팅창에 입력하면 단어로 제출됩니다. 내 차례가 아닐 때 입력하면 채팅이 됩니다.
+
+## 구조
+
+```
+app/
+  main.py        FastAPI 앱, 정적 파일 서빙, /ws WebSocket 엔드포인트
+  server.py      접속자·로비·방 목록 관리, 메시지 라우팅
+  room.py        대기실(참가자, 준비, 설정), 게임 시작/종료
+  game.py        게임 진행(라운드, 턴 타이머, 단어 판정, 점수)
+  dictionary.py  사전 로딩, 두음법칙, 한방단어 판정
+  models.py      Player, broadcast 헬퍼
+static/          index.html, style.css, app.js
+data/
+  sample_words.txt  개발용 샘플 사전 (약 450단어)
+  extra_words.txt   보충 사전 (사전에 없는 비속어 등)
+  words.txt         전체 사전 (스크립트로 생성, git에서 제외)
+scripts/
+  build_dictionary.py  표준국어대사전 xls → data/words.txt
+tests/
+```
+
+게임 상태는 모두 서버 메모리에 있습니다. 따라서 서버 프로세스는 하나로 실행해야 합니다.
+
+## 사전
+
+서버는 메인 사전과 보충 사전을 합쳐서 불러옵니다.
+
+- **메인 사전**: 다음 순서로 찾습니다.
+  1. `WORDS_FILE` 환경변수에 지정한 경로
+  2. `data/words.txt` (표준국어대사전에서 생성, 약 21만 단어, git에서 제외)
+  3. `data/sample_words.txt` (샘플, 약 450단어)
+- **보충 사전**: `data/extra_words.txt`. 표준국어대사전에 없는 비속어나 신조어를 넣습니다. git에 포함됩니다.
+
+파일 형식은 한 줄에 한 단어이고, 공백으로 구분해도 됩니다. `#` 뒤는 주석입니다. 한글이 아니거나 한 글자인 단어는 불러올 때 제외됩니다.
+
+### 표준국어대사전으로 `data/words.txt` 만들기
+
+1. [표준국어대사전](https://stdict.korean.go.kr)에 로그인한 뒤 "사전 내려받기"에서 전체 파일(xls)을 받습니다.
+2. 받은 xls 파일들이 있는 폴더를 지정해 스크립트를 실행합니다. 15초 정도 걸립니다.
+
+```bash
+python scripts/build_dictionary.py "C:\경로\전체 내려받기_표준국어대사전_xls_..."
+```
+
+스크립트의 선별 기준은 다음과 같습니다.
+
+- 구성 단위가 '단어'인 표제어만 넣습니다. 구, 관용구, 속담은 뺍니다.
+- 품사에 명사가 있는 단어만 넣습니다.
+- **비속어는 반드시 포함**합니다. 뜻풀이에 "속되게", "비속하게", "낮잡아", "욕으로" 같은 표시가 있으면 명사가 아니어도 넣습니다. 예: 제기랄, 젠장, 이놈. 단, 동사와 형용사처럼 활용하는 말은 뺍니다.
+- 방언, 북한어, 옛말뿐인 표제어는 뺍니다.
+- 동음이의어 번호 `(02)`와 구분 기호 `-`, `^`를 떼고, 두 글자 이상 순수 한글만 남깁니다.
+
+사전 데이터는 국립국어원의 이용 조건을 따릅니다.
+
+## WebSocket 프로토콜
+
+접속: `ws://<host>/ws?name=<닉네임>`
+
+모든 메시지는 JSON이고 `type` 필드를 가집니다.
+
+| 클라이언트 → 서버 | 필드 |
+|---|---|
+| `chat` | `text` |
+| `create_room` | `title`, `max_players` |
+| `join_room` | `room_id` |
+| `leave_room` | |
+| `ready` | |
+| `update_settings` | `settings: {rounds, turn_time, round_time, max_players, no_killer}` |
+| `start` | |
+| `submit_word` | `word` |
+
+| 서버 → 클라이언트 | 설명 |
+|---|---|
+| `welcome` | 내 정보, 사전 단어 수 |
+| `lobby` | 방 목록, 접속자 목록 (로비에 있을 때) |
+| `room` | 방 전체 상태 (`room: null`이면 방에서 나감) |
+| `chat` / `system` / `error` | 채팅, 시스템 메시지, 오류 |
+| `game_start` / `round_start` / `turn` | 게임 진행 |
+| `word_ok` / `word_fail` | 단어 판정 결과 |
+| `round_end` / `game_over` | 라운드 패배자, 최종 순위 |
+
+## 다음 할 일
+
+- [x] 표준국어대사전 전처리 스크립트 (`scripts/build_dictionary.py`)
+- [ ] 단어를 맞혔을 때 뜻풀이 보여주기
+- [ ] 재접속 처리
+- [ ] 관전 모드
+- [ ] 다른 게임 모드 (쿵쿵따, 앞말잇기 등)
+- [ ] 효과음과 애니메이션
