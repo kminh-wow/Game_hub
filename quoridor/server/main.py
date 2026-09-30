@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from . import ai, analysis, game
 from .rooms import RoomManager
 
-app = FastAPI()
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 manager = RoomManager()
 
 AI_THINK_DELAY_SECONDS = 1

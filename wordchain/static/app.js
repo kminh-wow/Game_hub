@@ -72,8 +72,11 @@ function logSystem(log, text, cls = "sys") {
 // ---------- 연결 ----------
 
 function connect(name) {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/ws?name=${encodeURIComponent(name)}`);
+  // 페이지 위치 기준 상대 주소라서 /wordchain/ 처럼 하위 경로에 붙어도 동작한다.
+  const url = new URL("ws", location.href);
+  url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  url.search = new URLSearchParams({ name }).toString();
+  const ws = new WebSocket(url);
   state.ws = ws;
   ws.onmessage = (e) => handle(JSON.parse(e.data));
   ws.onclose = (e) => {

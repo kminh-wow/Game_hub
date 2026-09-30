@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>끝말잇기 온라인</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
   <!-- 로그인 -->
@@ -17,12 +17,14 @@
         <button type="submit">입장</button>
       </form>
       <p id="login-error" class="error"></p>
+      <a class="hub-link" href="../">← 다른 게임 고르기</a>
     </div>
   </section>
 
   <!-- 로비 -->
   <section id="screen-lobby" class="screen hidden">
     <header class="topbar">
+      <a class="hub-link" href="../" title="게임 목록">← Game Hub</a>
       <h2>로비</h2>
       <span class="muted">접속: <b id="me-name"></b> · 사전 <span id="word-count"></span>단어</span>
     </header>
@@ -124,6 +126,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="/static/app.js"></script>
+  <script src="static/app.js"></script>
 </body>
 </html>

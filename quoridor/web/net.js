@@ -7,8 +7,10 @@ const Net = (() => {
     if (ws?.readyState === WebSocket.OPEN) return Promise.resolve();
     if (connecting) return connecting;
     connecting = new Promise((resolve, reject) => {
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}/ws`);
+      // 페이지 위치 기준 상대 주소라서 /quoridor/ 처럼 하위 경로에 붙어도 동작한다.
+      const url = new URL("ws", location.href);
+      url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(url);
       ws.onopen = () => resolve();
       ws.onerror = (e) => reject(e);
       ws.onmessage = (event) => {

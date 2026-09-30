@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game Hub</title>
+  <style>
+    :root {
+      --bg: #eef1f6;
+      --panel: #ffffff;
+      --text: #1f2430;
+      --muted: #6f7689;
+      --line: #e1e5ee;
+      --accent: #4b6bfb;
+      --shadow: 0 1px 2px rgba(20, 24, 35, .05), 0 8px 24px rgba(20, 24, 35, .06);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14171f;
+        --panel: #1d212c;
+        --text: #e9ecf3;
+        --muted: #9aa1b3;
+        --line: #2b3040;
+        --accent: #7b93ff;
+        --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 64px 16px 32px;
+    }
+    header { text-align: center; margin-bottom: 40px; }
+    h1 { font-size: 36px; margin: 0 0 8px; letter-spacing: -0.5px; }
+    h1 span { color: var(--accent); }
+    header p { margin: 0; color: var(--muted); }
+
+    .games {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      width: min(760px, 100%);
+    }
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      color: inherit;
+      text-decoration: none;
+      transition: transform .15s, border-color .15s;
+    }
+    .card:hover, .card:focus-visible { transform: translateY(-3px); border-color: var(--accent); outline: none; }
+    .art { height: 120px; border-radius: 10px; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+    .card h2 { margin: 0; font-size: 20px; }
+    .card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; flex: 1; }
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tags span { font-size: 12px; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+    .play { font-weight: 600; color: var(--accent); }
+
+    /* 끝말잇기 그림: 글자 타일 */
+    .tiles { display: flex; gap: 6px; }
+    .tiles b {
+      width: 38px; height: 38px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--panel); border: 1px solid var(--line); font-size: 18px;
+    }
+    .tiles b.hit { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* 쿼리도 그림: 격자와 벽 */
+    .board { display: grid; grid-template-columns: repeat(5, 16px); gap: 4px; position: relative; }
+    .board i { width: 16px; height: 16px; border-radius: 3px; background: var(--line); }
+    .board i.p1 { background: var(--accent); border-radius: 50%; }
+    .board i.p2 { background: #e0474c; border-radius: 50%; }
+    .board .wall { position: absolute; background: #c98a3c; border-radius: 2px; }
+
+    footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Game <span>Hub</span></h1>
+    <p>친구들과 함께할 게임을 골라 보세요</p>
+  </header>
+
+  <main class="games">
+    <a class="card" href="wordchain/">
+      <div class="art" aria-hidden="true">
+        <div class="tiles"><b>노</b><b class="hit">력</b><b class="hit">역</b><b>사</b></div>
+      </div>
+      <h2>끝말잇기</h2>
+      <p>끝 글자로 시작하는 단어를 이어 가는 실시간 대전. 두음법칙, 한방단어 규칙, 표준국어대사전 21만 단어.</p>
+      <div class="tags"><span>2~8명</span><span>멀티플레이</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
+    <a class="card" href="quoridor/">
+      <div class="art" aria-hidden="true">
+        <div class="board">
+          <i></i><i></i><i class="p2"></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i class="p1"></i><i></i><i></i>
+          <span class="wall" style="left:0;top:18px;width:36px;height:4px"></span>
+          <span class="wall" style="left:58px;top:38px;width:4px;height:36px"></span>
+        </div>
+      </div>
+      <h2>쿼리도</h2>
+      <p>벽을 세워 상대의 길을 막고 먼저 반대편에 도착하는 전략 보드게임. 3D 보드, AI 대전 지원.</p>
+      <div class="tags"><span>2명</span><span>AI 대전</span><span>3D</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+  </main>
+
+  <footer>Game Hub</footer>
+</body>
+</html>

@@ -80,6 +80,10 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
   .panel.side { width: auto; }
 }
 
+.hub-link { color: var(--muted); text-decoration: none; font-size: 14px; }
+.hub-link:hover { color: var(--accent); }
+.login-card .hub-link { display: inline-block; margin-top: 8px; }
+
 /* ---- 로그인 ---- */
 
 #screen-login { justify-content: center; align-items: center; }
