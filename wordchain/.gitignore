@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# 전처리된 전체 사전과 원본 데이터는 라이선스/용량 때문에 커밋하지 않는다.
+data/words.txt
+data/raw/
+*.db
