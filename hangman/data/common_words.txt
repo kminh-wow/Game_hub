@@ -1,0 +1,17 @@
+# 출제자가 시간 안에 단어를 못 정했을 때 자동으로 내는 쉬운 단어들 (모두 enable1.txt 에 있어야 함)
+apple banana orange grape lemon melon peach cherry potato tomato carrot onion
+bread butter cheese coffee cookie pizza salad sugar honey candy juice water
+tiger lion zebra monkey rabbit horse mouse snake eagle shark whale dolphin
+turtle penguin giraffe elephant kitten puppy spider camel donkey parrot
+school teacher student pencil eraser paper notebook library science history
+music guitar piano violin drum dance movie camera picture painting
+house window garden kitchen bedroom mirror blanket pillow chair table
+doctor nurse hospital police farmer pilot driver artist singer writer
+river mountain ocean island desert forest valley beach flower planet
+winter summer spring autumn rainbow thunder cloud storm snow sunshine
+friend family mother father sister brother baby birthday holiday party
+computer phone keyboard robot rocket engine bicycle train airplane bridge
+castle dragon wizard pirate monster ghost treasure jungle dinosaur magic
+soccer baseball tennis basket football hockey swimming running marathon
+yellow purple silver golden orange violet
+happy smile laugh dream sleep travel journey adventure mystery secret
