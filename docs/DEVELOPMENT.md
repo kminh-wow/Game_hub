@@ -65,7 +65,7 @@ bash deploy/setup.sh              # 기본 8000번 포트 (nginx가 80 → 8000 
 ```
 
 - nginx 없이 80번으로 바로 띄우려면: `PORT=80 bash deploy/setup.sh`
-- 코드 업데이트: `bash deploy/update.sh`
+- 코드 업데이트: `bash deploy/update.sh` (git pull 후 `deploy/post_update.sh`로 의존성 설치, 끄투 단어 생성, 재시작)
 - 로그 보기: `sudo journalctl -u game-hub -f`
 - 끝말잇기 전체 사전은 git에 없으므로 서버에 따로 올립니다.
   - `scp -i <키> wordchain/data/words.txt <user>@<서버IP>:~/Game_hub/wordchain/data/`
@@ -154,7 +154,7 @@ python wordchain/scripts/import_kkutu.py db.sql     # 이미 받은 파일로 �
 - 끄투 기본 끝말잇기 규칙과 같게, 품사(`type`)가 끄투의 `KOR_GROUP`에 드는 단어만 씁니다. 동사·형용사처럼 활용하는 말은 뺍니다.
 - `flag & 2`(어인정)인 단어는 `kkutu_injeong.txt`로 따로 저장합니다.
 - 뜻풀이(`mean`)는 가져오지 않습니다. KKuTu 레포가 GPL v3이므로 결과 파일은 git에 넣지 않습니다.
-- `deploy/setup.sh`와 `deploy/update.sh`는 `kkutu_words.txt`가 없으면 이 스크립트를 자동으로 실행합니다.
+- `deploy/setup.sh`와 `deploy/post_update.sh`(`update.sh`가 호출)는 `kkutu_words.txt`가 없으면 이 스크립트를 자동으로 실행합니다.
 
 ### WebSocket 프로토콜
 
