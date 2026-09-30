@@ -17,6 +17,7 @@ http://127.0.0.1:8000 을 여세요.
 - 테스트
   - 허브 통합 테스트: `pytest tests`
   - 끝말잇기 규칙·접속 관리: `cd wordchain && pytest`
+  - 팩맨 규칙: `node --test pacman/tests/logic.test.mjs` (Node 18 이상)
 
 ## 구조
 
@@ -26,6 +27,7 @@ hub/
   static/        메인 화면
 wordchain/       끝말잇기 (FastAPI 앱: wordchain/app/main.py)
 quoridor/        쿼리도   (FastAPI 앱: quoridor/server/main.py)
+pacman/          팩맨     (FastAPI 앱: pacman/app.py, 정적 파일만 제공)
 deploy/          서버 설치, 업데이트 스크립트
 docs/            이 문서, README용 스크린샷
 tests/           허브 통합 테스트
@@ -36,6 +38,7 @@ tests/           허브 통합 테스트
 | `/` | 메인 화면 (`hub/static`) |
 | `/wordchain/` | 끝말잇기 |
 | `/quoridor/` | 쿼리도 |
+| `/pacman/` | 팩맨 |
 
 - 각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
 - 게임 상태는 각 앱의 **메모리**에 있습니다. uvicorn 워커는 반드시 1개로 실행합니다.
@@ -198,3 +201,26 @@ quoridor/
 - 좌표는 `(row, col)`이고 0~8입니다. 1P는 0행에서 출발해 8행이 목표, 2P는 반대입니다.
 - 벽은 8×8 교차점 위에 놓입니다. `H`는 가로, `V`는 세로입니다.
 - 3D 에셋 제작 기록은 [assets-source/README.md](../quoridor/assets-source/README.md)에 있습니다.
+
+---
+
+## 팩맨
+
+브라우저에서만 도는 싱글 게임입니다. 서버(`pacman/app.py`)는 정적 파일만 내려줍니다.
+
+```
+pacman/
+  app.py             정적 파일 서빙
+  web/
+    index.html, style.css   화면 (임시 스타일)
+    logic.js         규칙: 미로, 타일 이동, 유령 목표·방향 선택, 모드 일정 (DOM 없음)
+    game.js          게임 진행(상태, 점수, 목숨, 레벨), 입력, 캔버스 그리기
+  tests/
+    logic.test.mjs   logic.js 테스트 (node --test)
+```
+
+- 미로는 `logic.js`의 `MAZE` 문자열입니다. `#` 벽, `-` 유령 집 문, `.` 점, `o` 파워 점입니다.
+- 엔티티는 타일 좌표 `(x, y)`, 다음 타일까지의 진행도 `p`(0~1), 방향 `dir`로 움직입니다. 타일 중앙에 닿을 때마다 다음 방향을 고릅니다.
+- 유령 상태: `house`(집 안) → `leaving` → `normal` → (먹히면) `eaten` → `entering` → `leaving` …
+- 디버그: 브라우저 콘솔에서 `__pacman.game`, `__pacman.pac`, `__pacman.ghosts`로 상태를 볼 수 있습니다.
+- 그리기는 `game.js`의 `draw*` 함수에 모여 있습니다. 디자인을 바꿀 때는 이 부분과 `style.css`만 고치면 됩니다.
