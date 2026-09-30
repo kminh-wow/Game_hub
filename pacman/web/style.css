@@ -1,0 +1,20 @@
+/* 임시 스타일: 디자인은 따로 적용 예정 */
+body {
+  margin: 0;
+  padding: 16px;
+  background: #111;
+  color: #eee;
+  font-family: sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+header { display: flex; align-items: center; gap: 16px; }
+header a { color: #aaa; text-decoration: none; }
+h1 { margin: 0; color: #ff0; }
+#hud { display: flex; gap: 20px; }
+#hud b { color: #ff0; }
+#lives { letter-spacing: 2px; }
+canvas { max-width: 100%; height: auto; image-rendering: pixelated; touch-action: none; }
+.help { color: #888; font-size: 13px; margin: 0; }
