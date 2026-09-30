@@ -202,11 +202,11 @@ export function ghostTarget(name, mode, { pac, pacDir, self, blinky }) {
   }
 }
 
-/** 레벨 시작 후 t초(겁먹은 시간 제외)일 때 모드. */
-export function modeAt(t) {
+/** 레벨 시작 후 t초(겁먹은 시간 제외)일 때 모드. schedule 은 난이도마다 다르다. */
+export function modeAt(t, schedule = MODE_SCHEDULE) {
   let acc = 0;
-  for (let i = 0; i < MODE_SCHEDULE.length; i++) {
-    acc += MODE_SCHEDULE[i];
+  for (let i = 0; i < schedule.length; i++) {
+    acc += schedule[i];
     if (t < acc) return i % 2 === 0 ? "scatter" : "chase";
   }
   return "chase";
