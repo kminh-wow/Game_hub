@@ -55,7 +55,7 @@ export class Board3D {
     this.renderer.setAnimationLoop(now => {
       const dt = previous === undefined ? 0 : Math.min((now - previous) / 1000, .1); previous = now;
       for (const pawn of Object.values(this.pawns)) pawn.mixer.update(dt);
-      const pulse = .5 + .35 * (.5 + .5 * Math.sin(now / 1000 * Math.PI * 2 / 1.2));
+      const pulse = .1 + .25 * (.5 + .5 * Math.sin(now / 1000 * Math.PI * 2 / 1.2));
       for (const tile of this.tiles) if (tile.legal) tile.object.traverse(n => { if (n.isMesh) n.material.emissiveIntensity = pulse; });
       for (const tween of [...this.tweens]) {
         tween.elapsed += dt; const t = Math.min(tween.elapsed / tween.duration, 1); tween.update(t);
@@ -146,9 +146,9 @@ export class Board3D {
       tile.legal = legal;
       tile.object.position.y = legal ? .39 : .35;
       tile.object.traverse(n => { if (n.isMesh) {
-        if (legal) n.material.color.setHex(colors[entry?.label] || 0x00d68f);
+        if (legal) n.material.color.setHex(colors[entry?.label] || 0x07823f);
         else n.material.color.copy(n.userData.baseColor);
-        n.material.emissive.setHex(legal ? colors[entry?.label] || 0x00c07f : 0); n.material.emissiveIntensity = legal ? .6 : 0;
+        n.material.emissive.setHex(legal ? colors[entry?.label] || 0x07823f : 0); n.material.emissiveIntensity = legal ? .2 : 0;
       } });
     }
   }
