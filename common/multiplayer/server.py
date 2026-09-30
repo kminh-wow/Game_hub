@@ -1,15 +1,20 @@
-"""접속자와 로비, 방 목록을 관리하고 클라이언트 메시지를 처리한다."""
+"""접속자와 로비, 방 목록을 관리하고 클라이언트 메시지를 처리한다.
+
+공통 메시지: chat, create_room, join_room, leave_room, ready, update_settings, start
+게임 메시지: GameServer(actions={...}) 로 넘긴다. 핸들러는 (room, player, msg) 를 받고,
+            오류가 있으면 안내 문구(str)를 돌려준다. 방에서 게임 중일 때만 불린다.
+"""
 from __future__ import annotations
 
 import itertools
 import uuid
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import WebSocket
 
-from .dictionary import Dictionary
 from .models import Player, broadcast
-from .room import MAX_PLAYERS, MIN_PLAYERS, Room
+from .room import BaseRoom
 
 MAX_NAME = 12
 MAX_TITLE = 30
@@ -21,16 +26,26 @@ CLOSE_INVALID_NAME = 4000
 CLOSE_NAME_TAKEN = 4001
 CLOSE_REPLACED = 4002
 
+Action = Callable[[Any, Player, dict], Awaitable[str | None]]
+
 
 def valid_name(name: str) -> bool:
     return 1 <= len(name) <= MAX_NAME
 
 
 class GameServer:
-    def __init__(self, dictionary: Dictionary):
-        self.dictionary = dictionary
+    def __init__(
+        self,
+        room_class: type[BaseRoom],
+        ctx: Any = None,
+        actions: dict[str, Action] | None = None,
+        welcome_info: Callable[[], dict[str, Any]] = dict,
+    ):
+        self.room_class = room_class
+        self.ctx = ctx
+        self.welcome_info = welcome_info
         self.players: dict[str, Player] = {}
-        self.rooms: dict[str, Room] = {}
+        self.rooms: dict[str, BaseRoom] = {}
         self._room_ids = itertools.count(1)
         self._handlers = {
             "chat": self._on_chat,
@@ -40,8 +55,8 @@ class GameServer:
             "ready": self._on_ready,
             "update_settings": self._on_update_settings,
             "start": self._on_start,
-            "submit_word": self._on_submit_word,
         }
+        self._actions = actions or {}
 
     # ---- 연결 ----
 
@@ -66,11 +81,7 @@ class GameServer:
 
         player = Player(id=uuid.uuid4().hex[:8], name=name, ws=ws, token=token)
         self.players[player.id] = player
-        await player.send({
-            "type": "welcome",
-            "player": player.public(),
-            "word_count": len(self.dictionary),
-        })
+        await player.send({"type": "welcome", "player": player.public(), **self.welcome_info()})
         await self.broadcast_lobby()
         return player
 
@@ -86,9 +97,11 @@ class GameServer:
     async def handle(self, player: Player, msg: Any) -> None:
         if not isinstance(msg, dict):
             return
-        handler = self._handlers.get(msg.get("type"))
-        if handler:
+        kind = msg.get("type")
+        if handler := self._handlers.get(kind):
             await handler(player, msg)
+        elif (action := self._actions.get(kind)) and player.room and player.room.game:
+            await self._error(player, await action(player.room, player, msg))
 
     # ---- 로비 ----
 
@@ -139,17 +152,20 @@ class GameServer:
     async def _on_create_room(self, player: Player, msg: dict) -> None:
         if player.room:
             return await self._error(player, "이미 방에 있어요.")
+        cls = self.room_class
         title = str(msg.get("title", "")).strip()[:MAX_TITLE] or f"{player.name}의 방"
+        max_players = cls.default_max_players
         try:
-            max_players = max(MIN_PLAYERS, min(MAX_PLAYERS, int(msg.get("max_players", 4))))
+            max_players = int(msg.get("max_players", max_players))
         except (TypeError, ValueError):
-            max_players = 4
-        room = Room(
+            pass
+        max_players = max(cls.min_players, min(cls.max_players_limit, max_players))
+        room = cls(
             room_id=str(next(self._room_ids)),
             title=title,
             host=player,
             max_players=max_players,
-            dictionary=self.dictionary,
+            ctx=self.ctx,
             on_lobby_change=self.broadcast_lobby,
         )
         self.rooms[room.id] = room
@@ -183,7 +199,3 @@ class GameServer:
     async def _on_start(self, player: Player, msg: dict) -> None:
         if player.room:
             await self._error(player, await player.room.start(player))
-
-    async def _on_submit_word(self, player: Player, msg: dict) -> None:
-        if player.room:
-            await player.room.submit(player, str(msg.get("word", "")))

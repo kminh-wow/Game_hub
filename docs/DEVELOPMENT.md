@@ -26,10 +26,15 @@ http://127.0.0.1:8000 을 여세요.
 hub/
   main.py        메인 앱: 게임 앱들을 경로별로 붙인다 (mount), 캐시 헤더
   static/        메인 화면
+common/
+  multiplayer/   멀티 게임 공통 서버: 접속·닉네임·로비·방·채팅·WebSocket (끝말잇기, 행맨, 오목, 요트 다이스)
+  web/lobby.js   멀티 게임 공통 화면: 로그인·로비·대기실·채팅·결과 창 (/common/lobby.js, 오목·요트 다이스가 사용)
 wordchain/       끝말잇기 (FastAPI 앱: wordchain/app/main.py)
 quoridor/        쿼리도   (FastAPI 앱: quoridor/server/main.py)
 pacman/          팩맨     (FastAPI 앱: pacman/app.py, 정적 파일만 제공)
 hangman/         행맨     (FastAPI 앱: hangman/app/main.py)
+omok/            오목     (FastAPI 앱: omok/app/main.py)
+yacht/           요트 다이스 (FastAPI 앱: yacht/app/main.py)
 deploy/          서버 설치, 업데이트 스크립트
 docs/            이 문서, README용 스크린샷
 tests/           허브 통합 테스트
@@ -42,6 +47,9 @@ tests/           허브 통합 테스트
 | `/quoridor/` | 쿼리도 |
 | `/pacman/` | 팩맨 |
 | `/hangman/` | 행맨 |
+| `/omok/` | 오목 |
+| `/yacht/` | 요트 다이스 |
+| `/common/` | 공통 프론트엔드 파일 (`lobby.js`) |
 
 - 각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
 - 게임 상태는 각 앱의 **메모리**에 있습니다. uvicorn 워커는 반드시 1개로 실행합니다.
@@ -54,6 +62,71 @@ tests/           허브 통합 테스트
 3. `hub/static/index.html`에 카드를 추가합니다.
 4. `tests/test_hub.py`에 페이지와 WebSocket 테스트를 추가합니다.
 
+멀티 게임이라면 아래 공통 모듈을 쓰세요. 오목(`omok/`)이 가장 짧은 예시입니다.
+
+## 공통 멀티플레이 모듈
+
+### 서버: `common/multiplayer`
+
+접속(닉네임 중복 거부, 같은 브라우저 이어받기), 로비, 방(방장, 준비, 설정, 시작, 퇴장), 채팅, WebSocket 엔드포인트를 모두 처리합니다. 게임은 **방 설정, 게임 클래스, 게임 전용 메시지**만 만들면 됩니다.
+
+```python
+# <게임>/app/room.py
+from dataclasses import dataclass, replace
+from common.multiplayer import BaseRoom
+
+@dataclass
+class RoomSettings:
+    turn_time: int = 30
+    def copy(self): return replace(self)
+
+class Room(BaseRoom):
+    settings_class = RoomSettings
+    setting_limits = {"turn_time": (10, 120)}   # 정수 설정 (최소, 최대)
+    bool_settings = ()                          # 참/거짓 설정 이름
+    min_players, max_players_limit, default_max_players = 2, 8, 4
+
+    def create_game(self):
+        return Game(self)       # start(), remove_player(p), finish() 를 갖고, 끝나면 room.end_game(self)
+
+# <게임>/app/main.py
+from common.multiplayer import GameServer, create_app
+
+async def place(room, player, msg):             # 게임 중일 때만 불림. 오류면 안내 문구(str)를 돌려줌
+    return await room.game.place(player, msg.get("x"), msg.get("y"))
+
+server = GameServer(Room, ctx=None, actions={"place": place}, welcome_info=dict)
+app = create_app(server, STATIC_DIR, "My Game")
+```
+
+- `ctx`는 방마다 공유할 자원입니다 (끝말잇기는 사전, 행맨은 영어 단어 목록). 방에서는 `self.ctx`로 씁니다.
+- `extra_state()`를 덮어쓰면 방 상태(`room` 메시지)에 게임별 정보를 붙일 수 있습니다 (오목의 방 전적 등).
+- `can_start()`를 덮어쓰면 시작 조건을 바꿀 수 있습니다.
+- 게임 폴더 안에서 `pytest`를 돌리려면 `conftest.py`로 저장소 루트를 경로에 추가합니다 (`omok/conftest.py` 참고).
+- 테스트에서 여러 WebSocket을 열 때는 `with TestClient(app) as client:`로 열어야 모든 연결이 이벤트 루프 하나를 공유합니다.
+
+### 화면: `common/web/lobby.js`
+
+로그인 → 로비 → 대기실 → 게임 화면 전환, 방 목록, 참가자 목록, 설정 폼, 채팅, 결과 창을 처리합니다. 게임의 `app.js`는 게임 화면만 그립니다.
+
+```html
+<script src="../common/lobby.js"></script>
+<script src="static/app.js"></script>
+```
+
+```js
+const lobby = GameLobby.init({
+  storageKey: "omok",                              // 닉네임·브라우저 식별값 저장 키
+  renderGame(game, room) { /* #game-view 안을 그림 */ },
+  handlers: { game(msg) { lobby.setGame(msg.game); } },
+  playerRight: (p, room) => `${room.wins[p.id] || 0}승`,
+  showLastGame: true,                              // 끝난 뒤에도 대기실 아래에 마지막 판 표시
+});
+lobby.send("place", { x, y });
+```
+
+필요한 HTML id(`screen-login`, `room-list`, `settings-form`, `game-view` …)는 `omok/static/index.html`을 참고하세요. 설정 폼의 입력은 `name`이 서버 설정 이름과 같아야 하고, 바뀌면 자동으로 서버에 보냅니다. 끝말잇기와 행맨은 아직 각자 `app.js`에 같은 코드를 갖고 있고, 디자인 작업이 끝나면 `lobby.js`로 옮길 예정입니다.
+
 ## 서버 배포 (EC2 등 Linux)
 
 Amazon Linux와 Ubuntu에서 동작합니다. systemd 서비스(`game-hub`)로 등록되므로 SSH를 끊어도 계속 돌고, 재부팅하면 자동으로 다시 시작합니다.
@@ -65,7 +138,7 @@ bash deploy/setup.sh              # 기본 8000번 포트 (nginx가 80 → 8000 
 ```
 
 - nginx 없이 80번으로 바로 띄우려면: `PORT=80 bash deploy/setup.sh`
-- 코드 업데이트: `bash deploy/update.sh`
+- 코드 업데이트: `bash deploy/update.sh` (git pull 후 `deploy/post_update.sh`로 의존성 설치, 끄투 단어 생성, 재시작)
 - 로그 보기: `sudo journalctl -u game-hub -f`
 - 끝말잇기 전체 사전은 git에 없으므로 서버에 따로 올립니다.
   - `scp -i <키> wordchain/data/words.txt <user>@<서버IP>:~/Game_hub/wordchain/data/`
@@ -94,12 +167,10 @@ location / {
 ```
 wordchain/
   app/
-    main.py        FastAPI 앱, 정적 파일, /ws 엔드포인트
-    server.py      접속자·로비·방 목록 관리, 닉네임 중복 처리, 메시지 라우팅
-    room.py        대기실(참가자, 준비, 설정), 게임 시작/종료
+    main.py        사전 로딩, GameServer·앱 생성 (게임 메시지: submit_word)
+    room.py        방 설정(라운드, 턴 시간, 한방단어 금지, 어인정)과 게임 연결
     game.py        게임 진행(라운드, 턴 타이머, 단어 판정, 점수)
     dictionary.py  사전 로딩, 두음법칙, 한방단어 판정
-    models.py      Player, broadcast 헬퍼
   static/          index.html, style.css, app.js
   data/
     sample_words.txt  개발용 샘플 사전 (약 450단어)
@@ -112,12 +183,14 @@ wordchain/
 
 ### 사전 불러오기
 
-서버는 메인 사전과 보충 사전을 합쳐서 불러옵니다.
+서버는 메인 사전, 끄투 단어, 보충 사전을 합쳐서 불러오고, 어인정 단어는 따로 불러옵니다(방 설정 `injeong`으로 허용 여부를 정함).
 
 - **메인 사전**은 다음 순서로 찾습니다.
   1. `WORDS_FILE` 환경변수에 지정한 경로
   2. `wordchain/data/words.txt`
   3. `wordchain/data/sample_words.txt`
+- **끄투 일반 단어**: `wordchain/data/kkutu_words.txt` (git에서 제외, 아래 스크립트로 생성)
+- **끄투 어인정 단어**: `wordchain/data/kkutu_injeong.txt` (git에서 제외)
 - **보충 사전**은 `wordchain/data/extra_words.txt`입니다.
 
 파일 형식은 한 줄에 한 단어이고, 공백으로 구분해도 됩니다. `#` 뒤는 주석입니다. 한글이 아니거나 한 글자인 단어는 불러올 때 제외됩니다.
@@ -140,6 +213,19 @@ python wordchain/scripts/build_dictionary.py "C:\경로\전체 내려받기_표�
 - 동음이의어 번호 `(02)`와 구분 기호 `-`, `^`를 떼고, 두 글자 이상 순수 한글만 남깁니다.
 
 사전 데이터는 국립국어원의 이용 조건을 따릅니다.
+
+### 끄투 단어 가져오기
+
+```bash
+python wordchain/scripts/import_kkutu.py            # GitHub 에서 db.sql(약 42MB)을 받아서 처리
+python wordchain/scripts/import_kkutu.py db.sql     # 이미 받은 파일로 처리
+```
+
+- [KKuTu](https://github.com/JJoriping/KKuTu)의 `db.sql`에서 `kkutu_ko` 표를 읽습니다.
+- 끄투 기본 끝말잇기 규칙과 같게, 품사(`type`)가 끄투의 `KOR_GROUP`에 드는 단어만 씁니다. 동사·형용사처럼 활용하는 말은 뺍니다.
+- `flag & 2`(어인정)인 단어는 `kkutu_injeong.txt`로 따로 저장합니다.
+- 뜻풀이(`mean`)는 가져오지 않습니다. KKuTu 레포가 GPL v3이므로 결과 파일은 git에 넣지 않습니다.
+- `deploy/setup.sh`와 `deploy/post_update.sh`(`update.sh`가 호출)는 `kkutu_words.txt`가 없으면 이 스크립트를 자동으로 실행합니다.
 
 ### WebSocket 프로토콜
 
@@ -232,14 +318,13 @@ pacman/
 
 ## 행맨
 
-접속·로비·방 관리(`server.py`, `room.py`, `models.py`)는 끝말잇기와 같은 구조입니다. 게임 규칙은 `game.py`에 있습니다.
+접속·로비·방 관리는 공통 모듈(`common/multiplayer`)을 씁니다. 게임 규칙은 `game.py`에 있습니다.
 
 ```
 hangman/
   app/
-    main.py      FastAPI 앱, /ws 엔드포인트
-    server.py    접속자·로비·방 목록, 닉네임 중복 처리, 메시지 라우팅
-    room.py      대기실(참가자, 준비, 설정), 게임 시작/종료
+    main.py      단어 목록 로딩, GameServer·앱 생성 (게임 메시지: set_word, guess)
+    room.py      방 설정(출제 바퀴 수, 목숨, 턴 시간, 힌트 공개)과 게임 연결
     game.py      라운드 진행(출제 → 추측 → 정답 공개), 차례, 점수, 힌트, 퇴장 처리
     words.py     영어 단어 목록 로딩과 검사
   static/        index.html, style.css, app.js
@@ -269,3 +354,42 @@ hangman/
 |---|---|
 | `game` | `game`: 내 시점의 게임 상태, `events`: 방금 일어난 일 목록 (`letter_ok`, `letter_fail`, `word_ok`, `hanged`, `hint` …) |
 | `game_over` | 최종 순위 |
+
+---
+
+## 오목
+
+공통 모듈 위에 만든 가장 작은 멀티 게임입니다. 새 멀티 게임을 만들 때 참고하세요.
+
+```
+omok/
+  app/
+    main.py     GameServer·앱 생성 (게임 메시지: place, resign)
+    room.py     방 설정(한 수 제한 시간), 최대 2명, 방 전적(wins)과 다음 판 흑 결정
+    game.py     한 판 진행: 착수, 턴 타이머(초과 시 패배), 기권, 퇴장, AI 차례
+    rules.py    판, 5목 판정(자유룰, 장목 인정), AI
+  static/       index.html, style.css, app.js (lobby.js 사용)
+  tests/
+```
+
+- 혼자 시작하면 `AIPlayer`가 상대가 됩니다. AI는 빈 칸마다 공격 점수(내 돌이 이어지는 정도) × 1.1 + 수비 점수(상대 돌이 이어지는 정도)를 계산해 가장 높은 곳에 둡니다. 띈 모양(예: ●●_●●)은 보지 않는 단순한 방식입니다.
+- 첫 판은 흑백을 무작위로 정하고, 다음 판부터는 직전 판에서 진 사람이 흑입니다.
+- 게임 메시지: `place {x, y}`, `resign` → 서버는 `game`(판 상태), `game_over`(승자, 이유: five·timeout·resign·leave·draw)를 보냅니다.
+
+---
+
+## 요트 다이스
+
+```
+yacht/
+  app/
+    main.py     GameServer·앱 생성 (게임 메시지: roll, hold, write)
+    room.py     방 설정(한 차례 제한 시간), 1~5명
+    game.py     차례 진행: 굴리기(최대 3번), 고정, 점수 기록, 시간 초과 자동 기록, 퇴장
+    rules.py    족보 점수 계산, 보너스, 자동 기록 칸 고르기
+  static/       index.html, style.css, app.js (lobby.js 사용)
+  tests/
+```
+
+- 주사위 값은 서버가 정합니다. `game` 메시지의 `events`에 `roll` 이벤트(`dice`, 이번에 굴러간 주사위 `rolled`)가 오면, 화면은 굴러간 주사위만 0.7초 동안 무작위 눈을 보여 주다가 실제 값에 멈춥니다.
+- `preview`는 지금 주사위로 각 칸에 적을 수 있는 점수입니다. 차례인 사람은 버튼으로, 다른 사람은 회색 글자로 봅니다.

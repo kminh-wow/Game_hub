@@ -94,6 +94,8 @@ test("모드 일정: 흩어지기 7초 → 쫓기 20초 → …", () => {
   assert.equal(modeAt(7), "chase");
   assert.equal(modeAt(27), "scatter");
   assert.equal(modeAt(10_000), "chase");
+  assert.equal(modeAt(7, [10, 15, Infinity]), "scatter");   // 난이도별 시간표
+  assert.equal(modeAt(10, [10, 15, Infinity]), "chase");
 });
 
 test("DIRS 와 DIR_ORDER 가 일치한다", () => {

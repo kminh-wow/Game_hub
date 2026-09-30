@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from fastapi import WebSocket
 
 if TYPE_CHECKING:
-    from .room import Room
+    from .room import BaseRoom as Room
 
 
 @dataclass(eq=False)

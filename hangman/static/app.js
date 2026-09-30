@@ -358,17 +358,24 @@ function renderGame(g) {
   renderGallows(g);
 
   // 빈칸 단어. 출제자와 정답 공개 때는 전체 단어가 온다.
+  // 출제자 화면: 맞힌 글자는 진하게(open), 아직 못 맞힌 글자는 흐리게(closed) 보여서 진행 상황을 알 수 있다.
+  const setterView = g.phase === "guessing" && isMe(g.setter_id);
   const letters = g.word ? [...g.word] : g.pattern;
   $("#pattern").replaceChildren(
     ...letters.map((c, i) => {
       const known = g.pattern[i];
       let cls = "";
-      if (known && known === g.hint_letter) cls = "hint";
+      if (setterView) cls = known ? "open" : "closed";
+      if (known && known === g.hint_letter) cls += " hint";
       else if (!known && g.phase === "break") cls = "miss";
-      return el("span", { className: cls, textContent: known || (g.word ? c : "") });
+      return el("span", { className: cls.trim(), textContent: known || (g.word ? c : "") });
     })
   );
   if (g.phase === "setting") $("#pattern").replaceChildren();
+
+  const openCount = g.pattern.filter(Boolean).length;
+  $("#progress-line").textContent =
+    g.phase === "guessing" ? `공개 ${openCount} / ${g.pattern.length}칸` + (setterView ? " · 흐린 글자는 아직 아무도 못 맞힌 글자예요" : "") : "";
 
   let hintText = "";
   if (g.hint) hintText = `힌트: <b>${escapeHtml(g.hint)}</b>`;
@@ -383,12 +390,13 @@ function renderGame(g) {
   const mySet = isMySet();
   const myGuess = isMyGuess();
   $("#setter-form").classList.toggle("hidden", !mySet);
-  const guessing = g.phase === "guessing" && !isMe(g.setter_id);
-  $("#guess-area").classList.toggle("hidden", !guessing);
+  // 키보드는 출제자에게도 보기 전용으로 보여 준다 (나온 글자 확인용).
+  $("#guess-area").classList.toggle("hidden", g.phase !== "guessing");
+  $("#word-guess").classList.toggle("hidden", isMe(g.setter_id));
   const watch = $("#watch");
   let watchText = "";
   if (g.phase === "setting" && !mySet) watchText = `${playerName(g.setter_id)}님이 단어를 고르고 있어요...`;
-  if (g.phase === "guessing" && isMe(g.setter_id)) watchText = `내가 낸 단어: ${g.word} — 다른 사람들이 맞히는 걸 지켜보세요.`;
+  if (setterView) watchText = "내가 낸 문제예요. 다른 사람들이 맞히는 걸 지켜보세요.";
   watch.textContent = watchText;
   watch.classList.toggle("hidden", !watchText);
 

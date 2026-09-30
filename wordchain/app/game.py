@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from .dictionary import HANGUL_WORD, next_chars
 
 if TYPE_CHECKING:
-    from .models import Player
+    from common.multiplayer import Player
     from .room import Room
 
 ROUND_BREAK = 3.0     # 라운드 사이 쉬는 시간(초)
@@ -149,9 +149,11 @@ class Game:
             return f"'{'/'.join(self.chars)}'(으)로 시작해야 해요"
         if word in self.used:
             return "이미 나온 단어예요"
-        if word not in self.dictionary:
+        if not self.dictionary.allows(word, self.settings.injeong):
+            if word in self.dictionary.injeong:
+                return "어인정 단어는 이 방에서 쓸 수 없어요"
             return "사전에 없는 단어예요"
-        if self.settings.no_killer and self.dictionary.is_killer(word):
+        if self.settings.no_killer and self.dictionary.is_killer(word, self.settings.injeong):
             return "한방단어는 금지예요"
         return None
 

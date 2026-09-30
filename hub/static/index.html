@@ -96,6 +96,17 @@
     .blanks { display: flex; gap: 8px; }
     .blanks b { width: 26px; border-bottom: 3px solid var(--text); text-align: center; font-size: 22px; line-height: 30px; }
 
+    /* 오목 그림: 돌 다섯 개 */
+    .stones { display: grid; grid-template-columns: repeat(5, 24px); gap: 4px; padding: 10px; background: #dcb35c; border-radius: 6px; }
+    .stones i { width: 22px; height: 22px; border-radius: 50%; }
+    .stones i.b { background: #1b1b1b; }
+    .stones i.w { background: #f7f7f2; }
+
+    /* 요트 그림: 주사위 */
+    .dice { display: flex; gap: 8px; }
+    .dice b { width: 34px; height: 34px; border-radius: 8px; background: var(--panel); border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .dice b.held { border-color: var(--accent); transform: translateY(-5px); }
+
     footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
   </style>
 </head>
@@ -111,7 +122,7 @@
         <div class="tiles"><b>노</b><b class="hit">력</b><b class="hit">역</b><b>사</b></div>
       </div>
       <h2>끝말잇기</h2>
-      <p>끝 글자로 시작하는 단어를 이어 가는 실시간 대전. 두음법칙, 한방단어 규칙, 표준국어대사전 21만 단어.</p>
+      <p>끝 글자로 시작하는 단어를 이어 가는 실시간 대전. 두음법칙, 한방단어 규칙, 끄투 단어까지 35만 단어.</p>
       <div class="tags"><span>2~8명</span><span>멀티플레이</span></div>
       <span class="play">플레이 →</span>
     </a>
@@ -151,6 +162,27 @@
       <h2>행맨</h2>
       <p>돌아가며 영어 단어를 내고, 차례대로 알파벳을 맞혀요. 교수대가 완성되기 전에 정답을 찾아라!</p>
       <div class="tags"><span>2~8명</span><span>멀티플레이</span><span>영어</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
+    <a class="card" href="omok/">
+      <div class="art" aria-hidden="true">
+        <div class="stones"><i class="b"></i><i class="b"></i><i class="b"></i><i class="b"></i><i class="b"></i>
+          <i></i><i class="w"></i><i class="w"></i><i class="w"></i><i></i></div>
+      </div>
+      <h2>오목</h2>
+      <p>먼저 다섯 개를 나란히 놓으면 승리! 친구와 1:1로 두거나, 혼자라면 AI와 한 판.</p>
+      <div class="tags"><span>1~2명</span><span>멀티플레이</span><span>AI 대전</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
+    <a class="card" href="yacht/">
+      <div class="art" aria-hidden="true">
+        <div class="dice"><b class="held">⚅</b><b class="held">⚅</b><b class="held">⚅</b><b>⚂</b><b>⚀</b></div>
+      </div>
+      <h2>요트 다이스</h2>
+      <p>주사위 5개를 최대 3번 굴려 족보를 채워요. 풀 하우스, 스트레이트, 그리고 꿈의 요트!</p>
+      <div class="tags"><span>1~5명</span><span>멀티플레이</span></div>
       <span class="play">플레이 →</span>
     </a>
   </main>

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>오목</title>
+  <link rel="stylesheet" href="static/style.css?v=1">
+</head>
+<body>
+  <!-- 로그인 -->
+  <section id="screen-login" class="screen">
+    <div class="login-card">
+      <h1>오목 <span>Omok</span></h1>
+      <p class="muted">친구와 1:1로, 혼자면 AI와 한 판</p>
+      <form id="login-form">
+        <input id="login-name" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="off" required>
+        <button type="submit">입장</button>
+      </form>
+      <p id="login-error" class="error"></p>
+      <a class="hub-link" href="../">← 다른 게임 고르기</a>
+    </div>
+  </section>
+
+  <!-- 로비 -->
+  <section id="screen-lobby" class="screen hidden">
+    <header class="topbar">
+      <a class="hub-link" href="../" title="게임 목록">← Game Hub</a>
+      <h2>로비</h2>
+      <span class="muted">접속: <b id="me-name"></b></span>
+    </header>
+    <div class="layout">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h3>방 목록</h3>
+          <button id="btn-open-create">방 만들기</button>
+        </div>
+        <form id="create-form" class="create-form hidden">
+          <input id="create-title" maxlength="30" placeholder="방 제목" autocomplete="off">
+          <button type="submit">만들기</button>
+          <button type="button" id="btn-cancel-create" class="ghost">취소</button>
+        </form>
+        <ul id="room-list" class="room-list"></ul>
+      </div>
+      <div class="panel side">
+        <h3>접속자 <span id="user-count" class="muted"></span></h3>
+        <ul id="user-list" class="user-list"></ul>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="lobby-chat-log" class="chat-log"></ul>
+      <form id="lobby-chat-form" class="chat-form">
+        <input id="lobby-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 방 -->
+  <section id="screen-room" class="screen hidden">
+    <header class="topbar">
+      <h2 id="room-title"></h2>
+      <span id="room-info" class="muted"></span>
+      <button id="btn-leave" class="ghost">나가기</button>
+    </header>
+    <div class="layout">
+      <div class="panel side">
+        <h3>참가자 <span class="muted">(방 전적)</span></h3>
+        <ul id="player-list" class="player-list"></ul>
+      </div>
+
+      <div class="panel grow">
+        <!-- 대기 화면 -->
+        <div id="waiting-view">
+          <h3>게임 설정</h3>
+          <form id="settings-form" class="settings">
+            <label>한 수 제한 시간(초) <input type="number" name="turn_time" min="10" max="120" step="5"></label>
+          </form>
+          <p class="muted">15×15 판, 자유룰(5개 이상 이으면 승리). 흑이 먼저 두고, 다음 판은 진 사람이 흑이에요.</p>
+          <p id="settings-note" class="muted"></p>
+          <button id="btn-ready" class="big"></button>
+        </div>
+
+        <!-- 게임 화면 (끝난 뒤에는 마지막 판을 보여 줌) -->
+        <div id="game-view" class="hidden">
+          <div class="game-top">
+            <div id="side-info" class="side-info"></div>
+            <span id="turn-info" class="muted"></span>
+          </div>
+          <div class="bar-row"><span>시간</span><div class="bar"><div id="time-bar"></div></div><span id="time-sec"></span></div>
+          <div class="board-wrap"><canvas id="board" aria-label="오목판"></canvas></div>
+          <p id="game-status" class="game-status"></p>
+          <div class="game-actions">
+            <button id="btn-resign" class="ghost">기권</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="room-chat-log" class="chat-log"></ul>
+      <form id="room-chat-form" class="chat-form">
+        <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 결과 -->
+  <div id="result-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="result-title">게임 결과</h3>
+      <ol id="result-list" class="result-list"></ol>
+      <button id="btn-close-result">확인</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="../common/lobby.js?v=1"></script>
+  <script src="static/app.js?v=1"></script>
+</body>
+</html>
