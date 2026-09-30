@@ -14,6 +14,12 @@ from .room import MAX_PLAYERS, MIN_PLAYERS, Room
 MAX_NAME = 12
 MAX_TITLE = 30
 MAX_CHAT = 200
+MAX_TOKEN = 64
+
+# WebSocket 종료 코드 (클라이언트가 안내 문구를 고르는 데 쓴다)
+CLOSE_INVALID_NAME = 4000
+CLOSE_NAME_TAKEN = 4001
+CLOSE_REPLACED = 4002
 
 
 def valid_name(name: str) -> bool:
@@ -39,8 +45,26 @@ class GameServer:
 
     # ---- 연결 ----
 
-    async def connect(self, ws: WebSocket, name: str) -> Player:
-        player = Player(id=uuid.uuid4().hex[:8], name=name, ws=ws)
+    def _find_by_name(self, name: str) -> Player | None:
+        key = name.casefold()
+        return next((p for p in self.players.values() if p.name.casefold() == key), None)
+
+    async def connect(self, ws: WebSocket, name: str, token: str) -> Player | None:
+        """닉네임 중복을 막는다. 같은 브라우저(token 일치)면 예전 연결을 끊고 이어받는다."""
+        token = token[:MAX_TOKEN]
+        existing = self._find_by_name(name)
+        if existing:
+            if not token or existing.token != token:
+                await ws.close(code=CLOSE_NAME_TAKEN, reason="name taken")
+                return None
+            await existing.send({"type": "kicked", "message": "다른 창에서 같은 닉네임으로 접속했어요."})
+            await self.disconnect(existing)
+            try:
+                await existing.ws.close(code=CLOSE_REPLACED)
+            except Exception:
+                pass
+
+        player = Player(id=uuid.uuid4().hex[:8], name=name, ws=ws, token=token)
         self.players[player.id] = player
         await player.send({
             "type": "welcome",
@@ -51,9 +75,12 @@ class GameServer:
         return player
 
     async def disconnect(self, player: Player) -> None:
+        # 이어받기로 먼저 정리된 연결이 나중에 한 번 더 들어와도 무시한다.
+        if self.players.get(player.id) is not player:
+            return
+        del self.players[player.id]
         if player.room:
             await self._leave(player)
-        self.players.pop(player.id, None)
         await self.broadcast_lobby()
 
     async def handle(self, player: Player, msg: Any) -> None:

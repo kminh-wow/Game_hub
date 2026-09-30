@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .dictionary import Dictionary
-from .server import GameServer, valid_name
+from .server import CLOSE_INVALID_NAME, GameServer, valid_name
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
@@ -61,10 +61,12 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     await ws.accept()
     name = ws.query_params.get("name", "").strip()
     if not valid_name(name):
-        await ws.close(code=4000, reason="invalid name")
+        await ws.close(code=CLOSE_INVALID_NAME, reason="invalid name")
         return
 
-    player = await server.connect(ws, name)
+    player = await server.connect(ws, name, ws.query_params.get("token", ""))
+    if player is None:
+        return
     try:
         while True:
             raw = await ws.receive_text()

@@ -71,11 +71,28 @@ function logSystem(log, text, cls = "sys") {
 
 // ---------- 연결 ----------
 
+// 브라우저별 식별값. 같은 브라우저에서 같은 닉네임으로 다시 들어오면 예전 연결을 이어받는다.
+const TOKEN = (() => {
+  try {
+    const saved = localStorage.getItem("wco-token");
+    if (saved) return saved;
+  } catch {}
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+  try { localStorage.setItem("wco-token", token); } catch {}
+  return token;
+})();
+
+const CLOSE_MESSAGES = {
+  4000: "닉네임을 확인해 주세요.",
+  4001: "이미 접속 중인 닉네임이에요. 다른 닉네임을 써 주세요.",
+  4002: "다른 창에서 같은 닉네임으로 접속해서 연결이 끊겼어요.",
+};
+
 function connect(name) {
   // 페이지 위치 기준 상대 주소라서 /wordchain/ 처럼 하위 경로에 붙어도 동작한다.
   const url = new URL("ws", location.href);
   url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  url.search = new URLSearchParams({ name }).toString();
+  url.search = new URLSearchParams({ name, token: TOKEN }).toString();
   const ws = new WebSocket(url);
   state.ws = ws;
   ws.onmessage = (e) => handle(JSON.parse(e.data));
@@ -83,7 +100,7 @@ function connect(name) {
     if (state.ws !== ws) return;
     Object.assign(state, { ws: null, me: null, room: null, game: null });
     show("login");
-    $("#login-error").textContent = e.code === 4000 ? "닉네임을 확인해 주세요." : "서버와 연결이 끊겼어요.";
+    $("#login-error").textContent = CLOSE_MESSAGES[e.code] || "서버와 연결이 끊겼어요.";
   };
 }
 
