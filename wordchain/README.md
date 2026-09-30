@@ -1,45 +1,9 @@
 # 끝말잇기 온라인 (Word Chain Online)
 
+> Game Hub의 일부입니다. 실행과 배포 방법은 [루트 README](../README.md)를 보세요.
+
 끄투(KKuTu) 스타일의 실시간 멀티플레이 끝말잇기 게임입니다.
 FastAPI와 WebSocket으로 서버를 만들었고, 프론트엔드는 순수 HTML/CSS/JS입니다.
-
-## 실행
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
-pip install -r requirements-dev.txt
-uvicorn app.main:app --reload
-```
-
-브라우저에서 http://127.0.0.1:8000 을 여세요. 창을 여러 개 띄우면 혼자서도 멀티플레이를 테스트할 수 있습니다.
-
-테스트는 이렇게 실행합니다.
-
-```bash
-pytest
-```
-
-## 서버 배포 (EC2 등 Linux)
-
-Amazon Linux와 Ubuntu에서 동작합니다. systemd 서비스로 등록되므로 SSH 접속을 끊어도 계속 실행되고, 재부팅하면 자동으로 다시 시작합니다.
-
-```bash
-git clone https://github.com/kminh-wow/word-chain-online.git
-cd word-chain-online
-bash deploy/setup.sh              # 기본 80번 포트. 다른 포트를 쓰려면: PORT=8000 bash deploy/setup.sh
-```
-
-전체 사전은 git에 없으므로 내 PC에서 따로 올리고 서버를 재시작합니다.
-
-```bash
-scp -i 키.pem data/words.txt <user>@<서버IP>:~/word-chain-online/data/
-ssh -i 키.pem <user>@<서버IP> sudo systemctl restart word-chain-online
-```
-
-- 코드 업데이트: `bash deploy/update.sh` (git pull 후 재시작)
-- 로그 보기: `sudo journalctl -u word-chain-online -f`
-- 게임 상태가 메모리에 있으므로 **워커는 1개로만** 실행합니다. 재시작하면 진행 중인 방은 모두 사라집니다.
 
 ## 게임 규칙
 
@@ -90,10 +54,10 @@ tests/
 ### 표준국어대사전으로 `data/words.txt` 만들기
 
 1. [표준국어대사전](https://stdict.korean.go.kr)에 로그인한 뒤 "사전 내려받기"에서 전체 파일(xls)을 받습니다.
-2. 받은 xls 파일들이 있는 폴더를 지정해 스크립트를 실행합니다. 15초 정도 걸립니다.
+2. 저장소 루트에서, 받은 xls 파일들이 있는 폴더를 지정해 스크립트를 실행합니다. 15초 정도 걸립니다. 결과는 `wordchain/data/words.txt`에 저장됩니다.
 
 ```bash
-python scripts/build_dictionary.py "C:\경로\전체 내려받기_표준국어대사전_xls_..."
+python wordchain/scripts/build_dictionary.py "C:\경로\전체 내려받기_표준국어대사전_xls_..."
 ```
 
 스크립트의 선별 기준은 다음과 같습니다.
