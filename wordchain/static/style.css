@@ -135,13 +135,17 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 12px; }
 .settings label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .settings label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--text); }
+.settings.editable label { color: var(--text); font-weight: 600; }
+.settings.editable input { color: var(--text); font-weight: 600; border-color: #a5aec2; }
+.settings.editable input:focus { border-color: var(--accent); }
 #waiting-view { display: flex; flex-direction: column; }
 #waiting-view .big { align-self: center; margin-top: 12px; }
 
 .game-top { display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; }
-.word-stage { text-align: center; padding: 18px 0 10px; }
-.last-word { font-size: 40px; font-weight: 700; letter-spacing: 2px; min-height: 52px; }
+.word-stage { text-align: center; padding: 32px 0 10px; overflow: hidden; }
+.last-word { font-size: 40px; font-weight: 700; letter-spacing: 2px; min-height: 52px; margin-inline: 8%; overflow-wrap: anywhere; transform-origin: center; }
 .last-word .tail { color: var(--accent); }
+.word-letter { display: inline-block; transform-origin: center 80%; }
 .need { margin-top: 6px; font-size: 18px; }
 .need b { font-size: 24px; color: var(--accent); }
 
