@@ -18,6 +18,7 @@ http://127.0.0.1:8000 을 여세요.
   - 허브 통합 테스트: `pytest tests`
   - 끝말잇기 규칙·접속 관리: `cd wordchain && pytest`
   - 팩맨 규칙: `node --test pacman/tests/logic.test.mjs` (Node 18 이상)
+  - 행맨 게임 흐름: `cd hangman && pytest`
 
 ## 구조
 
@@ -28,6 +29,7 @@ hub/
 wordchain/       끝말잇기 (FastAPI 앱: wordchain/app/main.py)
 quoridor/        쿼리도   (FastAPI 앱: quoridor/server/main.py)
 pacman/          팩맨     (FastAPI 앱: pacman/app.py, 정적 파일만 제공)
+hangman/         행맨     (FastAPI 앱: hangman/app/main.py)
 deploy/          서버 설치, 업데이트 스크립트
 docs/            이 문서, README용 스크린샷
 tests/           허브 통합 테스트
@@ -39,6 +41,7 @@ tests/           허브 통합 테스트
 | `/wordchain/` | 끝말잇기 |
 | `/quoridor/` | 쿼리도 |
 | `/pacman/` | 팩맨 |
+| `/hangman/` | 행맨 |
 
 - 각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
 - 게임 상태는 각 앱의 **메모리**에 있습니다. uvicorn 워커는 반드시 1개로 실행합니다.
@@ -224,3 +227,44 @@ pacman/
 - 유령 상태: `house`(집 안) → `leaving` → `normal` → (먹히면) `eaten` → `entering` → `leaving` …
 - 디버그: 브라우저 콘솔에서 `__pacman.game`, `__pacman.pac`, `__pacman.ghosts`로 상태를 볼 수 있습니다.
 - 그리기는 `game.js`의 `draw*` 함수에 모여 있습니다. 디자인을 바꿀 때는 이 부분과 `style.css`만 고치면 됩니다.
+
+---
+
+## 행맨
+
+접속·로비·방 관리(`server.py`, `room.py`, `models.py`)는 끝말잇기와 같은 구조입니다. 게임 규칙은 `game.py`에 있습니다.
+
+```
+hangman/
+  app/
+    main.py      FastAPI 앱, /ws 엔드포인트
+    server.py    접속자·로비·방 목록, 닉네임 중복 처리, 메시지 라우팅
+    room.py      대기실(참가자, 준비, 설정), 게임 시작/종료
+    game.py      라운드 진행(출제 → 추측 → 정답 공개), 차례, 점수, 힌트, 퇴장 처리
+    words.py     영어 단어 목록 로딩과 검사
+  static/        index.html, style.css, app.js
+  data/
+    enable1.txt       ENABLE 단어 목록 (퍼블릭 도메인, 약 17만 단어)
+    common_words.txt  출제 시간 초과 때 자동으로 낼 쉬운 단어
+  tests/
+```
+
+- 라운드 단계: `setting`(출제) → `guessing`(추측) → `break`(정답 공개) → 다음 라운드
+- 출제 순서와 추측 순서는 모두 **방에 들어온 순서**입니다. 추측 순서는 출제자 다음 사람부터 시작하고 출제자는 건너뜁니다.
+- 게임 상태는 플레이어마다 따로 보냅니다(`type: "game"`). **정답(`word`)은 출제자와 정답 공개 때만** 들어갑니다.
+- 테스트에서 여러 WebSocket을 열 때는 `with TestClient(app) as client:`처럼 열어야 모든 연결이 이벤트 루프 하나를 공유합니다.
+
+### WebSocket 메시지
+
+접속, 로비, 방, 채팅 메시지와 종료 코드는 끝말잇기와 같습니다. 게임 메시지만 다릅니다.
+
+| 클라이언트 → 서버 | 필드 |
+|---|---|
+| `set_word` | `word`, `hint` (출제자만) |
+| `guess` | `text` (알파벳 1글자 또는 단어 전체, 내 차례만) |
+| `update_settings` | `settings: {cycles, lives, turn_time, hint_turn, max_players}` |
+
+| 서버 → 클라이언트 | 설명 |
+|---|---|
+| `game` | `game`: 내 시점의 게임 상태, `events`: 방금 일어난 일 목록 (`letter_ok`, `letter_fail`, `word_ok`, `hint` …) |
+| `game_over` | 최종 순위 |
