@@ -27,6 +27,8 @@ def client():
         ("/omok/", "오목"),
         ("/omok/static/app.js", "GameLobby.init"),
         ("/common/lobby.js", "new URL(\"ws\""),
+        ("/yacht/", "요트"),
+        ("/yacht/static/app.js", "GameLobby.init"),
     ],
 )
 def test_pages(client, path, needle):
@@ -35,14 +37,14 @@ def test_pages(client, path, needle):
     assert needle in r.text
 
 
-@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman", "omok"])
+@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman", "omok", "yacht"])
 def test_redirect_to_trailing_slash(client, name):
     r = client.get(f"/{name}", follow_redirects=False)
     assert r.status_code in (307, 308)
     assert r.headers["location"] == f"/{name}/"
 
 
-@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/wordchain/docs", "/quoridor/docs", "/pacman/docs", "/hangman/docs", "/omok/docs", "/nothing"])
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/wordchain/docs", "/quoridor/docs", "/pacman/docs", "/hangman/docs", "/omok/docs", "/yacht/docs", "/nothing"])
 def test_hidden_pages(client, path):
     assert client.get(path).status_code == 404
 
@@ -81,4 +83,9 @@ def test_hangman_websocket(client):
 
 def test_omok_websocket(client):
     with client.websocket_connect("/omok/ws?name=hubomok&token=t") as ws:
+        assert ws.receive_json()["type"] == "welcome"
+
+
+def test_yacht_websocket(client):
+    with client.websocket_connect("/yacht/ws?name=hubyacht&token=t") as ws:
         assert ws.receive_json()["type"] == "welcome"

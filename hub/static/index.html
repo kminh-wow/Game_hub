@@ -102,6 +102,11 @@
     .stones i.b { background: #1b1b1b; }
     .stones i.w { background: #f7f7f2; }
 
+    /* 요트 그림: 주사위 */
+    .dice { display: flex; gap: 8px; }
+    .dice b { width: 34px; height: 34px; border-radius: 8px; background: var(--panel); border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .dice b.held { border-color: var(--accent); transform: translateY(-5px); }
+
     footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
   </style>
 </head>
@@ -168,6 +173,16 @@
       <h2>오목</h2>
       <p>먼저 다섯 개를 나란히 놓으면 승리! 친구와 1:1로 두거나, 혼자라면 AI와 한 판.</p>
       <div class="tags"><span>1~2명</span><span>멀티플레이</span><span>AI 대전</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
+    <a class="card" href="yacht/">
+      <div class="art" aria-hidden="true">
+        <div class="dice"><b class="held">⚅</b><b class="held">⚅</b><b class="held">⚅</b><b>⚂</b><b>⚀</b></div>
+      </div>
+      <h2>요트 다이스</h2>
+      <p>주사위 5개를 최대 3번 굴려 족보를 채워요. 풀 하우스, 스트레이트, 그리고 꿈의 요트!</p>
+      <div class="tags"><span>1~5명</span><span>멀티플레이</span></div>
       <span class="play">플레이 →</span>
     </a>
   </main>
