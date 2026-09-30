@@ -55,6 +55,8 @@ export class Board3D {
     this.renderer.setAnimationLoop(now => {
       const dt = previous === undefined ? 0 : Math.min((now - previous) / 1000, .1); previous = now;
       for (const pawn of Object.values(this.pawns)) pawn.mixer.update(dt);
+      const pulse = .5 + .35 * (.5 + .5 * Math.sin(now / 1000 * Math.PI * 2 / 1.2));
+      for (const tile of this.tiles) if (tile.legal) tile.object.traverse(n => { if (n.isMesh) n.material.emissiveIntensity = pulse; });
       for (const tween of [...this.tweens]) {
         tween.elapsed += dt; const t = Math.min(tween.elapsed / tween.duration, 1); tween.update(t);
         if (t === 1) { this.tweens.delete(tween); tween.resolve(); }
@@ -141,10 +143,12 @@ export class Board3D {
     for (const tile of this.tiles) {
       const legal = this.interactive && this.state?.legalMoves.some(([r, c]) => r === tile.r && c === tile.c);
       const entry = this.state?.analysis?.find(a => a.kind === 'move' && a.to[0] === tile.r && a.to[1] === tile.c);
+      tile.legal = legal;
+      tile.object.position.y = legal ? .39 : .35;
       tile.object.traverse(n => { if (n.isMesh) {
-        if (legal) n.material.color.setHex(colors[entry?.label] || 0x28bf95);
+        if (legal) n.material.color.setHex(colors[entry?.label] || 0x00d68f);
         else n.material.color.copy(n.userData.baseColor);
-        n.material.emissive.setHex(legal ? colors[entry?.label] || 0x15a987 : 0); n.material.emissiveIntensity = legal ? .18 : 0;
+        n.material.emissive.setHex(legal ? colors[entry?.label] || 0x00c07f : 0); n.material.emissiveIntensity = legal ? .6 : 0;
       } });
     }
   }
