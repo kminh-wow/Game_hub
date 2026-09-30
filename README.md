@@ -1,58 +1,117 @@
-# Game Hub
+<div align="center">
 
-친구들과 브라우저에서 바로 즐기는 게임 모음입니다. FastAPI 서버 하나가 메인 화면과 모든 게임을 제공합니다.
+# 🎮 Game Hub
 
-| 경로 | 게임 | 설명 |
-|---|---|---|
-| `/` | 메인 화면 | 게임 선택 |
-| `/wordchain/` | [끝말잇기](wordchain/README.md) | 실시간 멀티플레이 끝말잇기 (2~8명) |
-| `/quoridor/` | [쿼리도](quoridor/README.md) | 3D 보드 전략 게임 (2명, AI 대전) |
+**설치도, 가입도 없이. 링크 하나로 친구들과 바로 한 판.**
 
-## 로컬 실행
+### [▶ 지금 플레이하기](http://100.53.186.9)
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
-pip install -r requirements-dev.txt
-uvicorn hub.main:app --reload
-```
+<img src="docs/images/hub.png" alt="Game Hub 메인 화면" width="760">
 
-http://127.0.0.1:8000 을 여세요.
+</div>
 
-- 끝말잇기 전체 사전(`wordchain/data/words.txt`)은 git에 없습니다. 없으면 샘플 사전(약 450단어)으로 실행됩니다. 만드는 방법은 [끝말잇기 README](wordchain/README.md#사전)에 있습니다.
-- 테스트: `pytest tests` (허브), `cd wordchain && pytest` (끝말잇기 규칙)
+---
 
-## 구조
+## 게임
 
-```
-hub/
-  main.py        메인 앱: 게임 앱들을 경로별로 붙인다 (mount)
-  static/        메인 화면
-wordchain/       끝말잇기 (FastAPI 앱: wordchain/app/main.py)
-quoridor/        쿼리도 (FastAPI 앱: quoridor/server/main.py)
-deploy/          서버 설치, 업데이트 스크립트
-tests/           허브 통합 테스트
-```
+| | 게임 | 인원 | 한 줄 소개 |
+|:-:|---|:-:|---|
+| 🔤 | **[끝말잇기](wordchain/README.md)** | 2~8명 | 21만 단어 사전으로 겨루는 실시간 끝말잇기 |
+| 🧱 | **[쿼리도](quoridor/README.md)** | 1~2명 | 벽을 세워 길을 막는 3D 전략 보드게임 |
 
-각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
+### 🔤 끝말잇기
 
-### 새 게임 추가하기
+<img src="docs/images/wordchain-game.png" alt="끝말잇기 게임 화면" width="760">
 
-1. `<게임이름>/` 폴더에 FastAPI 앱을 만듭니다. 프론트엔드에서는 `/ws` 대신 `new URL("ws", location.href)`처럼 상대 경로를 씁니다.
-2. `hub/main.py`의 `GAMES`에 등록합니다.
-3. `hub/static/index.html`에 카드를 추가합니다.
+끝 글자를 이어 가며 제한 시간 안에 단어를 대는 실시간 대전입니다.
+**표준국어대사전 21만 단어**로 판정하고, 두음법칙(력 → 역)과 한방단어 규칙까지 챙겼어요.
+빨리 칠수록, 긴 단어일수록 점수가 올라갑니다.
 
-## 서버 배포 (EC2 등 Linux)
+[게임 설명 보기 →](wordchain/README.md)
 
-게임 상태가 서버 메모리에 있으므로 **워커는 1개로만** 실행합니다. 재시작하면 진행 중인 방은 모두 사라집니다.
+### 🧱 쿼리도
 
-```bash
-git clone https://github.com/kminh-wow/Game_hub.git
-cd Game_hub
-bash deploy/setup.sh              # 기본 8000번 포트 (nginx가 80 → 8000 전달)
-```
+<img src="docs/images/quoridor-game.png" alt="쿼리도 3D 보드" width="760">
 
-- 예전에 따로 설치한 `word-chain-online`, `quoridor` 서비스는 자동으로 끄고 지웁니다. 서버의 `~/word-chain-online`에 끝말잇기 사전이 있으면 그것도 복사해 옵니다.
-- nginx 없이 80번으로 바로 띄우려면: `PORT=80 bash deploy/setup.sh`
-- 코드 업데이트: `bash deploy/update.sh`
-- 로그 보기: `sudo journalctl -u game-hub -f`
+말을 한 칸씩 움직이거나 벽을 세워서, 상대보다 먼저 반대편 끝에 도착하면 이기는 전략 보드게임입니다.
+돌리고 확대할 수 있는 **3D 보드**에서 친구와 1:1로 붙거나 **AI**(하·중·상)와 대결할 수 있어요.
+AI가 한 수 한 수를 어떻게 평가하는지 보여주는 **학습 모드**도 있습니다.
+
+[게임 설명 보기 →](quoridor/README.md)
+
+---
+
+## 이렇게 시작하세요
+
+1. **[Game Hub](http://100.53.186.9)에 접속**해서 하고 싶은 게임을 고릅니다.
+2. **닉네임을 정하거나 방을 만듭니다.** 가입도 로그인도 필요 없어요.
+3. **친구에게 주소를 보내세요.** 같은 방에 들어오면 바로 시작입니다.
+
+크롬, 엣지, 사파리 같은 최신 브라우저에서 동작합니다. 앱을 설치할 필요는 없어요.
+
+## 자주 묻는 질문
+
+<details>
+<summary><b>회원가입을 해야 하나요?</b></summary>
+
+아니요. 끝말잇기는 닉네임만 입력하면 되고, 쿼리도는 바로 시작할 수 있어요.
+</details>
+
+<details>
+<summary><b>점수나 전적이 저장되나요?</b></summary>
+
+아직은 저장하지 않아요. 한 판이 끝나면 결과를 보여주고 그걸로 끝입니다.
+서버를 점검하면 진행 중인 방도 초기화돼요.
+</details>
+
+<details>
+<summary><b>"이미 접속 중인 닉네임"이라고 떠요.</b></summary>
+
+같은 닉네임을 다른 사람이 쓰고 있거나, 다른 기기에서 접속한 연결이 아직 남아 있는 경우예요.
+
+- **같은 브라우저**라면 다시 입장할 때 예전 연결을 자동으로 이어받아요.
+- **다른 기기**에서 쓰던 닉네임이라면 1분 정도 뒤에 다시 시도해 주세요.
+</details>
+
+<details>
+<summary><b>화면이 이상하거나 예전 모습 그대로예요.</b></summary>
+
+업데이트 직후라면 브라우저가 예전 화면을 기억하고 있을 수 있어요.
+<kbd>Ctrl</kbd> + <kbd>F5</kbd>(맥은 <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>)로 새로고침해 주세요.
+</details>
+
+<details>
+<summary><b>끝말잇기에서 욕도 인정되나요?</b></summary>
+
+네. **사전에 실린 말이면 비속어도 인정**합니다.
+사전에는 없지만 흔히 쓰는 몇몇 비속어도 따로 추가해 두었어요.
+친구끼리 편하게 즐기되, 모르는 사람과 할 때는 매너를 지켜 주세요.
+</details>
+
+## 업데이트 소식
+
+| 날짜 | 내용 |
+|---|---|
+| 2026-09-30 | 🎉 **Game Hub 오픈**: 끝말잇기와 쿼리도를 한곳에서 |
+| 2026-09-30 | 두 게임 디자인 통일, 끝말잇기 단어 착지 효과 |
+| 2026-09-30 | 끝말잇기 닉네임 중복 접속 방지, 빈 방 자동 정리 |
+| 2026-09-29 | 끝말잇기 사전을 **표준국어대사전 21만 단어**로 확장, 비속어 인정 |
+| 2026-09-29 | 끝말잇기 첫 공개: 로비, 방, 두음법칙, 한방단어 규칙 |
+| 2026-09-26 | 쿼리도 **3D 보드**와 캐릭터 애니메이션 |
+
+## 준비 중
+
+- 🔤 끝말잇기: 맞힌 단어의 뜻풀이 보여주기, 관전 모드, 쿵쿵따·앞말잇기 모드
+- 🧱 쿼리도: 온라인 대전 재접속
+- 🎮 Game Hub: 새로운 게임 추가
+
+하고 싶은 게임이나 불편한 점이 있다면 [이슈](https://github.com/kminh-wow/Game_hub/issues)로 알려 주세요.
+
+## 출처
+
+- 끝말잇기 사전: 국립국어원 [표준국어대사전](https://stdict.korean.go.kr)
+- 3D 렌더링: [three.js](https://threejs.org) (MIT License)
+
+<br>
+
+<sub>개발 참여나 직접 서버를 띄우는 방법은 [개발 문서](docs/DEVELOPMENT.md)에 있어요.</sub>
