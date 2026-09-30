@@ -166,13 +166,20 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 /* ---- 행맨 ---- */
 
 .game-top { display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; }
-.stage { display: flex; gap: 24px; align-items: center; justify-content: center; padding: 12px 0; flex-wrap: wrap; }
-.gallows { width: 170px; height: 190px; }
+.gallows-list { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 12px 0; }
+.gallows-list li { width: 110px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; text-align: center; font-size: 13px; }
+.gallows-list li.turn { border-color: var(--accent); background: var(--accent-soft); }
+.gallows-list li.me .name { color: var(--accent); }
+.gallows-list li.dead { opacity: .55; }
+.gallows-list .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gallows-list .count { color: var(--muted); }
+.gallows-list li.dead .count { color: var(--bad); font-weight: 600; }
+.gallows { width: 90px; height: 100px; }
 .gallows line, .gallows circle { stroke: var(--text); stroke-width: 5; stroke-linecap: round; fill: none; }
 .gallows .frame { stroke: var(--muted); }
 .gallows .part { visibility: hidden; }
 .gallows .part.on { visibility: visible; stroke: var(--bad); }
-.word-area { text-align: center; min-width: 260px; }
+.word-area { text-align: center; padding-top: 16px; }
 .pattern { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .pattern span { width: 34px; height: 44px; border-bottom: 3px solid var(--text); font-size: 30px; font-weight: 700; display: flex; align-items: end; justify-content: center; }
 .pattern span.hint { color: var(--warn); }

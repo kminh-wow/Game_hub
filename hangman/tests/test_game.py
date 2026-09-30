@@ -102,23 +102,26 @@ def test_full_game_two_players(client):
     assert "이미 나온 글자" in b.until("error")["message"]
 
     b.send("guess", text="z")
-    g = b.game(lambda g: g["strikes"] == 1)["game"]
-    assert g["wrong_letters"] == ["Z"]
+    g = b.game(lambda g: g["strikes"][b.id] == 1)["game"]
+    assert g["wrong_letters"] == ["Z"] and g["strikes"][a.id] == 0
 
     b.send("guess", text="APPLE")                     # 남은 빈칸 3개 × 10 + 30
     g = b.game(lambda g: g["phase"] == "break")["game"]
     assert g["word"] == "APPLE" and g["solver_id"] == b.id
     assert g["scores"][b.id] == 20 + 60
 
-    # 2라운드: b 가 출제, a 가 추측. 6번 틀리면 교수대 완성 → 출제자 +50
+    # 2라운드: b 가 출제, a 가 추측. 6번 틀리면 a 의 교수대 완성 → a -20, 출제자 +20
     g = a.game(lambda g: g["phase"] == "setting" and g["round"] == 2)["game"]
     assert g["setter_id"] == b.id
     b.send("set_word", word="kiwi")
     a.game(lambda g: g["phase"] == "guessing")
     for letter in "ABCDEF":
         a.send("guess", text=letter)
-    g = a.game(lambda g: g["phase"] == "break")["game"]
-    assert g["solver_id"] is None and g["scores"][b.id] == 80 + 50
+    m = a.game(lambda g: g["phase"] == "break")
+    g = m["game"]
+    assert g["solver_id"] is None and g["hanged"] == [a.id]
+    assert g["scores"][b.id] == 80 + 20 and g["scores"][a.id] == -20
+    assert [e["kind"] for e in m["events"]][-2:] == ["hanged", "round_end"]
 
     ranking = a.until("game_over")["ranking"]
     assert [r["name"] for r in ranking] == [b.name, a.name]
@@ -137,7 +140,7 @@ def test_guess_order_skips_setter_and_hint_letter(client):
     g = c.game(lambda g: g["guesser_id"] == c.id)["game"]
     assert g["hint_in"] == 1
     c.send("guess", text="q")
-    m = b.game(lambda g: g["guesser_id"] == b.id and g["strikes"] == 2)  # 출제자 a 는 건너뜀
+    m = b.game(lambda g: g["guesser_id"] == b.id and g["strikes"][c.id] == 1)  # 출제자 a 는 건너뜀
     assert m["game"]["hint_letter"] in ("A", "N", "B")
     assert m["events"][-1]["kind"] == "hint_letter"
     for conn in (a, b, c):
@@ -174,3 +177,26 @@ def test_last_guesser_leaving_ends_game(client):
     assert a.until("game_over")["ranking"][0]["name"] == a.name
     assert all(r.game is None for r in server.rooms.values() if a.id in [p.id for p in r.players])
     a.close()
+
+
+def test_hanged_player_is_skipped_until_all_hanged(client):
+    a, b, c = start_game(client, 3, lives=4)
+    a.game(lambda g: g["phase"] == "setting")
+    a.send("set_word", word="kiwi")
+    b.game(lambda g: g["phase"] == "guessing")
+
+    # b, c 번갈아 틀림 → 4번째에 b 탈락. 그다음부터는 c 만 계속 추측
+    for i, (letter, who) in enumerate(zip("ABCDEFG", [b, c, b, c, b, c, b])):
+        if i > 0:  # 첫 차례(b)는 이미 위에서 받았다
+            who.game(lambda g, w=who: g["guesser_id"] == w.id)
+        who.send("guess", text=letter)
+    g = c.game(lambda g: b.id in g["hanged"])["game"]
+    assert g["guesser_id"] == c.id and g["strikes"][b.id] == 4 and g["strikes"][c.id] == 3
+    assert g["scores"][b.id] == -20 and g["scores"][a.id] == 20
+
+    c.send("guess", text="H")                               # c 도 탈락 → 모두 탈락, 라운드 끝
+    g = c.game(lambda g: g["phase"] == "break")["game"]
+    assert g["hanged"] == [b.id, c.id]
+    assert g["scores"][a.id] == 40 and g["scores"][c.id] == -20
+    for conn in (a, b, c):
+        conn.close()

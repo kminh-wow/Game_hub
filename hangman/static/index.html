@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>행맨</title>
-  <link rel="stylesheet" href="static/style.css?v=1">
+  <link rel="stylesheet" href="static/style.css?v=2">
 </head>
 <body>
   <!-- 로그인 -->
@@ -97,25 +97,14 @@
             <span id="turn-info"></span>
           </div>
 
-          <div class="stage">
-            <svg class="gallows" viewBox="0 0 170 190" aria-label="교수대">
-              <line class="frame" x1="10" y1="180" x2="110" y2="180" />
-              <line class="frame" x1="40" y1="180" x2="40" y2="10" />
-              <line class="frame" x1="40" y1="10" x2="120" y2="10" />
-              <line class="frame" x1="120" y1="10" x2="120" y2="35" />
-              <circle class="part" cx="120" cy="52" r="17" />
-              <line class="part" x1="120" y1="69" x2="120" y2="120" />
-              <line class="part" x1="120" y1="82" x2="97" y2="105" />
-              <line class="part" x1="120" y1="82" x2="143" y2="105" />
-              <line class="part" x1="120" y1="120" x2="100" y2="155" />
-              <line class="part" x1="120" y1="120" x2="140" y2="155" />
-            </svg>
-            <div class="word-area">
-              <div id="pattern" class="pattern"></div>
-              <div id="hint-line" class="hint-line"></div>
-              <div id="wrong-line" class="wrong-line"></div>
-            </div>
+          <div class="word-area">
+            <div id="pattern" class="pattern"></div>
+            <div id="hint-line" class="hint-line"></div>
+            <div id="wrong-line" class="wrong-line"></div>
           </div>
+
+          <!-- 추측하는 사람마다 교수대 하나씩 -->
+          <ul id="gallows-list" class="gallows-list"></ul>
 
           <div class="bar-row"><span>시간</span><div class="bar"><div id="time-bar"></div></div><span id="time-sec"></span></div>
           <p id="game-status" class="game-status"></p>
@@ -159,6 +148,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="static/app.js?v=1"></script>
+  <script src="static/app.js?v=2"></script>
 </body>
 </html>
