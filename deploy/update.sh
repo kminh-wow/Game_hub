@@ -1,15 +1,7 @@
 #!/usr/bin/env bash
-# 코드 업데이트: git pull → 의존성 설치 → 재시작
+# 코드 업데이트: git pull 후, 받은 최신 post_update.sh 로 나머지(의존성·데이터·재시작)를 진행한다.
+# (git pull 이 이 파일 자체를 바꿔도 실행이 꼬이지 않도록 나머지 단계는 별도 파일에 둔다)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 git pull --ff-only
-.venv/bin/pip install -q -r requirements.txt
-
-# 끄투 단어(일반 + 어인정)는 git 에 없으므로 없으면 GitHub 에서 받아 만든다.
-if [ ! -f wordchain/data/kkutu_words.txt ]; then
-  echo "==> 끄투 단어 가져오는 중 (약 42MB 다운로드)"
-  .venv/bin/python wordchain/scripts/import_kkutu.py || echo "!! 끄투 단어를 못 가져왔어요. 표준국어대사전만으로 실행됩니다."
-fi
-sudo systemctl restart game-hub
-sleep 2
-systemctl --no-pager status game-hub | head -5
+exec bash deploy/post_update.sh
