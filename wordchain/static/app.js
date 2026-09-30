@@ -138,6 +138,7 @@ const handlers = {
   },
 
   round_start(msg) {
+    stopWordImpact();
     Object.assign(state.game, {
       round: msg.round,
       rounds: msg.rounds,
@@ -167,6 +168,8 @@ const handlers = {
     state.game.chain.push(msg.word);
     state.game.scores = msg.scores;
     setStatus(`${playerName(msg.player_id)} 「${msg.word}」 +${msg.gain}`, "ok");
+    renderGame();
+    playWordImpact();
   },
 
   word_fail(msg) {
@@ -287,6 +290,7 @@ function renderRoom() {
 
 function renderWaiting(room, amHost) {
   const form = $("#settings-form");
+  form.classList.toggle("editable", amHost);
   const values = { ...room.settings, max_players: room.max_players };
   for (const input of form.elements) {
     input.disabled = !amHost;
@@ -317,10 +321,17 @@ function renderGame() {
   $("#turn-info").textContent = game.current ? `${playerName(game.current)}님 차례` : "";
 
   const last = game.chain[game.chain.length - 1] || "";
-  $("#last-word").replaceChildren(
-    last.slice(0, -1),
-    el("span", { className: "tail", textContent: last.slice(-1) })
-  );
+  const word = $("#last-word");
+  // The immediate turn message must preserve the letters being animated.
+  if (word.dataset.word !== last) {
+    stopWordImpact();
+    word.dataset.word = last;
+    const letters = Array.from(last);
+    word.replaceChildren(...letters.map((letter, i) => el("span", {
+      className: `word-letter${i === letters.length - 1 ? " tail" : ""}`,
+      textContent: letter,
+    })));
+  }
   $("#need-chars").textContent = game.chars.join(" / ");
 
   $("#chain-list").replaceChildren(
@@ -339,6 +350,35 @@ function shake(node) {
   void node.offsetWidth;
   node.classList.add("shake");
 }
+
+// Land each letter at 0.3-second intervals.
+let wordImpacts = [];
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function stopWordImpact() {
+  wordImpacts.forEach(animation => animation.cancel());
+  wordImpacts = [];
+}
+
+function playWordImpact() {
+  stopWordImpact();
+  if (reducedMotion.matches) return;
+  const letters = [...$("#last-word").children];
+  const stagger = 300;
+  wordImpacts = letters.map((letter, i) => letter.animate([
+    { transform: "translateY(-18px) scale(1.65)", opacity: 0, offset: 0 },
+    { transform: "translateY(-12px) scale(1.45)", opacity: 1, offset: 0.12 },
+    { transform: "translateY(4px) scale(1.22, .78)", opacity: 1, offset: 0.30 },
+    { transform: "translate(-3px, -3px) scale(.96, 1.12)", offset: 0.46 },
+    { transform: "translate(3px, 1px) scale(1.05, .96)", offset: 0.62 },
+    { transform: "translateX(-1px) scale(1.02)", offset: 0.80 },
+    { transform: "translate(0, 0) scale(1)", opacity: 1, offset: 1 },
+  ], { duration: 360, delay: i * stagger, easing: "linear", fill: "backwards" }));
+}
+
+reducedMotion.addEventListener("change", () => {
+  if (reducedMotion.matches) stopWordImpact();
+});
 
 // ---------- 타이머 ----------
 

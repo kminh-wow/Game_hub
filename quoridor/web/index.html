@@ -7,11 +7,13 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <a href="../" style="display:block;text-align:center;margin-top:12px;color:#6f7689;font-size:14px;text-decoration:none">← Game Hub</a>
-  <h1>Quoridor</h1>
 
   <section id="menu" class="screen">
-    <button id="btn-create">새 게임 만들기</button>
+    <div class="login-card">
+    <h1>쿼리도 <span>온라인</span></h1>
+    <p class="muted">길을 만들고, 상대보다 먼저 도착하세요</p>
+    <div class="menu-actions">
+    <button id="btn-create" class="big">새 게임 만들기</button>
     <div class="join-row">
       <input id="join-code" maxlength="6" placeholder="방 코드 입력">
       <button id="btn-join">코드로 참가</button>
@@ -22,17 +24,28 @@
       <button class="btn-ai-diff" data-difficulty="medium">중</button>
       <button class="btn-ai-diff" data-difficulty="hard">상</button>
     </div>
-    <button id="btn-learn">학습 모드</button>
+    <button id="btn-learn" class="ghost">학습 모드</button>
+    </div>
     <p id="menu-error" class="error"></p>
+    <a class="hub-link" href="../">← 다른 게임 고르기</a>
+    </div>
   </section>
 
   <section id="waiting" class="screen hidden">
+    <div class="login-card">
+    <h2>친구를 기다리고 있어요</h2>
     <p>방 코드: <span id="waiting-code"></span></p>
-    <p>상대를 기다리는 중...</p>
+    <p class="muted">친구에게 방 코드를 알려 주세요</p>
+    <a class="hub-link" href="../">← Game Hub</a>
+    </div>
   </section>
 
   <section id="game" class="screen hidden">
-    <div id="hud">
+    <header class="topbar">
+      <a class="hub-link" href="../">← Game Hub</a>
+      <h2>쿼리도</h2>
+    </header>
+    <div id="hud" class="panel">
       <span id="turn-indicator"></span>
       <span id="walls-left"></span>
       <span id="difficulty-indicator"></span>
@@ -81,7 +94,7 @@ for a in actions:
     elif gap <= 19:   label = "괜찮은 수"
     else:             label = "안좋은 수"</pre>
       </div>
-      <div id="board-panel">
+      <div id="board-panel" class="panel">
         <div id="board-controls" aria-label="보드 조작">
           <button id="mode-move" aria-pressed="true">말 이동</button>
           <button id="mode-wall" aria-pressed="false">벽 설치</button>
@@ -89,11 +102,12 @@ for a in actions:
           <button id="reset-camera">시점 초기화</button>
         </div>
         <p id="board-help">빛나는 칸을 누르면 이동합니다. 빨강: 1P · 파랑: 2P</p>
-        <p>드래그: 회전 · 휠/두 손가락: 확대·축소</p>
+        <p class="board-hint">드래그: 회전 · 휠/두 손가락: 확대·축소</p>
         <div id="board-wrap" aria-label="3D 코리도 보드"></div>
         <p id="board-status" role="status">3D 모델을 불러오는 중...</p>
       </div>
       <div id="chat-panel">
+        <h3>채팅</h3>
         <div id="chat-log"></div>
         <div class="chat-input-row">
           <input id="chat-input" maxlength="300" placeholder="메시지 입력">
@@ -112,6 +126,7 @@ for a in actions:
 
   <div id="result-modal" class="hidden">
     <div class="modal-box">
+      <h3>게임 결과</h3>
       <p id="result-text"></p>
       <button id="btn-restart">메뉴로</button>
     </div>
