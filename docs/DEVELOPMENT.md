@@ -27,13 +27,14 @@ hub/
   main.py        메인 앱: 게임 앱들을 경로별로 붙인다 (mount), 캐시 헤더
   static/        메인 화면
 common/
-  multiplayer/   멀티 게임 공통 서버: 접속·닉네임·로비·방·채팅·WebSocket (끝말잇기, 행맨, 오목)
-  web/lobby.js   멀티 게임 공통 화면: 로그인·로비·대기실·채팅·결과 창 (/common/lobby.js, 지금은 오목만 사용)
+  multiplayer/   멀티 게임 공통 서버: 접속·닉네임·로비·방·채팅·WebSocket (끝말잇기, 행맨, 오목, 요트 다이스)
+  web/lobby.js   멀티 게임 공통 화면: 로그인·로비·대기실·채팅·결과 창 (/common/lobby.js, 오목·요트 다이스가 사용)
 wordchain/       끝말잇기 (FastAPI 앱: wordchain/app/main.py)
 quoridor/        쿼리도   (FastAPI 앱: quoridor/server/main.py)
 pacman/          팩맨     (FastAPI 앱: pacman/app.py, 정적 파일만 제공)
 hangman/         행맨     (FastAPI 앱: hangman/app/main.py)
 omok/            오목     (FastAPI 앱: omok/app/main.py)
+yacht/           요트 다이스 (FastAPI 앱: yacht/app/main.py)
 deploy/          서버 설치, 업데이트 스크립트
 docs/            이 문서, README용 스크린샷
 tests/           허브 통합 테스트
@@ -47,6 +48,7 @@ tests/           허브 통합 테스트
 | `/pacman/` | 팩맨 |
 | `/hangman/` | 행맨 |
 | `/omok/` | 오목 |
+| `/yacht/` | 요트 다이스 |
 | `/common/` | 공통 프론트엔드 파일 (`lobby.js`) |
 
 - 각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
@@ -373,3 +375,21 @@ omok/
 - 혼자 시작하면 `AIPlayer`가 상대가 됩니다. AI는 빈 칸마다 공격 점수(내 돌이 이어지는 정도) × 1.1 + 수비 점수(상대 돌이 이어지는 정도)를 계산해 가장 높은 곳에 둡니다. 띈 모양(예: ●●_●●)은 보지 않는 단순한 방식입니다.
 - 첫 판은 흑백을 무작위로 정하고, 다음 판부터는 직전 판에서 진 사람이 흑입니다.
 - 게임 메시지: `place {x, y}`, `resign` → 서버는 `game`(판 상태), `game_over`(승자, 이유: five·timeout·resign·leave·draw)를 보냅니다.
+
+---
+
+## 요트 다이스
+
+```
+yacht/
+  app/
+    main.py     GameServer·앱 생성 (게임 메시지: roll, hold, write)
+    room.py     방 설정(한 차례 제한 시간), 1~5명
+    game.py     차례 진행: 굴리기(최대 3번), 고정, 점수 기록, 시간 초과 자동 기록, 퇴장
+    rules.py    족보 점수 계산, 보너스, 자동 기록 칸 고르기
+  static/       index.html, style.css, app.js (lobby.js 사용)
+  tests/
+```
+
+- 주사위 값은 서버가 정합니다. `game` 메시지의 `events`에 `roll` 이벤트(`dice`, 이번에 굴러간 주사위 `rolled`)가 오면, 화면은 굴러간 주사위만 0.7초 동안 무작위 눈을 보여 주다가 실제 값에 멈춥니다.
+- `preview`는 지금 주사위로 각 칸에 적을 수 있는 점수입니다. 차례인 사람은 버튼으로, 다른 사람은 회색 글자로 봅니다.
