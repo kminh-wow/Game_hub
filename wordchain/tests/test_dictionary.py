@@ -33,3 +33,12 @@ def test_dictionary_filters_and_killer():
     assert d.is_killer("로봇")      # '봇'으로 시작하는 단어 없음
     assert d.is_killer("과일")      # '일'로 시작하는 단어 없음
     assert not d.is_killer(d.random_start_word())
+
+
+def test_injeong_words_are_optional():
+    d = Dictionary(["사과", "과일"], injeong=["일본", "사과"])
+    assert d.injeong == {"일본"}              # 일반 단어와 겹치면 일반 단어로 본다
+    assert d.allows("사과") and not d.allows("일본")
+    assert d.allows("일본", injeong=True)
+    assert d.is_killer("과일")                 # 어인정을 빼면 '일'로 시작하는 말이 없다
+    assert not d.is_killer("과일", injeong=True)

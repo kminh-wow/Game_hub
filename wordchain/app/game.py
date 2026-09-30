@@ -149,9 +149,11 @@ class Game:
             return f"'{'/'.join(self.chars)}'(으)로 시작해야 해요"
         if word in self.used:
             return "이미 나온 단어예요"
-        if word not in self.dictionary:
+        if not self.dictionary.allows(word, self.settings.injeong):
+            if word in self.dictionary.injeong:
+                return "어인정 단어는 이 방에서 쓸 수 없어요"
             return "사전에 없는 단어예요"
-        if self.settings.no_killer and self.dictionary.is_killer(word):
+        if self.settings.no_killer and self.dictionary.is_killer(word, self.settings.injeong):
             return "한방단어는 금지예요"
         return None
 

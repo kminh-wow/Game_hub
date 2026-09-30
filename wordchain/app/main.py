@@ -27,14 +27,20 @@ def resolve_words_path() -> Path:
 
 
 def dictionary_paths() -> list[Path]:
+    """메인 사전 + 끄투 일반 단어(scripts/import_kkutu.py 로 생성) + 보충 사전."""
     paths = [resolve_words_path()]
-    extra = DATA_DIR / "extra_words.txt"
-    if extra.exists():
-        paths.append(extra)
+    for name in ("kkutu_words.txt", "extra_words.txt"):
+        if (DATA_DIR / name).exists():
+            paths.append(DATA_DIR / name)
     return paths
 
 
-dictionary = Dictionary.load(*dictionary_paths())
+def injeong_paths() -> list[Path]:
+    path = DATA_DIR / "kkutu_injeong.txt"
+    return [path] if path.exists() else []
+
+
+dictionary = Dictionary.load(*dictionary_paths(), injeong_paths=injeong_paths())
 server = GameServer(dictionary)
 
 # 게임 화면 외의 자동 문서 페이지(/docs, /redoc, /openapi.json)는 노출하지 않는다.
