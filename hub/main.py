@@ -6,6 +6,7 @@
     /pacman/     팩맨
     /hangman/    행맨
     /omok/       오목
+    /yacht/      요트 다이스
     /common/     게임들이 함께 쓰는 프론트엔드 파일 (lobby.js 등)
 
 게임 상태가 각 앱의 메모리에 있으므로 uvicorn 워커는 반드시 1개로 실행한다.
@@ -21,6 +22,7 @@ from starlette.datastructures import MutableHeaders
 
 from hangman.app.main import app as hangman_app
 from omok.app.main import app as omok_app
+from yacht.app.main import app as yacht_app
 from pacman.app import app as pacman_app
 from quoridor.server.main import app as quoridor_app
 from wordchain.app.main import app as wordchain_app
@@ -34,6 +36,7 @@ GAMES = {
     "pacman": pacman_app,
     "hangman": hangman_app,
     "omok": omok_app,
+    "yacht": yacht_app,
 }
 
 app = FastAPI(title="Game Hub", docs_url=None, redoc_url=None, openapi_url=None)
