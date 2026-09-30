@@ -4,6 +4,7 @@
     /wordchain/  끝말잇기
     /quoridor/   쿼리도
     /pacman/     팩맨
+    /hangman/    행맨
 
 게임 상태가 각 앱의 메모리에 있으므로 uvicorn 워커는 반드시 1개로 실행한다.
 """
@@ -16,6 +17,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import MutableHeaders
 
+from hangman.app.main import app as hangman_app
 from pacman.app import app as pacman_app
 from quoridor.server.main import app as quoridor_app
 from wordchain.app.main import app as wordchain_app
@@ -26,6 +28,7 @@ GAMES = {
     "wordchain": wordchain_app,
     "quoridor": quoridor_app,
     "pacman": pacman_app,
+    "hangman": hangman_app,
 }
 
 app = FastAPI(title="Game Hub", docs_url=None, redoc_url=None, openapi_url=None)

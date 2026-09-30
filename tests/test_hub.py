@@ -22,6 +22,8 @@ def client():
         ("/pacman/", "팩맨"),
         ("/pacman/game.js", "./logic.js"),
         ("/pacman/logic.js", "export const MAZE"),
+        ("/hangman/", "행맨"),
+        ("/hangman/static/app.js", "new URL(\"ws\""),
     ],
 )
 def test_pages(client, path, needle):
@@ -30,14 +32,14 @@ def test_pages(client, path, needle):
     assert needle in r.text
 
 
-@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman"])
+@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman"])
 def test_redirect_to_trailing_slash(client, name):
     r = client.get(f"/{name}", follow_redirects=False)
     assert r.status_code in (307, 308)
     assert r.headers["location"] == f"/{name}/"
 
 
-@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/wordchain/docs", "/quoridor/docs", "/pacman/docs", "/nothing"])
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/wordchain/docs", "/quoridor/docs", "/pacman/docs", "/hangman/docs", "/nothing"])
 def test_hidden_pages(client, path):
     assert client.get(path).status_code == 404
 
@@ -66,3 +68,9 @@ def test_responses_are_revalidated(client):
     assert r.headers["cache-control"] == "no-cache"
     etag = r.headers["etag"]
     assert client.get("/wordchain/static/app.js", headers={"If-None-Match": etag}).status_code == 304
+
+
+def test_hangman_websocket(client):
+    with client.websocket_connect("/hangman/ws?name=hubtester&token=t") as ws:
+        msg = ws.receive_json()
+        assert msg["type"] == "welcome" and msg["word_count"] > 100_000
