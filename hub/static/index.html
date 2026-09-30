@@ -96,6 +96,12 @@
     .blanks { display: flex; gap: 8px; }
     .blanks b { width: 26px; border-bottom: 3px solid var(--text); text-align: center; font-size: 22px; line-height: 30px; }
 
+    /* 오목 그림: 돌 다섯 개 */
+    .stones { display: grid; grid-template-columns: repeat(5, 24px); gap: 4px; padding: 10px; background: #dcb35c; border-radius: 6px; }
+    .stones i { width: 22px; height: 22px; border-radius: 50%; }
+    .stones i.b { background: #1b1b1b; }
+    .stones i.w { background: #f7f7f2; }
+
     footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
   </style>
 </head>
@@ -151,6 +157,17 @@
       <h2>행맨</h2>
       <p>돌아가며 영어 단어를 내고, 차례대로 알파벳을 맞혀요. 교수대가 완성되기 전에 정답을 찾아라!</p>
       <div class="tags"><span>2~8명</span><span>멀티플레이</span><span>영어</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
+    <a class="card" href="omok/">
+      <div class="art" aria-hidden="true">
+        <div class="stones"><i class="b"></i><i class="b"></i><i class="b"></i><i class="b"></i><i class="b"></i>
+          <i></i><i class="w"></i><i class="w"></i><i class="w"></i><i></i></div>
+      </div>
+      <h2>오목</h2>
+      <p>먼저 다섯 개를 나란히 놓으면 승리! 친구와 1:1로 두거나, 혼자라면 AI와 한 판.</p>
+      <div class="tags"><span>1~2명</span><span>멀티플레이</span><span>AI 대전</span></div>
       <span class="play">플레이 →</span>
     </a>
   </main>
