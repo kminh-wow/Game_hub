@@ -18,3 +18,7 @@ h1 { margin: 0; color: #ff0; }
 #lives { letter-spacing: 2px; }
 canvas { max-width: 100%; height: auto; image-rendering: pixelated; touch-action: none; }
 .help { color: #888; font-size: 13px; margin: 0; }
+.difficulty { display: flex; gap: 6px; }
+.difficulty button { background: #222; color: #aaa; border: 1px solid #444; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.difficulty button.on { background: #ff0; color: #111; border-color: #ff0; font-weight: bold; }
+.difficulty button:disabled { opacity: .5; cursor: default; }
