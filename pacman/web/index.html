@@ -4,12 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>팩맨</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=large-board-stars">
+  <script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js","three/addons/":"./vendor/three/examples/jsm/"}}</script>
 </head>
 <body>
+  <main class="game-shell">
   <header>
     <a href="../">← Game Hub</a>
-    <h1>팩맨</h1>
+    <h1>팩맨<span class="title-dot" aria-hidden="true"></span></h1>
   </header>
 
   <div id="hud">
@@ -19,10 +21,14 @@
     <span>목숨 <b id="lives"></b></span>
   </div>
 
-  <canvas id="board"></canvas>
+  <div class="board-wrap">
+    <canvas id="board" aria-label="팩맨 3D 미로"></canvas>
+    <div id="message" role="status">게임을 불러오는 중</div>
+  </div>
 
   <p class="help">방향키 / WASD: 이동 · Enter: 시작 · P: 일시정지 · 모바일: 화면을 쓸어서 이동</p>
+  </main>
 
-  <script type="module" src="game.js"></script>
+  <script type="module" src="game.js?v=magenta-stars"></script>
 </body>
 </html>

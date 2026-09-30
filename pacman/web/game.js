@@ -1,11 +1,11 @@
 // 팩맨 게임 진행과 그리기. 규칙은 logic.js 에 있다.
 import {
-  W, H, MAZE, PAC_START, HOUSE_EXIT, HOUSE_CENTER, DIRS, OPPOSITE,
+  PAC_START, HOUSE_EXIT, HOUSE_CENTER, OPPOSITE,
   isOpen, createPellets, createEntity, position, step, reverse, nextTile,
-  chooseGhostDir, ghostTarget, modeAt, inTunnel, wrapX,
+  chooseGhostDir, ghostTarget, modeAt, inTunnel,
 } from "./logic.js";
 
-const TILE = 20;
+import { createRenderer } from "./renderer.js?v=magenta-stars";
 const BASE_SPEED = 9.5;          // 타일/초
 const DOT_SCORE = 10;
 const POWER_SCORE = 50;
@@ -22,10 +22,7 @@ const GHOSTS = [
 ];
 
 const canvas = document.getElementById("board");
-const ctx = canvas.getContext("2d");
-canvas.width = W * TILE;
-canvas.height = H * TILE;
-
+let visual;
 const $score = document.getElementById("score");
 const $high = document.getElementById("high");
 const $lives = document.getElementById("lives");
@@ -278,131 +275,14 @@ function checkCollisions() {
   }
 }
 
-// ---- 그리기 (디자인은 나중에 교체) ----
-
-function draw() {
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  drawMaze();
-  drawPellets();
-  if (game.phase !== "start" && game.phase !== "over") {
-    drawPac();
-    if (game.phase !== "dying" || game.phaseTime < 0.3) ghosts.forEach(drawGhost);
-  }
-  drawMessage();
-
+// ---- 3D 화면과 기존 HUD ----
+function draw(dt) {
+  visual.draw(game, pac, ghosts, dt);
   $score.textContent = game.score;
   $high.textContent = game.high;
   $lives.textContent = "●".repeat(Math.max(game.lives, 0));
   $level.textContent = game.level;
 }
-
-function drawMaze() {
-  const flash = game.phase === "clear" && Math.floor(game.phaseTime * 4) % 2 === 1;
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const c = MAZE[y][x];
-      if (c === "#") {
-        ctx.fillStyle = flash ? "#fff" : "#2121de";
-        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
-      } else if (c === "-") {
-        ctx.fillStyle = "#ffb8de";
-        ctx.fillRect(x * TILE, y * TILE + TILE / 2 - 2, TILE, 4);
-      }
-    }
-  }
-}
-
-function drawPellets() {
-  const blink = Math.floor(performance.now() / 250) % 2 === 0;
-  ctx.fillStyle = "#ffb8ae";
-  for (const [key, kind] of game.pellets) {
-    const [x, y] = key.split(",").map(Number);
-    const r = kind === "power" ? 6 : 2;
-    if (kind === "power" && !blink && game.phase === "playing") continue;
-    ctx.beginPath();
-    ctx.arc(x * TILE + TILE / 2, y * TILE + TILE / 2, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-function screen(e) {
-  const p = position(e);
-  return { x: wrapX(p.x + 0.5) * TILE, y: (p.y + 0.5) * TILE };
-}
-
-const FACE_ANGLE = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
-
-function drawPac() {
-  const { x, y } = screen(pac);
-  let mouth;
-  if (game.phase === "dying") {
-    mouth = Math.min(1, game.phaseTime / 1.2) * Math.PI;       // 점점 사라짐
-  } else {
-    mouth = (Math.abs(Math.sin(performance.now() / 80)) * 0.35 + 0.05) * Math.PI;
-    if (!pac.dir || game.phase !== "playing") mouth = 0.25 * Math.PI;
-  }
-  const a = FACE_ANGLE[pac.face];
-  ctx.fillStyle = "#ffff00";
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.arc(x, y, TILE * 0.8, a + mouth, a + Math.PI * 2 - mouth);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawGhost(g) {
-  let { x, y } = screen(g);
-  if (g.state === "house") y += Math.sin(performance.now() / 150) * 3;
-  const r = TILE * 0.8;
-
-  if (g.state !== "eaten" && g.state !== "entering") {
-    const ending = game.frightLeft > 0 && game.frightLeft < 2 && Math.floor(game.frightLeft * 5) % 2 === 0;
-    ctx.fillStyle = g.frightened ? (ending ? "#fff" : "#2121ff") : g.color;
-    ctx.beginPath();
-    ctx.arc(x, y, r, Math.PI, 0);
-    ctx.lineTo(x + r, y + r);
-    ctx.lineTo(x - r, y + r);
-    ctx.closePath();
-    ctx.fill();
-  }
-  if (g.frightened && g.state !== "eaten") return;
-
-  // 눈 (먹힌 유령은 눈만 남는다)
-  const look = DIRS[g.dir] || { x: 0, y: 0 };
-  for (const side of [-1, 1]) {
-    const ex = x + side * r * 0.4;
-    const ey = y - r * 0.2;
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.arc(ex, ey, r * 0.28, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#22f";
-    ctx.beginPath();
-    ctx.arc(ex + look.x * 3, ey + look.y * 3, r * 0.14, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-function drawMessage() {
-  let text = null;
-  let color = "#ffff00";
-  if (game.phase === "start") text = "Enter 또는 스페이스로 시작";
-  if (game.phase === "ready") text = "READY!";
-  if (game.phase === "over") {
-    text = "GAME OVER  (Enter로 다시)";
-    color = "#ff0000";
-  }
-  if (game.phase === "playing" && game.paused) text = "일시정지 (P)";
-  if (!text) return;
-  ctx.fillStyle = color;
-  ctx.font = "bold 20px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, canvas.width / 2, 17.5 * TILE);
-}
-
 // ---- 입력 ----
 
 const KEY_DIRS = {
@@ -459,12 +339,19 @@ function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   update(dt);
-  draw();
+  draw(dt);
   requestAnimationFrame(frame);
 }
 
 newGame();
-requestAnimationFrame(frame);
+createRenderer(canvas).then((view) => {
+  visual = view;
+  last = performance.now();
+  requestAnimationFrame(frame);
+}).catch((error) => {
+  console.error(error);
+  document.getElementById("message").textContent = "3D 화면을 불러오지 못했어요. 새로고침해 주세요.";
+});
 
 // 테스트·디버그용
 window.__pacman = { get game() { return game; }, get pac() { return pac; }, get ghosts() { return ghosts; } };
