@@ -7,7 +7,8 @@ from fastapi.testclient import TestClient
 
 import app.game as game_module
 from app.main import app
-from app.rules import BLACK, EMPTY, WHITE, SIZE, ai_move, is_full, new_board, winning_line
+from app.ai import ai_move
+from app.rules import BLACK, EMPTY, WHITE, SIZE, is_full, new_board, winning_line
 
 
 # ---- 규칙 ----
@@ -175,4 +176,19 @@ def test_solo_game_against_ai(client):
     me.send("place", x=x, y=y)
     g = me.game(lambda g: g["move_count"] == n + 2)    # 내 수 + AI 응수
     assert g["current_id"] == me.id
+    me.close()
+
+
+def test_ai_level_setting_applies_to_ai_name(client):
+    me = Conn(client, "lv" + uuid.uuid4().hex[:4])
+    me.send("create_room", title="난이도")
+    room = me.until("room")["room"]
+    assert room["settings"]["ai_level"] == 2          # 기본은 중상
+    me.send("update_settings", settings={"ai_level": 4})
+    room = me.until("room", lambda m: m["room"]["settings"]["ai_level"] == 4)["room"]
+    me.send("update_settings", settings={"ai_level": 99})   # 범위 밖은 무시
+    me.send("start")
+    g = me.game()
+    ai = g["black"] if g["black"]["id"] == "ai" else g["white"]
+    assert ai["name"] == "AI · 최상"
     me.close()

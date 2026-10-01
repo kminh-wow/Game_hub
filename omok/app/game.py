@@ -5,7 +5,8 @@ import asyncio
 import random
 from typing import TYPE_CHECKING, Any
 
-from .rules import BLACK, WHITE, in_bounds, is_full, new_board, other, ai_move, winning_line
+from .ai import LEVEL_NAMES, ai_move
+from .rules import BLACK, WHITE, in_bounds, is_full, new_board, other, winning_line
 
 if TYPE_CHECKING:
     from common.multiplayer import Player
@@ -16,7 +17,10 @@ AI_DELAY = 0.6   # AI 가 두기 전 기다리는 시간(초)
 
 class AIPlayer:
     id = "ai"
-    name = "AI"
+
+    def __init__(self, level: int):
+        self.level = level
+        self.name = f"AI · {LEVEL_NAMES[level]}"
 
     def public(self) -> dict[str, Any]:
         return {"id": self.id, "name": self.name}
@@ -28,7 +32,7 @@ class Game:
         self.settings = room.settings.copy()
         players: list[Any] = list(room.players)
         if len(players) == 1:
-            players.append(AIPlayer())
+            players.append(AIPlayer(self.settings.ai_level))
         # 첫 판은 무작위, 다음 판부터는 직전 판에서 진 사람이 흑
         if room.last_loser_id in (players[1].id,):
             players.reverse()
@@ -102,13 +106,17 @@ class Game:
         loser = self.current
         await self.finish(winner=self.opponent_of(loser), reason="timeout")
 
+    # AI 수 두기
     async def _ai_turn(self) -> None:
+        loop = asyncio.get_running_loop()
+        started = loop.time()
         try:
-            await asyncio.sleep(AI_DELAY)
+            board = [row[:] for row in self.board]
+            x, y = await asyncio.to_thread(ai_move, board, self.turn, None, self.current.level)
+            await asyncio.sleep(max(AI_DELAY - (loop.time() - started), 0))
         except asyncio.CancelledError:
             return
         self._timer = None
-        x, y = ai_move(self.board, self.turn)
         await self._place(x, y)
 
     def _cancel_timer(self) -> None:

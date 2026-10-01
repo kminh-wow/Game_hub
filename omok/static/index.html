@@ -79,6 +79,15 @@
           <h3>게임 설정</h3>
           <form id="settings-form" class="settings">
             <label>한 수 제한 시간(초) <input type="number" name="turn_time" min="10" max="120" step="5"></label>
+            <label id="ai-level-row">AI 난이도
+              <select name="ai_level">
+                <option value="0">하</option>
+                <option value="1">중</option>
+                <option value="2">중상</option>
+                <option value="3">상</option>
+                <option value="4">최상</option>
+              </select>
+            </label>
           </form>
           <p class="muted">15×15 판, 자유룰(5개 이상 이으면 승리). 흑이 먼저 두고, 다음 판은 진 사람이 흑이에요.</p>
           <p id="settings-note" class="muted"></p>
