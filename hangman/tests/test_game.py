@@ -147,6 +147,30 @@ def test_guess_order_skips_setter_and_hint_letter(client):
         conn.close()
 
 
+# 힌트 공개 기준
+def test_only_wrong_guesses_count_toward_hint(client):
+    a, b, c = start_game(client, 3, hint_turn=2)
+    a.game(lambda g: g["phase"] == "setting")
+    a.send("set_word", word="tiger")                    # 힌트 없음 → 틀린 추측이 쌓이면 글자 하나 공개
+    b.game(lambda g: g["phase"] == "guessing" and g["guesser_id"] == b.id)
+
+    for letter in "tig":                                # 맞힌 추측은 세지 않는다
+        b.send("guess", text=letter)
+        g = b.game(lambda g, l=letter: l.upper() in g["pattern"])["game"]
+    assert g["hint_in"] == 2 and g["hint_letter"] is None and g["guesser_id"] == b.id
+
+    b.send("guess", text="z")                           # 첫 번째 틀린 추측
+    g = c.game(lambda g: g["guesser_id"] == c.id)["game"]
+    assert g["hint_in"] == 1 and g["hint_letter"] is None
+
+    c.send("guess", text="q")                           # 두 번째 틀린 추측 → 힌트 공개
+    m = b.game(lambda g: g["hint_letter"] is not None)
+    assert m["game"]["hint_letter"] in ("E", "R") and m["game"]["hint_in"] == 0
+    assert m["events"][-1]["kind"] == "hint_letter"
+    for conn in (a, b, c):
+        conn.close()
+
+
 def test_setter_leaving_cancels_round(client):
     a, b, c = start_game(client, 3)
     a.game(lambda g: g["phase"] == "setting")

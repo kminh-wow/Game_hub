@@ -59,7 +59,7 @@ class Game:
         self.strikes: dict[str, int] = {}   # 추측자별 틀린 횟수
         self.hanged: list[str] = []         # 교수대가 완성돼 탈락한 추측자 (탈락 순서)
         self.setter_gain = 0
-        self.turns = 0
+        self.misses = 0   # 틀린 추측 횟수 (힌트 공개 기준)
         self.solver: Player | None = None
 
     # ---- 조회 ----
@@ -108,7 +108,7 @@ class Game:
             "lives": self.settings.lives,
             "hint": self.hint if (self.hint_shown or show_word) and self.hint else None,
             "hint_letter": self.hint_letter,
-            "hint_in": 0 if self.hint_shown else max(self.settings.hint_turn - self.turns, 0),
+            "hint_in": 0 if self.hint_shown else max(self.settings.hint_turn - self.misses, 0),
             "solver_id": self.solver.id if self.solver else None,
             "scores": self.scores,
             "time_left_ms": max(int((self.deadline - loop.time()) * 1000), 0),
@@ -213,7 +213,8 @@ class Game:
         return False
 
     async def _start_turn(self) -> None:
-        if not self.hint_shown and self.turns >= self.settings.hint_turn:
+        # 힌트 공개 조건
+        if not self.hint_shown and self.misses >= self.settings.hint_turn:
             self._reveal_hint()
         self._start_timer(self.settings.turn_time, self._on_turn_timeout)
         await self.broadcast_state()
@@ -232,7 +233,6 @@ class Game:
             self.events.append({"kind": "hint_letter", "letter": letter})
 
     async def _on_turn_timeout(self) -> None:
-        self.turns += 1
         self.events.append({"kind": "timeout", "player_id": self.guesser.id})
         await self._next_guesser()
 
@@ -246,7 +246,6 @@ class Game:
         if len(g) == 1:
             if g in self.revealed or g in self.wrong_letters:
                 return "이미 나온 글자예요."
-            self.turns += 1
             count = self.word.count(g)
             if count:
                 self.revealed.add(g)
@@ -259,11 +258,11 @@ class Game:
                     await self._start_turn()   # 맞히면 같은 사람이 한 번 더
                 return None
             self.wrong_letters.append(g)
+            self.misses += 1
             self.events.append({"kind": "letter_fail", "player_id": player.id, "letter": g})
         else:
             if g in self.wrong_words:
                 return "이미 틀린 단어예요."
-            self.turns += 1
             if g == self.word:
                 blanks = sum(1 for c in self.word if c not in self.revealed)
                 gain = blanks * LETTER_SCORE + SOLVE_BONUS
@@ -273,6 +272,7 @@ class Game:
                 await self._end_round(solver=player)
                 return None
             self.wrong_words.append(g)
+            self.misses += 1
             self.events.append({"kind": "word_fail", "player_id": player.id, "word": g})
 
         self._strike(player)
