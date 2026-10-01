@@ -1,6 +1,7 @@
 """포트리스 월드: 산 지형 만들기, 포탄 궤적, 폭발(지형 파괴·피해), 탱크 이동.
 
-좌표는 왼쪽 아래가 (0, 0)이고 위로 갈수록 y 가 커진다. 지형은 열마다 땅 높이 하나(높이맵)다.
+좌표는 왼쪽 아래가 (0, 0)이고 위로 갈수록 y 가 커진다.
+지형은 열마다 흙이 있는 구간 목록 [[아래, 위], ...] 이다. 그래서 비탈에 맞아도 둥글게 파이고, 위쪽 흙은 처마처럼 남는다.
 """
 from __future__ import annotations
 
@@ -25,9 +26,10 @@ TANK_CENTER = 8          # 탱크 중심이 땅에서 떨어진 높이
 BARREL = 22              # 포신 길이 (포탄이 나오는 곳)
 MAX_FUEL = 120           # 한 차례에 움직일 수 있는 거리
 MOVE_STEP = 3
-MAX_CLIMB = 14           # 한 걸음에 오를 수 있는 높이 (오르막은 연료를 더 쓴다)
+MAX_CLIMB = 20           # 한 걸음에 오를 수 있는 높이 (오르막은 연료를 더 쓴다)
 CLIMB_FUEL = .5          # 오른 높이 1당 더 쓰는 연료
-REPOSE = 3               # 흙이 버틸 수 있는 옆 칸과의 높이 차 (넘으면 무너져 내린다)
+TANK_HEIGHT = 16         # 처마 밑을 지나가려면 필요한 높이
+REPOSE = 3               # 처음 지형에서 옆 칸과 허용하는 높이 차 (넘으면 무너뜨려 둔다)
 MAX_HP = 100
 
 # 포탄 종류: 폭발 반지름, 최대 피해, 판마다 쓸 수 있는 개수 (None 은 무제한)
@@ -40,7 +42,11 @@ DIRECT_BONUS = 10
 
 # ---- 지형 ----
 
-# 산 지형 만들기
+Column = list[list[int]]     # 한 열의 흙 구간들 [[아래, 위], ...] (아래부터)
+Terrain = list[Column]
+
+
+# 산 지형 높이 만들기
 def generate_terrain(rng: random.Random) -> list[int]:
     peaks = [(rng.uniform(.38, .62) * WIDTH, rng.uniform(300, 400), rng.uniform(110, 160))]   # 가운데 큰 산
     for _ in range(rng.randint(3, 5)):
@@ -73,8 +79,35 @@ def spawn_points(rng: random.Random, terrain: list[int], count: int) -> list[flo
     return xs
 
 
-def ground(terrain: list[int], x: float) -> int:
+def to_columns(heights: list[int]) -> Terrain:
+    return [[[0, h]] for h in heights]
+
+
+# 화면으로 보낼 지형 (구간이 하나뿐인 열은 높이 숫자 하나로 줄인다)
+def pack(terrain: Terrain) -> list[Any]:
+    return [col[0][1] if len(col) == 1 and col[0][0] == 0 else col for col in terrain]
+
+
+def _col(terrain: Terrain, x: float) -> Column:
     return terrain[max(0, min(WIDTH - 1, int(round(x))))]
+
+
+def surface(terrain: Terrain, x: float) -> int:
+    """그 열의 가장 높은 땅."""
+    col = _col(terrain, x)
+    return col[-1][1] if col else 0
+
+
+def support(terrain: Terrain, x: float, y: float) -> int:
+    """(x, y)에서 아래로 떨어지면 닿는 땅 높이 (없으면 0)."""
+    tops = [top for _, top in _col(terrain, x) if top <= y + .5]
+    return max(tops) if tops else 0
+
+
+def solid(terrain: Terrain, x: float, y: float) -> bool:
+    if not 0 <= x < WIDTH:
+        return False
+    return any(lo <= y <= hi for lo, hi in _col(terrain, x))
 
 
 # ---- 탱크 ----
@@ -102,11 +135,15 @@ class Tank:
 
 
 # 탱크 이동 (쓴 연료, 막혔으면 0)
-def move_tank(terrain: list[int], tank: Tank, direction: int) -> float:
+def move_tank(terrain: Terrain, tank: Tank, direction: int) -> float:
     nx = tank.x + direction * MOVE_STEP
     if not 10 <= nx <= WIDTH - 10:
         return 0.0
-    gy = ground(terrain, nx)
+    col = _col(terrain, nx)
+    tops = [top for _, top in col if top <= tank.y + MAX_CLIMB]
+    gy = max(tops) if tops else 0
+    if any(gy < lo < gy + TANK_HEIGHT for lo, _ in col):       # 처마가 낮아 못 지나감
+        return 0.0
     climb = gy - tank.y
     if climb > MAX_CLIMB or gy <= SEA:
         return 0.0
@@ -124,7 +161,7 @@ def muzzle(tank: Tank) -> tuple[float, float, float, float]:
 
 
 # 포탄 궤적 (기록한 점들, 터진 곳, 직격한 탱크)
-def fly(terrain: list[int], tanks: list[Tank], shooter: Tank, power: float, wind: int) -> dict[str, Any]:
+def fly(terrain: Terrain, tanks: list[Tank], shooter: Tank, power: float, wind: int) -> dict[str, Any]:
     x, y, dx, dy = muzzle(shooter)
     speed = MAX_SPEED * max(0.0, min(100.0, power)) / 100
     vx, vy = dx * speed, dy * speed
@@ -134,7 +171,7 @@ def fly(terrain: list[int], tanks: list[Tank], shooter: Tank, power: float, wind
     hit = None
     direct = None
     while t < MAX_FLIGHT:
-        if 0 <= x < WIDTH and y <= ground(terrain, x):
+        if 0 <= x < WIDTH and (y <= 0 or solid(terrain, x, y)):
             hit = (x, max(y, 0.0))
             break
         for tank in tanks:
@@ -156,17 +193,24 @@ def fly(terrain: list[int], tanks: list[Tank], shooter: Tank, power: float, wind
     return {"frames": frames, "hit": hit, "direct": direct}
 
 
-# 지형 파이기 (원 안의 흙이 사라지고 위에 있던 흙은 내려앉는다)
-def carve(terrain: list[int], cx: float, cy: float, radius: float) -> None:
+# 지형 파이기 (원 안의 흙만 사라진다)
+def carve(terrain: Terrain, cx: float, cy: float, radius: float) -> None:
     for c in range(max(0, int(cx - radius)), min(WIDTH, int(cx + radius) + 1)):
         s = math.sqrt(max(0.0, radius * radius - (c - cx) ** 2))
-        h = terrain[c]
-        overlap = max(0.0, min(h, cy + s) - max(0.0, cy - s))
-        terrain[c] = int(round(h - overlap))
-    slide(terrain, int(cx - radius) - 40, int(cx + radius) + 40)
+        lo, hi = cy - s, cy + s
+        out = []
+        for a, b in terrain[c]:
+            if b <= lo or a >= hi:
+                out.append([a, b])
+                continue
+            if a < lo:
+                out.append([a, int(math.floor(lo))])
+            if b > hi:
+                out.append([int(math.ceil(hi)), b])
+        terrain[c] = [seg for seg in out if seg[1] - seg[0] >= 1]
 
 
-# 흙 무너짐 (옆 칸과 높이 차가 REPOSE 를 넘으면 흙이 낮은 쪽으로 흘러내린다)
+# 흙 무너뜨리기 (처음 지형용: 옆 칸과 높이 차가 REPOSE 를 넘으면 낮은 쪽으로 흘려 보낸다)
 def slide(terrain: list[int], lo: int, hi: int) -> None:
     lo, hi = max(0, lo), min(WIDTH - 1, hi)
     for _ in range(5000):
@@ -187,7 +231,7 @@ def slide(terrain: list[int], lo: int, hi: int) -> None:
 
 
 # 폭발 (피해, 지형 파괴, 떨어짐)
-def explode(terrain: list[int], tanks: list[Tank], x: float, y: float, weapon: str,
+def explode(terrain: Terrain, tanks: list[Tank], x: float, y: float, weapon: str,
             direct: Tank | None) -> list[dict[str, Any]]:
     w = WEAPONS[weapon]
     reach = w["radius"] + TANK_RADIUS
@@ -205,7 +249,7 @@ def explode(terrain: list[int], tanks: list[Tank], x: float, y: float, weapon: s
         if not tank.alive:
             continue
         r = results[tank.id]
-        gy = ground(terrain, tank.x)
+        gy = support(terrain, tank.x, tank.y)
         fall = tank.y - gy
         if fall > 0:
             r["fall"] = round(fall)

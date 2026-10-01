@@ -5,7 +5,7 @@ import math
 import random
 from dataclasses import replace
 
-from .world import TANK_CENTER, WEAPONS, Tank, fly
+from .world import TANK_CENTER, WEAPONS, Tank, Terrain, fly
 
 # 난이도 (1 하, 2 중, 3 상)
 LEVEL_NAMES = {1: "하", 2: "중", 3: "상"}
@@ -18,7 +18,7 @@ def _target(me: Tank, tanks: list[Tank]) -> Tank | None:
 
 
 # 한 발의 점수 (상대에 가까울수록 낮고, 내 근처에 떨어지면 크게 감점)
-def _miss(terrain: list[int], tanks: list[Tank], me: Tank, target: Tank, angle: float, power: float,
+def _miss(terrain: Terrain, tanks: list[Tank], me: Tank, target: Tank, angle: float, power: float,
           wind: int) -> float:
     shooter = replace(me, angle=angle)
     shot = fly(terrain, [shooter if t.id == me.id else t for t in tanks], shooter, power, wind)
@@ -32,7 +32,7 @@ def _miss(terrain: list[int], tanks: list[Tank], me: Tank, target: Tank, angle: 
 
 
 # 조준 계획 (각도, 방향, 파워, 포탄)
-def plan(terrain: list[int], tanks: list[Tank], me: Tank, wind: int, level: int,
+def plan(terrain: Terrain, tanks: list[Tank], me: Tank, wind: int, level: int,
          rng: random.Random) -> tuple[float, int, float, str]:
     target = _target(me, tanks)
     if target is None:

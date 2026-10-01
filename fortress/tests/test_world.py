@@ -2,17 +2,17 @@
 import random
 
 from app.world import (
-    CLIMB_FUEL, MAX_CLIMB, MOVE_STEP, REPOSE, SEA, WEAPONS, WIDTH, Tank, carve, explode, fly, generate_terrain, ground,
-    move_tank, spawn_points,
+    CLIMB_FUEL, MAX_CLIMB, MOVE_STEP, SEA, TANK_HEIGHT, WEAPONS, WIDTH, Tank, carve, explode, fly, generate_terrain,
+    move_tank, pack, solid, spawn_points, support, surface, to_columns,
 )
 
 
 def flat(h=200):
-    return [h] * WIDTH
+    return to_columns([h] * WIDTH)
 
 
 def tank(x, terrain, tid="a", **kw):
-    return Tank(id=tid, name=tid, color=0, x=x, y=ground(terrain, x), **kw)
+    return Tank(id=tid, name=tid, color=0, x=x, y=surface(terrain, x), **kw)
 
 
 def test_starting_terrain_can_be_climbed_everywhere():
@@ -72,27 +72,51 @@ def test_shell_leaving_the_map_hits_nothing():
     assert shot["hit"] is None and shot["frames"][-1][0] > WIDTH
 
 
-def test_carve_digs_a_crater_and_collapses_dirt_above():
+def test_carve_digs_a_round_crater():
     t = flat(200)
     carve(t, 600, 200, 40)
-    assert 158 <= t[600] <= 165 and t[500] == 200 and t[620] < 200
+    assert surface(t, 600) == 160 and surface(t, 500) == 200
+    assert 160 < surface(t, 620) < 200                     # 둥근 바닥
+    assert pack(t)[500] == 200 and pack(t)[600] == 160      # 구간이 하나면 숫자로 보낸다
+
+
+def test_crater_on_a_slope_is_round_and_leaves_an_overhang():
+    heights = [max(30, min(680, 400 + 2 * (x - 600))) for x in range(WIDTH)]   # 오른쪽이 높은 가파른 비탈
+    t = to_columns(heights)
+    cx, cy = 600, 400
+    carve(t, cx, cy, 40)
+    assert not solid(t, cx, cy) and not solid(t, cx + 30, cy + 10)   # 원 안은 비었다
+    assert solid(t, cx + 30, cy + 30)                       # 원 위쪽 흙은 처마처럼 남는다
+    assert len(t[cx + 30]) == 2 and surface(t, cx + 30) == heights[cx + 30]
+    assert solid(t, cx, cy - 45)                            # 원 아래는 그대로
+
+
+def test_underground_blast_makes_a_cave():
     t = flat(300)
-    carve(t, 600, 150, 40)                                # 땅속에서 터지면 위의 흙이 내려앉는다
-    assert 218 <= t[600] <= 225
+    carve(t, 600, 150, 40)
+    assert surface(t, 600) == 300 and not solid(t, 600, 150)
+    assert support(t, 600, 170) == 110                      # 동굴 안에서는 동굴 바닥에 선다
     t = flat(30)
     carve(t, 600, 0, 80)
-    assert min(t) >= 0
+    assert all(lo >= 0 for col in t for lo, _ in col)
 
 
-def test_crater_walls_collapse_into_climbable_slopes():
+def test_tank_can_climb_out_of_a_crater():
     for radius in (38, 62):
         t = flat(200)
         carve(t, 600, 200, radius)
-        assert max(abs(t[c] - t[c + 1]) for c in range(WIDTH - 1)) <= REPOSE
         a = tank(600, t)
-        for _ in range(60):                               # 구덩이 바닥에서 걸어 나올 수 있다
+        for _ in range(60):
             move_tank(t, a, 1)
         assert a.x > 600 + radius and a.y == 200
+
+
+def test_low_overhang_blocks_the_tank():
+    t = flat(200)
+    t[606] = [[0, 200], [200 + TANK_HEIGHT - 4, 260]]      # 낮은 처마
+    a = tank(600, t)
+    assert move_tank(t, a, 1) == MOVE_STEP
+    assert move_tank(t, a, 1) == 0
 
 
 def test_explosion_damage_falls_off_with_distance():
@@ -126,12 +150,12 @@ def test_move_uses_fuel_and_respects_slopes_and_edges():
     t = flat()
     a = tank(600, t)
     assert move_tank(t, a, 1) == MOVE_STEP and a.x == 600 + MOVE_STEP
-    t[int(a.x) + MOVE_STEP] = 210                         # 오르막은 연료를 더 쓴다
+    t[int(a.x) + MOVE_STEP] = [[0, 210]]                  # 오르막은 연료를 더 쓴다
     assert move_tank(t, a, 1) == MOVE_STEP + 10 * CLIMB_FUEL and a.y == 210
-    t[int(a.x) + MOVE_STEP] = 210 + MAX_CLIMB + 1         # 너무 가파른 벽
+    t[int(a.x) + MOVE_STEP] = [[0, 210 + MAX_CLIMB + 1]]  # 너무 가파른 벽
     assert move_tank(t, a, 1) == 0
     b = tank(11, flat())
     assert move_tank(flat(), b, -1) == 0                   # 맵 끝
-    shore = [SEA - 1] * 598 + [200] * (WIDTH - 598)
+    shore = to_columns([SEA - 1] * 598 + [200] * (WIDTH - 598))
     c = tank(600, shore)
     assert move_tank(shore, c, -1) == 0                   # 바다로는 못 감
