@@ -13,6 +13,14 @@ from fastapi.staticfiles import StaticFiles
 
 from .server import CLOSE_INVALID_NAME, GameServer, valid_name
 
+# 연결이 끊겼다는 예외. 새 Starlette(1.x)는 이미 끊긴 연결에서 다시 받으려 하면
+# WebSocketDisconnect 와는 다른 WebSocketDisconnected 를 던지므로 둘 다 잡는다.
+try:
+    from starlette.websockets import WebSocketDisconnected
+except ImportError:  # 예전 Starlette
+    WebSocketDisconnected = WebSocketDisconnect
+DISCONNECTED = (WebSocketDisconnect, WebSocketDisconnected)
+
 
 def create_app(
     server: GameServer,
@@ -51,7 +59,7 @@ def create_app(
                 except json.JSONDecodeError:
                     continue
                 await server.handle(player, msg)
-        except WebSocketDisconnect:
+        except DISCONNECTED:
             pass
         finally:
             # 연결 작업이 취소되더라도(서버 종료 등) 퇴장 정리는 끝까지 한다.
