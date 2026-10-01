@@ -75,6 +75,10 @@ class Game:
     async def broadcast_state(self) -> None:
         await self.room.broadcast({"type": "game", "game": self.state()})
 
+    # 관전자 입장 시 현재 상태
+    def watch_messages(self, player: Player) -> list[dict[str, Any]]:
+        return [{"type": "game", "game": self.state()}]
+
     # ---- 진행 ----
 
     async def start(self) -> None:

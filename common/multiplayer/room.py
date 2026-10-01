@@ -17,6 +17,9 @@ from typing import Any, ClassVar
 from .models import Player, broadcast
 
 
+MAX_SPECTATORS = 20   # 방마다 관전자 수 제한
+
+
 def clamp_int(value: Any, lo: int, hi: int) -> int | None:
     try:
         return max(lo, min(hi, int(value)))
@@ -48,6 +51,7 @@ class BaseRoom:
         self.ctx = ctx                      # 게임이 쓰는 공유 자원 (사전 등)
         self.settings = self.settings_class()
         self.players: list[Player] = []
+        self.spectators: list[Player] = []   # 관전자 (인원 제한에 들어가지 않고, 게임 조작은 못 한다)
         self.ready: set[str] = set()
         self.game: Any = None
         self._on_lobby_change = on_lobby_change
@@ -77,6 +81,11 @@ class BaseRoom:
     def full(self) -> bool:
         return len(self.players) >= self.max_players
 
+    @property
+    def audience(self) -> list[Player]:
+        """방의 모든 방송을 받는 사람 (참가자 + 관전자)."""
+        return [*self.players, *self.spectators]
+
     def summary(self) -> dict[str, Any]:
         return {
             "id": self.id,
@@ -84,6 +93,7 @@ class BaseRoom:
             "host": self.host.name,
             "players": len(self.players),
             "max_players": self.max_players,
+            "spectators": len(self.spectators),
             "playing": self.playing,
         }
 
@@ -95,12 +105,13 @@ class BaseRoom:
             "max_players": self.max_players,
             "settings": asdict(self.settings),
             "players": [{**p.public(), "ready": p.id in self.ready} for p in self.players],
+            "spectators": [p.public() for p in self.spectators],
             "playing": self.playing,
             **self.extra_state(),
         }
 
     async def broadcast(self, msg: dict[str, Any]) -> None:
-        await broadcast(self.players, msg)
+        await broadcast(self.audience, msg)
 
     async def system(self, text: str) -> None:
         await self.broadcast({"type": "system", "text": text})
@@ -117,7 +128,37 @@ class BaseRoom:
         await self.system(f"{player.name}님이 들어왔어요.")
         await self.sync()
 
+    async def add_spectator(self, player: Player) -> str | None:
+        """관전자로 들어온다. 진행 중인 게임이 있으면 지금 상태를 바로 보내 준다."""
+        if len(self.spectators) >= MAX_SPECTATORS:
+            return "관전석이 가득 찼어요."
+        self.spectators.append(player)
+        player.room = self
+        player.spectating = True
+        await self.system(f"{player.name}님이 관전을 시작했어요.")
+        await self.sync()
+        if self.game is not None and hasattr(self.game, "watch_messages"):
+            for msg in self.game.watch_messages(player):
+                await player.send(msg)
+        return None
+
+    async def close_for_spectators(self) -> None:
+        """참가자가 모두 나가서 방이 닫힐 때, 관전자를 로비로 돌려보낸다."""
+        for spectator in list(self.spectators):
+            self.spectators.remove(spectator)
+            spectator.room = None
+            spectator.spectating = False
+            await spectator.send({"type": "room", "room": None})
+            await spectator.send({"type": "error", "message": "참가자가 모두 나가서 방이 닫혔어요."})
+
     async def remove(self, player: Player) -> None:
+        if player in self.spectators:
+            self.spectators.remove(player)
+            player.room = None
+            player.spectating = False
+            await self.system(f"{player.name}님이 관전을 마쳤어요.")
+            await self.sync()
+            return
         if player not in self.players:
             return
         self.players.remove(player)

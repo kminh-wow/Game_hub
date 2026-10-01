@@ -51,6 +51,8 @@ function playerName(id) {
 }
 
 const isMe = (id) => !!state.me && id === state.me.id;
+// 관전 여부
+const isSpectator = () => !!state.room?.spectators?.some((s) => s.id === state.me?.id);
 const isMyGuess = () => !!state.game && state.game.phase === "guessing" && isMe(state.game.guesser_id);
 const isMySet = () => !!state.game && state.game.phase === "setting" && isMe(state.game.setter_id);
 
@@ -145,7 +147,7 @@ const handlers = {
 
   chat(msg) {
     const log = msg.scope === "room" ? $("#room-chat-log") : $("#lobby-chat-log");
-    logChat(log, msg.from.name, msg.text);
+    logChat(log, msg.from.name + (msg.spectator ? " (관전)" : ""), msg.text);
   },
 
   system(msg) {
@@ -162,7 +164,7 @@ const handlers = {
     state.deadline = performance.now() + msg.game.time_left_ms;
     if (first) {
       $("#result-modal").classList.add("hidden");
-      logSystem($("#room-chat-log"), "게임이 시작됐어요!");
+      logSystem($("#room-chat-log"), isSpectator() ? "진행 중인 게임을 관전해요." : "게임이 시작됐어요!");
     }
     msg.events.forEach(showEvent);
     renderRoom();
@@ -255,19 +257,24 @@ function renderLobby() {
   } else {
     list.replaceChildren(
       ...state.rooms.map((r) => {
+        // 게임 중이거나 꽉 찬 방은 들어갈 수 없으므로 눌러서 관전한다
         const blocked = r.playing || r.players >= r.max_players;
+        const watching = r.spectators ? ` · 👀 ${r.spectators}` : "";
         const card = el(
           "li",
-          { className: `room-card${blocked ? " disabled" : ""}` },
+          { className: `room-card${blocked ? " watchable" : ""}` },
           el("div", { className: "title", textContent: `#${r.id} ${r.title}` }),
           el(
             "div",
             { className: "meta" },
-            el("span", { textContent: `방장 ${r.host} · ${r.players}/${r.max_players}` }),
-            el("span", { className: `badge${r.playing ? " playing" : ""}`, textContent: r.playing ? "게임 중" : "대기 중" })
+            el("span", { textContent: `방장 ${r.host} · ${r.players}/${r.max_players}${watching}` }),
+            el("span", {
+              className: `badge${r.playing ? " playing" : ""}`,
+              textContent: r.playing ? "게임 중 · 관전하기" : blocked ? "꽉 참 · 관전하기" : "대기 중",
+            })
           )
         );
-        if (!blocked) card.onclick = () => send("join_room", { room_id: r.id });
+        card.onclick = () => send(blocked ? "spectate_room" : "join_room", { room_id: r.id });
         return card;
       })
     );
@@ -280,7 +287,7 @@ function renderLobby() {
         "li",
         {},
         el("span", { textContent: u.name + (isMe(u.id) ? " (나)" : "") }),
-        el("span", { className: "where", textContent: u.room_id ? `#${u.room_id}번 방` : "로비" })
+        el("span", { className: "where", textContent: u.room_id ? `#${u.room_id}번 방${u.spectating ? " 관전" : ""}` : "로비" })
       )
     )
   );
@@ -295,7 +302,16 @@ function renderRoom() {
   const game = state.game;
 
   $("#room-title").textContent = `#${room.id} ${room.title}`;
-  $("#room-info").textContent = `${room.players.length}/${room.max_players}명`;
+  const watchers = room.spectators || [];
+  $("#room-info").textContent = `${room.players.length}/${room.max_players}명${watchers.length ? ` · 👀 관전 ${watchers.length}` : ""}${isSpectator() ? " (내가 관전 중)" : ""}`;
+  $("#btn-leave").textContent = isSpectator() ? "관전 끝내기" : "나가기";
+
+  // 관전자 목록
+  $("#spectator-box").classList.toggle("hidden", !watchers.length);
+  $("#spectator-count").textContent = watchers.length;
+  $("#spectator-list").replaceChildren(
+    ...watchers.map((s) => el("li", {}, el("span", { className: "name", textContent: s.name + (isMe(s.id) ? " (나)" : "") })))
+  );
 
   $("#player-list").replaceChildren(
     ...room.players.map((p) => {
@@ -334,6 +350,12 @@ function renderWaiting(room, amHost) {
 
   const btn = $("#btn-ready");
   const others = room.players.filter((p) => p.id !== room.host_id);
+  // 관전자는 준비·시작을 못 하므로 안내만 보여 준다
+  btn.classList.toggle("hidden", isSpectator());
+  if (isSpectator()) {
+    $("#settings-note").textContent = "관전 중이에요. 게임이 시작되면 이 화면에서 바로 볼 수 있어요.";
+    return;
+  }
   if (amHost) {
     const canStart = others.length >= 1 && others.every((p) => p.ready);
     btn.textContent = "게임 시작";
@@ -392,7 +414,7 @@ function renderGame(g) {
   $("#setter-form").classList.toggle("hidden", !mySet);
   // 키보드는 출제자에게도 보기 전용으로 보여 준다 (나온 글자 확인용).
   $("#guess-area").classList.toggle("hidden", g.phase !== "guessing");
-  $("#word-guess").classList.toggle("hidden", isMe(g.setter_id));
+  $("#word-guess").classList.toggle("hidden", isMe(g.setter_id) || isSpectator());   // 관전자는 단어를 맞힐 수 없다
   const watch = $("#watch");
   let watchText = "";
   if (g.phase === "setting" && !mySet) watchText = `${playerName(g.setter_id)}님이 단어를 고르고 있어요...`;

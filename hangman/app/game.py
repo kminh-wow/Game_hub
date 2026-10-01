@@ -119,8 +119,12 @@ class Game:
         events, self.events = self.events, []
         await asyncio.gather(*(
             p.send({"type": "game", "game": self.state_for(p), "events": events})
-            for p in self.room.players
+            for p in self.room.audience
         ))
+
+    # 관전자 입장 시 현재 상태 (관전자는 출제자가 아니므로 정답은 정답 공개 때만 보인다)
+    def watch_messages(self, player: Player) -> list[dict[str, Any]]:
+        return [{"type": "game", "game": self.state_for(player), "events": []}]
 
     # ---- 타이머 ----
 

@@ -28,6 +28,9 @@ CLOSE_REPLACED = 4002
 
 Action = Callable[[Any, Player, dict], Awaitable[str | None]]
 
+# 관전 중에도 할 수 있는 메시지 (그 밖의 게임 조작·준비·설정·시작은 막는다)
+SPECTATOR_ALLOWED = {"chat", "leave_room"}
+
 
 def valid_name(name: str) -> bool:
     return 1 <= len(name) <= MAX_NAME
@@ -51,6 +54,7 @@ class GameServer:
             "chat": self._on_chat,
             "create_room": self._on_create_room,
             "join_room": self._on_join_room,
+            "spectate_room": self._on_spectate_room,
             "leave_room": self._on_leave_room,
             "ready": self._on_ready,
             "update_settings": self._on_update_settings,
@@ -98,6 +102,8 @@ class GameServer:
         if not isinstance(msg, dict):
             return
         kind = msg.get("type")
+        if player.spectating and kind not in SPECTATOR_ALLOWED:
+            return await self._error(player, "관전 중에는 할 수 없어요.")
         if handler := self._handlers.get(kind):
             await handler(player, msg)
         elif (action := self._actions.get(kind)) and player.room and player.room.game:
@@ -110,7 +116,7 @@ class GameServer:
             "type": "lobby",
             "rooms": [r.summary() for r in self.rooms.values()],
             "users": [
-                {**p.public(), "room_id": p.room.id if p.room else None}
+                {**p.public(), "room_id": p.room.id if p.room else None, "spectating": p.spectating}
                 for p in self.players.values()
             ],
         }
@@ -125,6 +131,7 @@ class GameServer:
             return
         await room.remove(player)
         if not room.players:
+            await room.close_for_spectators()
             if room.game:
                 await room.game.finish()
             self.rooms.pop(room.id, None)
@@ -142,7 +149,7 @@ class GameServer:
         text = str(msg.get("text", "")).strip()[:MAX_CHAT]
         if not text:
             return
-        out = {"type": "chat", "from": player.public(), "text": text}
+        out = {"type": "chat", "from": player.public(), "text": text, "spectator": player.spectating}
         if player.room:
             await player.room.broadcast({**out, "scope": "room"})
         else:
@@ -182,6 +189,14 @@ class GameServer:
         if room.full:
             return await self._error(player, "방이 꽉 찼어요.")
         await room.add(player)
+
+    async def _on_spectate_room(self, player: Player, msg: dict) -> None:
+        if player.room:
+            return await self._error(player, "이미 방에 있어요.")
+        room = self.rooms.get(str(msg.get("room_id")))
+        if room is None:
+            return await self._error(player, "없는 방이에요.")
+        await self._error(player, await room.add_spectator(player))
 
     async def _on_leave_room(self, player: Player, msg: dict) -> None:
         await self._leave(player)
