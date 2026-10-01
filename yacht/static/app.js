@@ -157,18 +157,24 @@ function renderSheet(g, finished) {
   const cell = (id, cat) => {
     const written = g.sheets[id][cat];
     const td = el("td");
+    // 점수가 어떻게 계산됐는지 점수 아래에 작게 보여 준다 (예: 3+3+3+2+2, 2-3-4-5, 조건 안 맞음)
+    const withNote = (score, note) => {
+      td.title = `${LABELS[cat]}: ${note}`;
+      td.append(score, el("span", { className: "note", textContent: note }));
+    };
     if (written !== null) {
-      td.textContent = written;
       td.className = "written" + (lastWrite === `${id}:${cat}` ? " just" : "");
+      withNote(el("b", { textContent: written }), g.notes?.[id]?.[cat] ?? "");
     } else if (!finished && id === g.current_id && g.preview && !rolling && !g.rolling) {
       const pts = g.preview[cat];
+      const note = g.preview_notes?.[cat] ?? "";
       if (isMyTurn(g)) {
         const b = el("button", { type: "button", className: `pick${pts ? "" : " zero"}`, textContent: pts });
         b.onclick = () => lobby.send("write", { category: cat });
-        td.append(b);
+        withNote(b, note);
       } else {
-        td.textContent = pts;
         td.className = `preview${pts ? "" : " zero"}`;
+        withNote(el("b", { textContent: pts }), note);
       }
     }
     return td;

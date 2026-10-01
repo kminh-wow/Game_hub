@@ -6,7 +6,7 @@ import logging
 import random
 from typing import TYPE_CHECKING, Any
 
-from .rules import CATEGORY_IDS, DICE, MAX_ROLLS, ROUNDS, all_scores, best_category, score, totals
+from .rules import CATEGORY_IDS, DICE, MAX_ROLLS, ROUNDS, all_notes, all_scores, best_category, explain, score, totals
 from .physics import initial_poses, throw_dice
 
 if TYPE_CHECKING:
@@ -21,6 +21,7 @@ class Game:
         self.rng = rng or random.Random()
         self.order: list[Player] = list(room.players)
         self.sheets: dict[str, dict[str, int | None]] = {p.id: {c: None for c in CATEGORY_IDS} for p in self.order}
+        self.notes: dict[str, dict[str, str]] = {p.id: {} for p in self.order}   # 적은 칸의 점수 계산 설명
         self.names = {p.id: p.name for p in self.order}
 
         self.round = 1
@@ -62,7 +63,9 @@ class Game:
             "rolls_left": self.rolls_left,
             "rolled": self.rolled,
             "preview": all_scores(self.dice) if self.rolled and not self.rolling else None,
+            "preview_notes": all_notes(self.dice) if self.rolled and not self.rolling else None,
             "sheets": self.sheets,
+            "notes": self.notes,
             "totals": {pid: totals(sheet) for pid, sheet in self.sheets.items()},
             "time_left_ms": 0 if self.finished else max(int((self.deadline - loop.time()) * 1000), 0),
             "time_total_ms": self.settings.turn_time * 1000,
@@ -212,6 +215,7 @@ class Game:
         self._cancel_timer()
         points = score(category, self.dice)
         self.sheets[self.current.id][category] = points
+        self.notes[self.current.id][category] = explain(category, self.dice)
         self.events.append({"kind": "write", "player_id": self.current.id, "category": category, "points": points})
         await self._next_turn()
 
@@ -234,6 +238,7 @@ class Game:
         was_current = idx == self.turn_idx
         self.order.remove(player)
         self.sheets.pop(player.id, None)
+        self.notes.pop(player.id, None)
         if not self.order:
             await self.finish()
             return
