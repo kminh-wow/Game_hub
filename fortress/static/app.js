@@ -28,6 +28,7 @@ let weapon = "normal";
 let charging = null;            // 파워를 모으는 중이면 시작 시각
 let lastPower = null;
 let lastAimSent = 0;
+let grassTops = null;           // 판이 시작될 때의 땅 높이 (파이지 않은 곳에만 잔디)
 let aimTimer = null;
 const holds = {};               // 누르고 있는 키 -> 반복 타이머
 
@@ -41,6 +42,7 @@ const lobby = GameLobby.init({
       if (shot && prev) startShot(prev, shot);
       for (const e of msg.events) logEvent(e, msg.game);
       if (msg.events.some((e) => e.kind === "turn")) resetAim(msg.game);
+      if (msg.game.turn === 1 && !shot) grassTops = columns(msg.game.terrain).map((c) => c.at(-1)?.[1]);
       deadline = performance.now() + msg.game.time_left_ms;
       lobby.setGame(msg.game);
     },
@@ -368,26 +370,33 @@ function drawSky() {
   ctx.fill();
 }
 
+// 지형 구간 (서버는 구간이 하나뿐인 열을 높이 숫자로 줄여 보낸다)
+const columnCache = new WeakMap();
+function columns(terrain) {
+  let cols = columnCache.get(terrain);
+  if (!cols) {
+    cols = terrain.map((c) => (typeof c === "number" ? [[0, c]] : c));
+    columnCache.set(terrain, cols);
+  }
+  return cols;
+}
+
 // 지형 렌더링
 function drawTerrain(terrain, sea) {
-  ctx.beginPath();
-  ctx.moveTo(0, H);
-  for (let x = 0; x < terrain.length; x += 2) ctx.lineTo(x, sy(terrain[x]));
-  ctx.lineTo(W, sy(terrain[terrain.length - 1]));
-  ctx.lineTo(W, H);
-  ctx.closePath();
+  const cols = columns(terrain);
   const dirt = ctx.createLinearGradient(0, sy(560), 0, H);
   dirt.addColorStop(0, "#9b6b3f");
   dirt.addColorStop(1, "#5a3a20");
   ctx.fillStyle = dirt;
-  ctx.fill();
-
-  ctx.beginPath();
-  for (let x = 0; x < terrain.length; x += 2) ctx[x ? "lineTo" : "moveTo"](x, sy(terrain[x]) + 3);
-  ctx.strokeStyle = "#5aa340";
-  ctx.lineWidth = 7;
-  ctx.lineJoin = "round";
-  ctx.stroke();
+  cols.forEach((segs, x) => {
+    for (const [lo, hi] of segs) ctx.fillRect(x, sy(hi), 1.4, hi - lo);
+  });
+  ctx.fillStyle = "#5aa340";
+  cols.forEach((segs, x) => {
+    for (const [lo, hi] of segs) {
+      if (!grassTops || grassTops[x] === hi) ctx.fillRect(x, sy(hi), 1.4, Math.min(6, hi - lo));
+    }
+  });
 
   ctx.fillStyle = "rgba(37, 105, 190, .78)";
   ctx.fillRect(0, sy(sea), W, sea);

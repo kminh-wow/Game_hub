@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 from . import ai
 from .world import (
-    HEIGHT, MAX_FUEL, MAX_WIND, SEA, WEAPONS, WIDTH, Tank, explode, fly, generate_terrain, ground,
-    move_tank, spawn_points,
+    HEIGHT, MAX_FUEL, MAX_WIND, SEA, WEAPONS, WIDTH, Tank, explode, fly, generate_terrain, pack,
+    move_tank, spawn_points, surface, to_columns,
 )
 
 if TYPE_CHECKING:
@@ -29,7 +29,6 @@ class Game:
         self.settings = room.settings.copy()
         self.rng = rng or random.Random()
         self.players: dict[str, Player] = {p.id: p for p in room.players}
-        self.terrain = generate_terrain(self.rng)
 
         names = [(p.id, p.name) for p in room.players]
         self.ai_level = 0
@@ -39,11 +38,13 @@ class Game:
                 names.append((AI_ID, f"AI · {ai.LEVEL_NAMES[self.ai_level]}"))
             else:                                         # 혼자면 연습용 과녁
                 names.append((DUMMY_ID, "허수아비"))
-        xs = spawn_points(self.rng, self.terrain, len(names))
+        heights = generate_terrain(self.rng)
+        xs = spawn_points(self.rng, heights, len(names))
+        self.terrain = to_columns(heights)
         self.tanks: dict[str, Tank] = {}
         for i, ((pid, name), x) in enumerate(zip(names, xs)):
             tank = Tank(id=pid, name=name, color=i, x=x, dummy=pid == DUMMY_ID)
-            tank.y = ground(self.terrain, x)
+            tank.y = surface(self.terrain, x)
             tank.facing = 1 if x < WIDTH / 2 else -1
             self.tanks[pid] = tank
 
@@ -70,7 +71,7 @@ class Game:
         loop = asyncio.get_running_loop()
         return {
             "width": WIDTH, "height": HEIGHT, "sea": SEA,
-            "terrain": self.terrain,
+            "terrain": pack(self.terrain),
             "tanks": [t.public() for t in self.tanks.values()],
             "weapons": {k: {"name": w["name"], "radius": w["radius"]} for k, w in WEAPONS.items()},
             "current_id": None if self.finished else self.current_id,
@@ -127,7 +128,7 @@ class Game:
             await asyncio.sleep(AI_THINK)
             try:
                 angle, facing, power, weapon = await asyncio.to_thread(
-                    ai.plan, [*self.terrain], list(self.tanks.values()), tank, self.wind, self.ai_level, self.rng)
+                    ai.plan, self.terrain, list(self.tanks.values()), tank, self.wind, self.ai_level, self.rng)
             except Exception:
                 logging.getLogger(__name__).exception("AI 조준 실패")
                 angle, facing, power, weapon = tank.angle, tank.facing, 50.0, "normal"
