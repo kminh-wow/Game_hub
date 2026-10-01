@@ -99,6 +99,8 @@ def test_turns_aim_move_and_fire(client):
 def test_big_shell_can_be_used_once(client):
     a, b, _, g = pair(client)
     cur, other = (a, b) if g["current_id"] == a.id else (b, a)
+    cur.send("fire", power="abc", weapon="big")                 # 잘못된 요청은 대형탄을 쓰지 않는다
+    assert "파워" in cur.until("error")["message"]
     shoot_self(cur, "big")
     m = cur.game(lambda g: g["flying"])
     assert tank(m["game"], cur.id)["stock"]["big"] == 0
@@ -107,6 +109,8 @@ def test_big_shell_can_be_used_once(client):
     other.game(lambda g: g["current_id"] == cur.id and not g["flying"])
     cur.send("fire", power=30, weapon="big")
     assert "다 썼어요" in cur.until("error")["message"]
+    cur.send("fire", power="abc")
+    assert "파워" in cur.until("error")["message"]
     cur.send("fire", power=30, weapon="nuke")
     assert "없어요" in cur.until("error")["message"]
     for c in (a, b):
@@ -150,3 +154,21 @@ def test_spectator_sees_shots_but_cannot_act(client):
     assert any(e["kind"] == "shot" for e in m["events"])
     for c in (a, b, spec):
         c.close()
+
+
+def test_timeout_passes_the_turn_and_solo_gets_it_back(client, monkeypatch):
+    from app.room import Room
+    monkeypatch.setattr(Room, "setting_limits", {"turn_time": (1, 60)})
+    me = Conn(client, "t" + uuid.uuid4().hex[:4])
+    me.send("create_room", title="시간")
+    me.until("room")
+    me.send("update_settings", settings={"turn_time": 1})
+    me.until("room", lambda m: m["room"]["settings"]["turn_time"] == 1)
+    me.send("start")
+    me.game()
+    m = me.game(lambda g: g["turn"] == 2)
+    assert any(e["kind"] == "timeout" and e["player_id"] == me.id for e in m["events"])
+    assert m["game"]["current_id"] == me.id and m["game"]["fuel"] == MAX_FUEL
+    shoot_self(me)                                              # 시간 초과 뒤에도 쏠 수 있다
+    me.game(lambda g: g["flying"])
+    me.close()

@@ -97,7 +97,12 @@ function colorOf(t) {
 // 채팅창 알림
 function logEvent(e, g) {
   const name = tankOf(g, e.player_id)?.name || "";
-  if (e.kind === "timeout") lobby.logSystem(`${name}님 시간 초과`);
+  if (e.kind === "timeout") {
+    const solo = g.tanks.some((t) => t.dummy);
+    const text = lobby.isMe(e.player_id) ? (solo ? "시간 초과! 다시 내 차례예요." : "시간 초과! 차례가 넘어갔어요.") : `${name}님 시간 초과`;
+    lobby.logSystem(text);
+    lobby.toast(text);
+  }
   if (e.kind === "left") lobby.logSystem(`${name}님이 나가서 탈락했어요.`);
   if (e.kind === "shot") {
     for (const r of e.results) {
@@ -262,7 +267,7 @@ document.addEventListener("keydown", (e) => {
   if (!KEYS.has(e.code) || typing(e) || $("#game-view").classList.contains("hidden")) return;
   if (!lobby.state.room?.playing) return;
   e.preventDefault();
-  if (!e.repeat) press(e.code);
+  press(e.code);                 // 누른 채로 차례가 바뀌어도 이어서 동작
 });
 document.addEventListener("keyup", (e) => {
   if (KEYS.has(e.code)) release(e.code);
@@ -568,6 +573,8 @@ function tick(now) {
     bar.style.width = "0";
     $("#time-sec").textContent = "";
   }
+  // 시간 끝나기 직전이면 모으던 파워로 발사
+  if (charging !== null && g && myTurn(g) && deadline - now < 200) release("Space");
   if (charging !== null) {
     const p = powerAt(now);
     $("#power-bar").style.width = `${p}%`;
