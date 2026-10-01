@@ -260,17 +260,18 @@ function stopAll() {
   $("#power-bar").style.width = "0";
 }
 
-const KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"]);
+// 키 배치 (WASD + 스페이스, 한글 입력 상태에서도 자리로 판별)
+const KEYS = { KeyA: "ArrowLeft", KeyD: "ArrowRight", KeyW: "ArrowUp", KeyS: "ArrowDown", Space: "Space" };
 const typing = (e) => ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName);
 
 document.addEventListener("keydown", (e) => {
-  if (!KEYS.has(e.code) || typing(e) || $("#game-view").classList.contains("hidden")) return;
+  if (!KEYS[e.code] || e.ctrlKey || e.metaKey || e.altKey || typing(e) || $("#game-view").classList.contains("hidden")) return;
   if (!lobby.state.room?.playing) return;
   e.preventDefault();
-  press(e.code);                 // 누른 채로 차례가 바뀌어도 이어서 동작
+  press(KEYS[e.code]);           // 누른 채로 차례가 바뀌어도 이어서 동작
 });
 document.addEventListener("keyup", (e) => {
-  if (KEYS.has(e.code)) release(e.code);
+  if (KEYS[e.code]) release(KEYS[e.code]);
 });
 window.addEventListener("blur", stopAll);
 
