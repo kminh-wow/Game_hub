@@ -171,14 +171,14 @@ class Game:
         tank = self.tanks[player.id]
         if weapon not in WEAPONS:
             return "그런 포탄은 없어요."
-        if weapon in tank.stock:
-            if tank.stock[weapon] <= 0:
-                return f"{WEAPONS[weapon]['name']}을 다 썼어요."
-            tank.stock[weapon] -= 1
+        if tank.stock.get(weapon, 1) <= 0:
+            return f"{WEAPONS[weapon]['name']}을 다 썼어요."
         try:
             power = max(0.0, min(100.0, float(power)))
         except (TypeError, ValueError):
             return "잘못된 파워예요."
+        if weapon in tank.stock:
+            tank.stock[weapon] -= 1
 
         self._cancel_timer()
         tanks = list(self.tanks.values())
