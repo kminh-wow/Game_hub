@@ -151,22 +151,32 @@ function renderSheet(g, finished) {
   const el = lobby.el;
   const mine = g.order.find(id => lobby.isMe(id));
   const ids = mine ? [mine, ...g.order.filter(id => id !== mine)] : [...g.order];
+  // 칸 채움 현황
+  const filledCount = (id) => Object.values(g.sheets[id]).filter((v) => v !== null).length;
+  const total = Object.keys(g.sheets[ids[0]] || {}).length;
   const head = el("tr", {}, el("th", { textContent: "족보" }),
-    ...ids.map((id) => el("th", { className: id === g.current_id && !finished ? "turn" : "", textContent: g.names[id] + (lobby.isMe(id) ? " (나)" : "") })));
+    ...ids.map((id) => el(
+      "th",
+      { className: id === g.current_id && !finished ? "turn" : "", title: `${filledCount(id)} / ${total}칸 채움` },
+      g.names[id] + (lobby.isMe(id) ? " (나)" : ""),
+      el("small", { className: "progress", textContent: `${filledCount(id)} / ${total}` })
+    )));
 
   const cell = (id, cat) => {
     const written = g.sheets[id][cat];
     const td = el("td");
     // 점수 바로 옆에 어떤 눈으로 그 점수가 나왔는지 괄호로 보여 준다 (예: 10 (5+5), 13 (2+2+3+3+3), 15 (2-3-4-5))
     const noteNode = (note) => (note ? el("span", { className: "note", textContent: `(${note})` }) : "");
+    // 적은 칸: ✓ 와 진한 배경으로 표시 (0점도 적은 칸이다)
     if (written !== null) {
       const note = g.notes?.[id]?.[cat] ?? "";
-      td.className = "written" + (lastWrite === `${id}:${cat}` ? " just" : "");
-      td.title = `${LABELS[cat]}: ${note}`;
-      td.append(el("b", { textContent: written }), " ", noteNode(note));
+      td.className = "filled written" + (lastWrite === `${id}:${cat}` ? " just" : "");
+      td.title = `${LABELS[cat]}: ${note} (적음)`;
+      td.append(el("span", { className: "check", textContent: "✓" }), el("b", { textContent: written }), " ", noteNode(note));
     } else if (!finished && id === g.current_id && g.preview && !rolling && !g.rolling) {
       const pts = g.preview[cat];
       const note = g.preview_notes?.[cat] ?? "";
+      td.className = "empty";
       td.title = `${LABELS[cat]}: ${note}`;
       if (isMyTurn(g)) {
         // 누르면 이 칸에 적는 버튼. 점수와 계산 근거가 한 덩어리로 보이게 버튼 안에 함께 넣는다.
@@ -174,16 +184,24 @@ function renderSheet(g, finished) {
         b.onclick = () => lobby.send("write", { category: cat });
         td.append(b);
       } else {
-        td.className = `preview${pts ? "" : " zero"}`;
+        td.className = `empty preview${pts ? "" : " zero"}`;
         td.append(el("b", { textContent: pts }), " ", noteNode(note));
       }
+    } else {
+      // 아직 안 적은 칸
+      td.className = "empty";
+      td.title = `${LABELS[cat]}: 아직 안 적었어요`;
+      td.append(el("span", { className: "blank", textContent: "—" }));
     }
     return td;
   };
-  const row = (label, cat) =>
-    el("tr", {},
-      el("td", {}, label, el("span", { className: "hint", textContent: ` (${HINTS[cat]})` })),
+  // 내가 적은 줄은 이름 앞에 ✓ 를 붙이고 흐리게 한다
+  const row = (label, cat) => {
+    const done = !!mine && g.sheets[mine][cat] !== null;
+    return el("tr", {},
+      el("td", { className: done ? "done" : "" }, done ? "✓ " : "", label, el("span", { className: "hint", textContent: ` (${HINTS[cat]})` })),
       ...ids.map((id) => cell(id, cat)));
+  };
   const sumRow = (label, fn, cls) => el("tr", { className: cls }, el("td", { textContent: label }), ...ids.map((id) => el("td", { textContent: fn(g.totals[id]) })));
 
   $("#sheet").replaceChildren(
