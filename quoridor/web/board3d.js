@@ -11,7 +11,8 @@ export class Board3D {
   constructor(host, callbacks) {
     this.host = host; this.callbacks = callbacks; this.mode = 'move'; this.orientation = 'H';
     this.pawns = {}; this.tiles = []; this.walls = new Map(); this.tweens = new Set(); this.generation = 0;
-    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color('#e8efed');
+    // 보드 주변 배경
+    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color('#f5f5ed');
     this.camera = new THREE.PerspectiveCamera(38, 1, .1, 100);
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
