@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>포트리스</title>
+  <link rel="stylesheet" href="static/style.css?v=1">
+</head>
+<body>
+  <!-- 로그인 -->
+  <section id="screen-login" class="screen">
+    <div class="login-card">
+      <h1>포트리스 <span>Fortress</span></h1>
+      <p class="muted">각도와 파워를 맞춰 산 너머 탱크를 맞혀라</p>
+      <form id="login-form">
+        <input id="login-name" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="off" required>
+        <button type="submit">입장</button>
+      </form>
+      <p id="login-error" class="error"></p>
+      <a class="hub-link" href="../">← 다른 게임 고르기</a>
+    </div>
+  </section>
+
+  <!-- 로비 -->
+  <section id="screen-lobby" class="screen hidden">
+    <header class="topbar">
+      <a class="hub-link" href="../" title="게임 목록">← Ddan Jit</a>
+      <h2>로비</h2>
+      <span class="muted">접속: <b id="me-name"></b></span>
+    </header>
+    <div class="layout">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h3>방 목록</h3>
+          <button id="btn-open-create">방 만들기</button>
+        </div>
+        <form id="create-form" class="create-form hidden">
+          <input id="create-title" maxlength="30" placeholder="방 제목" autocomplete="off">
+          <button type="submit">만들기</button>
+          <button type="button" id="btn-cancel-create" class="ghost">취소</button>
+        </form>
+        <ul id="room-list" class="room-list"></ul>
+      </div>
+      <div class="panel side">
+        <h3>접속자 <span id="user-count" class="muted"></span></h3>
+        <ul id="user-list" class="user-list"></ul>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="lobby-chat-log" class="chat-log"></ul>
+      <form id="lobby-chat-form" class="chat-form">
+        <input id="lobby-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 방 -->
+  <section id="screen-room" class="screen hidden">
+    <header class="topbar">
+      <h2 id="room-title"></h2>
+      <span id="room-info" class="muted"></span>
+      <button id="btn-leave" class="ghost">나가기</button>
+    </header>
+    <div class="layout">
+      <div class="panel side">
+        <h3>참가자</h3>
+        <ul id="player-list" class="player-list"></ul>
+        <div id="spectator-box" class="hidden">
+          <h3>관전 <span id="spectator-count" class="muted"></span></h3>
+          <ul id="spectator-list" class="player-list"></ul>
+        </div>
+      </div>
+
+      <div class="panel grow">
+        <!-- 대기 화면 -->
+        <div id="waiting-view">
+          <h3>게임 설정</h3>
+          <form id="settings-form" class="settings">
+            <label>한 차례 제한 시간(초) <input type="number" name="turn_time" min="10" max="60" step="5"></label>
+          </form>
+          <p class="muted">2~4명이 돌아가며 한 발씩 쏴요. 바람과 산을 보고 각도·파워를 맞추세요. 마지막까지 남은 탱크가 이겨요.</p>
+          <p id="settings-note" class="muted"></p>
+          <button id="btn-ready" class="big"></button>
+        </div>
+
+        <!-- 게임 화면 (끝난 뒤에는 마지막 판을 보여 줌) -->
+        <div id="game-view" class="hidden">
+          <div class="game-top">
+            <div id="tank-chips" class="tank-chips"></div>
+            <span id="turn-info" class="muted"></span>
+          </div>
+          <div class="bar-row"><span>시간</span><div class="bar"><div id="time-bar"></div></div><span id="time-sec"></span></div>
+          <div class="field-wrap"><canvas id="field" width="1200" height="700" aria-label="전장"></canvas></div>
+          <p id="game-status" class="game-status"></p>
+
+          <!-- 조작 -->
+          <div id="controls" class="controls">
+            <span class="stat">각도 <b id="angle-val">45°</b></span>
+            <div class="gauge" title="파워"><div id="power-bar"></div><i id="power-last"></i></div>
+            <span class="stat">파워 <b id="power-val">0</b></span>
+            <span class="stat">연료</span>
+            <div class="gauge fuel"><div id="fuel-bar"></div></div>
+            <div id="weapons" class="weapons"></div>
+          </div>
+          <div id="pad" class="pad">
+            <button data-key="ArrowLeft" title="왼쪽으로 이동">◀</button>
+            <button data-key="ArrowUp" title="각도 올리기">▲</button>
+            <button data-key="ArrowDown" title="각도 내리기">▼</button>
+            <button data-key="ArrowRight" title="오른쪽으로 이동">▶</button>
+            <button data-key="Space" class="fire" title="꾹 눌렀다 떼면 발사">발사</button>
+          </div>
+          <p id="help" class="help">← → 이동 · ↑ ↓ 각도 · 스페이스(또는 발사 버튼)를 꾹 누르면 파워 게이지가 움직이고, 떼면 발사</p>
+        </div>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="room-chat-log" class="chat-log"></ul>
+      <form id="room-chat-form" class="chat-form">
+        <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 결과 -->
+  <div id="result-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="result-title">게임 결과</h3>
+      <ol id="result-list" class="result-list"></ol>
+      <button id="btn-close-result">확인</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="../common/lobby.js?v=spectate"></script>
+  <script src="static/app.js?v=1"></script>
+</body>
+</html>
