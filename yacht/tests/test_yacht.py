@@ -110,6 +110,7 @@ def test_turn_roll_hold_write_and_order(client):
     assert other["events"] == animation["events"]
     assert m["game"]["poses"] == animation["events"][0]["frames"][-1]
     assert m["game"]["preview"]["choice"] == sum(first)
+    assert m["game"]["preview_notes"]["choice"] == "+".join(str(x) for x in sorted(first))
 
     a.send("hold", held=[True, True, False, False, False])
     a.game(lambda g: g["held"] == [True, True, False, False, False])
@@ -120,6 +121,7 @@ def test_turn_roll_hold_write_and_order(client):
     a.send("write", category="choice")
     m = b.game(lambda g: g["current_id"] == b.id)
     assert m["game"]["sheets"][a.id]["choice"] == sum(g["dice"])
+    assert m["game"]["notes"][a.id]["choice"] == "+".join(str(x) for x in sorted(g["dice"]))   # 적은 칸의 설명이 남는다
     assert m["game"]["rolls_left"] == 3 and m["game"]["held"] == [False] * 5
 
     b.send("roll")

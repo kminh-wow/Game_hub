@@ -205,6 +205,10 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .sheet button.pick { background: var(--accent-soft); color: var(--accent); padding: 3px 10px; border-radius: 6px; font-weight: 700; }
 .sheet button.pick.zero { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
 .sheet td.just { animation: flash 1s; }
+/* 점수 아래에 작게 보여 주는 계산 설명 */
+.sheet td .note { display:block; margin-top:1px; font-size:11px; line-height:1.2; font-weight:400; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sheet td.preview .note, .sheet td .pick + .note { opacity:.9; }
+.sheet td.written b { font-weight:700; }
 @keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
 
 /* Multiplayer table: shared dice above scorecard, people and chat at right. */

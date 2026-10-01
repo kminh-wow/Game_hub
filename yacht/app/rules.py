@@ -42,6 +42,53 @@ def score(category: str, dice: list[int]) -> int:
     raise ValueError(category)
 
 
+NOT_MET = "조건 안 맞음"
+
+
+def _longest_run(faces: set[int]) -> list[int]:
+    """이어진 눈 중 가장 긴 줄 (예: {1,2,3,5,6} -> [1,2,3])."""
+    best: list[int] = []
+    run: list[int] = []
+    for face in sorted(faces):
+        run = run + [face] if run and face == run[-1] + 1 else [face]
+        if len(run) > len(best):
+            best = run
+    return best
+
+
+def explain(category: str, dice: list[int]) -> str:
+    """점수가 어떻게 나왔는지 짧은 식으로 설명한다 (점수판의 점수 아래에 작게 보여 준다).
+
+    - 눈을 더하는 칸: "2+2+2" 처럼 더한 눈을 그대로 보여 준다.
+    - 스트레이트: 이어진 눈 "2-3-4-5", 요트: "6×5" (점수는 15·30·50으로 정해져 있다).
+    - 점수가 0이면 에이스~식스는 "0개", 나머지는 "조건 안 맞음".
+    """
+    counts = Counter(dice)
+    faces = set(dice)
+    plus = lambda xs: "+".join(str(x) for x in xs)  # noqa: E731
+    if category in UPPER_IDS:
+        face = UPPER_IDS.index(category) + 1
+        return plus([face] * counts[face]) if counts[face] else "0개"
+    if category == "choice":
+        return plus(sorted(dice))
+    if category == "four_kind":
+        return plus(sorted(dice)) if max(counts.values()) >= 4 else NOT_MET
+    if category == "full_house":
+        return plus(sorted(dice)) if sorted(counts.values()) == [2, 3] else NOT_MET
+    if category == "small_straight":
+        run = _longest_run(faces)
+        return "-".join(str(x) for x in run) if len(run) >= 4 else NOT_MET
+    if category == "large_straight":
+        return "-".join(str(x) for x in sorted(faces)) if faces in ({1, 2, 3, 4, 5}, {2, 3, 4, 5, 6}) else NOT_MET
+    if category == "yacht":
+        return f"{dice[0]}×{DICE}" if len(faces) == 1 else NOT_MET
+    raise ValueError(category)
+
+
+def all_notes(dice: list[int]) -> dict[str, str]:
+    return {c: explain(c, dice) for c in CATEGORY_IDS}
+
+
 def all_scores(dice: list[int]) -> dict[str, int]:
     return {c: score(c, dice) for c in CATEGORY_IDS}
 
