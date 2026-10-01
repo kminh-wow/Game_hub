@@ -111,15 +111,16 @@ function renderGame(g, room) {
 
 const pos = (i) => PAD + i * CELL;
 
+// 보드 렌더링
 function drawBoard(g) {
   if (boardView) {
     boardView.draw(g, hover, isMyTurn(g) ? myColor(g) : null);
     return;
   }
-  ctx.fillStyle = "#dcb35c";
+  ctx.fillStyle = getComputedStyle(canvas).getPropertyValue("--accent-soft").trim();
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.strokeStyle = "#5a4520";
+  ctx.strokeStyle = getComputedStyle(canvas).getPropertyValue("--muted").trim();
   ctx.lineWidth = 1;
   for (let i = 0; i < SIZE; i++) {
     ctx.beginPath();
@@ -129,7 +130,7 @@ function drawBoard(g) {
     ctx.lineTo(pos(i), pos(SIZE - 1));
     ctx.stroke();
   }
-  ctx.fillStyle = "#5a4520";
+  ctx.fillStyle = getComputedStyle(canvas).getPropertyValue("--muted").trim();
   for (const [x, y] of STARS) {
     ctx.beginPath();
     ctx.arc(pos(x), pos(y), 3.5, 0, Math.PI * 2);
@@ -170,6 +171,7 @@ function drawBoard(g) {
   }
 }
 
+// 돌 렌더링
 function drawStone(x, y, color) {
   const r = CELL * 0.44;
   ctx.beginPath();

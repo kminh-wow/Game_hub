@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ddan Jit</title>
   <style>
-    /* 공통 팔레트 */
     :root {
       --bg: #f5f5ed;
       --panel: #fcfcf7;
@@ -15,7 +14,6 @@
       --accent: #245442;
       --shadow: 0 1px 2px rgba(20, 24, 35, .05), 0 8px 24px rgba(20, 24, 35, .06);
     }
-    /* 다크 팔레트 */
     @media (prefers-color-scheme: dark) {
       :root {
         --bg: #1c2425;
@@ -111,9 +109,8 @@
 
     footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
   </style>
-</head>
+<script>document.addEventListener("click", e => { if(e.target.closest("a")) e.preventDefault(); });</script></head>
 <body>
-  <!-- 서비스 이름 -->
   <header>
     <h1>Ddan <span>Jit</span></h1>
     <p>딴짓 반드시 가야지</p>
