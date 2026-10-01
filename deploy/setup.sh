@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 # 서버 최초 설치: 패키지 설치 → venv → systemd 서비스 등록 → 시작
 # 사용법: bash deploy/setup.sh             (기본 8000번 포트, nginx가 80 → 8000 전달)
-#         PORT=80 bash deploy/setup.sh     (nginx 없이 80번으로 바로)
+#         PORT=80 bash deploy/setup.sh     (nginx 없이 80번으로 바로, 밖에서 직접 받음)
+#
+# 게임 서버는 기본으로 서버 안(127.0.0.1)에서만 받는다. 밖에서는 nginx(80번)로만 들어온다.
+# 밖에서 직접 받아야 하면(PORT=80 이거나 HOST=0.0.0.0) 전체 공개로 띄운다.
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${PORT:-8000}"
+if [ -z "${HOST:-}" ]; then
+  [ "$PORT" = 80 ] && HOST=0.0.0.0 || HOST=127.0.0.1
+fi
 SERVICE=game-hub
 RUN_USER="$(whoami)"
 OLD_SERVICES=(word-chain-online quoridor)
 
-echo "==> 설치 위치: $APP_DIR, 포트: $PORT"
+echo "==> 설치 위치: $APP_DIR, 주소: $HOST:$PORT"
 
 # 예전에 게임별로 따로 띄우던 서비스는 끄고 지운다 (포트 충돌 방지).
 for old in "${OLD_SERVICES[@]}"; do
@@ -74,7 +80,7 @@ After=network.target
 User=$RUN_USER
 WorkingDirectory=$APP_DIR
 # 게임 상태가 메모리에 있으므로 워커는 반드시 1개
-ExecStart=$APP_DIR/.venv/bin/uvicorn hub.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+ExecStart=$APP_DIR/.venv/bin/uvicorn hub.main:app --host $HOST --port $PORT --proxy-headers
 Restart=always
 RestartSec=3
 AmbientCapabilities=CAP_NET_BIND_SERVICE
@@ -91,6 +97,9 @@ sleep 2
 if curl -fsS "http://127.0.0.1:$PORT/wordchain/api/health"; then
   echo
   echo "==> 완료! http://<퍼블릭IP>/ 로 접속하세요."
+  if [ "$HOST" = 127.0.0.1 ]; then
+    echo "    (게임 서버는 서버 안에서만 받아요. 밖에서는 nginx 80번으로 들어와요.)"
+  fi
 else
   echo "!! 서버 응답이 없어요. 로그 확인: sudo journalctl -u $SERVICE -n 50" >&2
   exit 1
