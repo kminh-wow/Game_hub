@@ -1,0 +1,32 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>행맨 그림 미리보기</title>
+<link rel="stylesheet" href="../static/style.css?v=3">
+<main class="screen"><h2>행맨 · 그림 미리보기</h2><p class="muted">8인 게임의 추측자 7명 · 실제 게임과 같은 렌더러</p><section class="panel"><ul id="gallows-list" class="gallows-list"></ul></section><div><button id="step">한 번씩 틀리기</button> <button id="reset">처음부터</button> <label>목숨 <select id="lives"><option>4</option><option selected>6</option><option>10</option></select></label></div><p id="checks" class="muted"></p></main>
+<script type="module">
+const source = await (await fetch('../static/app.js')).text();
+const start = source.indexOf('const GALLOWS_SVG');
+const end = source.indexOf('function renderKeyboard', start);
+const render = new Function('$', 'el', 'playerName', 'isMe', source.slice(start,end) + ';return renderGallows;')(
+ s=>document.querySelector(s), (tag,props={})=>Object.assign(document.createElement(tag),props), id=>id===1?'플레이어':`참가자 ${id}`, id=>id===1);
+let g={round:1,setter_id:0,guesser_id:1,phase:'guessing',order:[0,1,2,3,4,5,6,7],strikes:{},hanged:[],lives:6};
+const list=document.querySelector('#gallows-list');
+function assert(ok,message){if(!ok)throw Error(message);}
+for(const lives of [4,6,10]){
+ g={...g,round:g.round+1,lives,strikes:{},hanged:[]};render(g);
+ const card=list.children[0];
+ let oldProgress=0;
+ for(let n=1;n<=lives;n++){
+  g.strikes[1]=n; if(n===lives)g.hanged=[1];render(g);
+  const total=[...card.querySelectorAll('.part')].reduce((sum,p)=>sum+Number(p.dataset.amount),0);
+  assert(total>oldProgress,'Every mistake must advance drawing');
+  assert(n===lives?total===6:total<6,'Finish only at final mistake');oldProgress=total;
+  const animations=[...card.querySelectorAll('.part')].flatMap(p=>p.getAnimations());
+  render(g);assert(list.children[0]===card,'Preserve player card');
+  assert(animations.every(a=>[...card.querySelectorAll('.part')].some(p=>p.getAnimations().includes(a))),'Do not restart animations');
+ }
+}
+g.round++;g.lives=6;g.strikes=Object.fromEntries([1,2,3,4,5,6,7].map((id,i)=>[id,i]));g.hanged=[7];render(g);
+document.querySelector('#checks').textContent='검증 통과: 목숨 4·6·10, 매 실수 진행, 마지막 완성, 카드 유지, 중복 애니메이션 방지';
+document.querySelector('#step').onclick=()=>{for(const id of g.order.slice(1)){g.strikes[id]=Math.min(g.lives,(g.strikes[id]||0)+1);}g.hanged=g.order.filter(id=>g.strikes[id]>=g.lives);render(g);};
+function reset(){g.round++;g.lives=Number(document.querySelector('#lives').value);g.strikes={};g.hanged=[];render(g);}
+document.querySelector('#reset').onclick=reset;document.querySelector('#lives').onchange=reset;
+</script></html>

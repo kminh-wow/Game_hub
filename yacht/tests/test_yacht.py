@@ -72,7 +72,7 @@ class Conn:
         raise AssertionError(f"{self.name}: {type_} 못 받음")
 
     def game(self, pred=lambda g: True):
-        return self.until("game", lambda m: pred(m["game"]))
+        return self.until("game", lambda m: not m["game"].get("rolling") and pred(m["game"]))
 
     def close(self):
         self._ctx.__exit__(None, None, None)
@@ -98,9 +98,17 @@ def test_turn_roll_hold_write_and_order(client):
     assert "차례" in b.until("error")["message"]
 
     a.send("roll")
+    animation = a.until("game", lambda m: bool(m["events"]) and m["events"][0]["kind"] == "roll")
+    for action, payload in [("roll", {}), ("hold", {"held": [True]*5}), ("write", {"category": "choice"})]:
+        a.send(action, **payload)
+        assert "멈출 때까지" in a.until("error")["message"]
     m = a.game(lambda g: g["rolls_left"] == 2)
     first = m["game"]["dice"]
-    assert m["events"][0]["kind"] == "roll" and m["events"][0]["rolled"] == [True] * 5
+    assert animation["events"][0]["rolled"] == [True] * 5
+    assert animation["game"]["preview"] is None
+    other = b.until("game", lambda m: any(ev["kind"] == "roll" for ev in m["events"]))
+    assert other["events"] == animation["events"]
+    assert m["game"]["poses"] == animation["events"][0]["frames"][-1]
     assert m["game"]["preview"]["choice"] == sum(first)
 
     a.send("hold", held=[True, True, False, False, False])
