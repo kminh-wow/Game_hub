@@ -279,3 +279,15 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 #spectator-box h3 { margin-bottom: 6px; }
 .room-card.watchable .badge { background: #eef3ff; color: var(--accent); }
 .room-card.watchable .badge.playing { background: #fdecec; color: var(--bad); }
+
+/* 채운 칸 / 안 채운 칸 구분 */
+.sheet td.filled { background:color-mix(in srgb, var(--accent) 16%, var(--panel)); font-weight:600; }
+.sheet td.mine.filled { background:color-mix(in srgb, var(--accent) 24%, var(--panel)); }
+.sheet td.empty { background:var(--panel); }
+.sheet td.mine.empty { background:var(--panel); box-shadow:inset 0 0 0 1px var(--line); }
+.sheet td .check { margin-right:4px; font-size:11px; font-weight:700; color:var(--accent); }
+.sheet td .blank { color:var(--muted); opacity:.55; font-weight:400; }
+.sheet button.pick.zero { border-style:solid; }
+.sheet td.done { color:var(--muted); font-weight:500; }
+.sheet td.done .hint { opacity:.6; }
+.sheet thead th small.progress { display:block; font-size:11px; font-weight:500; color:var(--muted); line-height:1.1; }
