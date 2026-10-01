@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pacman renderer fixtures</title>
+<link rel="stylesheet" href="../web/style.css">
+<script type="importmap">{"imports":{"three":"../web/vendor/three/build/three.module.js","three/addons/":"../web/vendor/three/examples/jsm/"}}</script>
+<main class="game-shell"><header><h1>팩맨 상태 검사</h1><select id="state" aria-label="미리보기 상태"><option>normal</option><option>power</option><option>ending</option><option>expired</option><option>paused</option><option>dying</option><option>over</option><option>clear</option><option>eaten</option></select></header>
+<div class="board-wrap"><canvas id="board"></canvas><div id="message" role="status"></div></div></main>
+<script type="module">
+import {createRenderer} from '../web/renderer.js?v=character-facing';
+import {createPellets,createEntity} from '../web/logic.js';
+const view=await createRenderer(document.querySelector('canvas'));
+const game={phase:'playing',phaseTime:.5,paused:false,frightLeft:0,pellets:createPellets()};
+const pac={...createEntity(13,23,'left'),face:'left'};
+const ghosts=[6,10,17,21].map((x,i)=>({...createEntity(x,20,['left','up','right','down'][i]),state:'normal',frightened:false}));
+document.querySelector('select').addEventListener('change',e=>{
+ const state=e.target.value;
+ game.phase=['dying','over','clear'].includes(state)?state:'playing';
+ game.paused=state==='paused';game.frightLeft=state==='power'?5:state==='ending'?1.5:0;
+ ghosts.forEach(g=>{g.frightened=game.frightLeft>0;g.state=state==='eaten'?'eaten':'normal';});
+});
+let last=performance.now();
+function frame(now){view.draw(game,pac,ghosts,Math.min(.05,(now-last)/1000));last=now;requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+</script></html>
