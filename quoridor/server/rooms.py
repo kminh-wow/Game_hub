@@ -10,6 +10,7 @@ from fastapi import WebSocket
 from . import game
 
 CODE_ALPHABET = string.ascii_uppercase + string.digits
+MAX_WATCHERS = 20   # 방마다 관전자 수 제한
 
 
 class Room:
@@ -18,13 +19,14 @@ class Room:
         self.mode = mode  # "pvp", "ai", or "learn"
         self.difficulty = difficulty  # "easy", "medium", or "hard" (ai/learn rooms)
         self.sockets: dict[int, WebSocket] = {}
+        self.watchers: list[WebSocket] = []   # 관전자 (방 코드로 들어와 보기만 한다)
         self.state = game.GameState()
 
     def opponent_of(self, player: int) -> int:
         return game.other(player)
 
     async def broadcast(self, message: dict):
-        for ws in list(self.sockets.values()):
+        for ws in [*self.sockets.values(), *self.watchers]:
             try:
                 await ws.send_json(message)
             except Exception:
@@ -43,6 +45,7 @@ class RoomManager:
     def __init__(self):
         self.rooms: dict[str, Room] = {}
         self.socket_room: dict[WebSocket, tuple[str, int]] = {}
+        self.watching: dict[WebSocket, str] = {}   # 관전자 소켓 -> 방 코드
 
     def _new_code(self) -> str:
         while True:
@@ -50,7 +53,24 @@ class RoomManager:
             if code not in self.rooms:
                 return code
 
+    def watch_room(self, code: str, ws: WebSocket) -> Optional[Room]:
+        """방 코드로 관전자로 들어간다. 없는 방, 이미 방에 있는 소켓, 관전석이 가득 찬 경우는 None."""
+        room = self.rooms.get(code)
+        if room is None or ws in self.socket_room or ws in self.watching or len(room.watchers) >= MAX_WATCHERS:
+            return None
+        room.watchers.append(ws)
+        self.watching[ws] = code
+        return room
+
+    def stop_watching(self, ws: WebSocket) -> None:
+        """관전을 끝낸다 (연결은 그대로)."""
+        code = self.watching.pop(ws, None)
+        room = self.rooms.get(code) if code else None
+        if room is not None and ws in room.watchers:
+            room.watchers.remove(ws)
+
     def create_room(self, ws: WebSocket) -> Room:
+        self.stop_watching(ws)
         code = self._new_code()
         room = Room(code, mode="pvp")
         room.sockets[1] = ws
@@ -59,6 +79,7 @@ class RoomManager:
         return room
 
     def join_room(self, code: str, ws: WebSocket) -> Optional[Room]:
+        self.stop_watching(ws)
         room = self.rooms.get(code)
         if room is None or room.mode != "pvp" or 2 in room.sockets:
             return None
@@ -67,6 +88,7 @@ class RoomManager:
         return room
 
     def _create_solo_room(self, ws: WebSocket, mode: str, difficulty: str = "medium") -> Room:
+        self.stop_watching(ws)
         code = self._new_code()
         room = Room(code, mode=mode, difficulty=difficulty)
         room.sockets[1] = ws
@@ -90,14 +112,24 @@ class RoomManager:
             return None
         return room, player
 
-    def disconnect(self, ws: WebSocket):
+    def disconnect(self, ws: WebSocket) -> list[WebSocket]:
+        """연결을 정리한다. 방이 닫혀서 갈 곳이 없어진 관전자 소켓들을 돌려준다."""
+        if ws in self.watching:
+            self.stop_watching(ws)
+            return []
         entry = self.socket_room.pop(ws, None)
         if entry is None:
-            return
+            return []
         code, player = entry
         room = self.rooms.get(code)
         if room is None:
-            return
+            return []
         room.sockets.pop(player, None)
-        if not room.sockets:
-            self.rooms.pop(code, None)
+        if room.sockets:
+            return []
+        self.rooms.pop(code, None)
+        orphans = list(room.watchers)
+        for watcher in orphans:
+            self.watching.pop(watcher, None)
+        room.watchers.clear()
+        return orphans
