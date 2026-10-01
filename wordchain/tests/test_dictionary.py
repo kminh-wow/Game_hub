@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from app.dictionary import Dictionary, apply_dueum, next_chars
@@ -42,3 +44,13 @@ def test_injeong_words_are_optional():
     assert d.allows("일본", injeong=True)
     assert d.is_killer("과일")                 # 어인정을 빼면 '일'로 시작하는 말이 없다
     assert not d.is_killer("과일", injeong=True)
+
+
+# 보충 사전 적재
+def test_extra_words_are_loaded():
+    extra = Path(__file__).resolve().parent.parent / "data" / "extra_words.txt"
+    d = Dictionary.load(extra)
+    assert "다익스트라" in d
+    assert d.allows("다익스트라")
+    assert next_chars("다익스트라") == ("라", "나")   # 두음법칙: 라 → 나
+
