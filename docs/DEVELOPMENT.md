@@ -13,6 +13,7 @@ uvicorn hub.main:app --reload
 
 http://127.0.0.1:8000 을 여세요.
 
+- **요트 다이스는 `pybullet`(물리 엔진)이 필요해요.** PyPI에는 Linux용 파이썬 3.11 이하 설치 파일만 있어서, 그 밖의 환경(Windows, macOS, 더 새로운 파이썬)에서는 직접 컴파일해야 해요(Windows는 Visual C++ 빌드 도구). 설치하지 못해도 **요트 다이스만 빠지고 나머지 게임은 정상으로 떠요.** 서버 로그에 `게임 'yacht'을(를) 불러오지 못했어요`가 남고, `pytest tests`의 `test_all_games_loaded`가 이유를 알려줘요.
 - 끝말잇기 전체 사전(`wordchain/data/words.txt`)은 git에 없어요. 없으면 샘플 사전(약 450단어)으로 실행됩니다. 만드는 방법은 [끝말잇기 사전 만들기](#끝말잇기-사전-만들기)에 있어요.
 - 테스트
   - 허브 통합 테스트: `pytest tests`
@@ -140,7 +141,13 @@ bash deploy/setup.sh              # 게임 서버는 127.0.0.1:8000, nginx가 80
 - 게임 서버는 기본으로 **서버 안(127.0.0.1)에서만** 받습니다. 밖에서는 nginx(80번)로만 들어오므로 보안 그룹에서 8000번을 열 필요가 없습니다.
 - nginx 없이 80번으로 바로 띄우려면: `PORT=80 bash deploy/setup.sh` (이때는 밖에서 직접 받도록 `0.0.0.0`으로 띄웁니다. `HOST=`로 직접 지정할 수도 있습니다)
 - 서버 설정(`/etc/systemd/system/game-hub.service`)은 `setup.sh`가 만듭니다. `update.sh`는 코드만 갱신하므로, 포트나 주소를 바꿀 때는 `setup.sh`를 다시 실행하세요 (여러 번 실행해도 안전합니다).
-- 코드 업데이트: `bash deploy/update.sh` (git pull 후 `deploy/post_update.sh`로 의존성 설치, 끄투 단어 생성, 재시작)
+- 코드 업데이트: `bash deploy/update.sh` (git pull 후 `deploy/post_update.sh`가 아래를 차례로 합니다)
+  1. `deploy/install_deps.sh`: 가상환경을 **파이썬 3.11**로 맞추고 `requirements.txt`를 설치합니다.
+  2. 끄투 단어 파일이 없으면 생성합니다.
+  3. **재시작 전에 새 코드가 모든 게임을 불러오는지 점검**합니다. 하나라도 실패하면 재시작하지 않고, 돌고 있는 서버를 그대로 둡니다.
+  4. 서비스를 재시작합니다.
+- **왜 파이썬 3.11인가**: pybullet 3.2.7은 3.11까지만 미리 빌드된 설치 파일이 있습니다. 더 새로운 파이썬(Ubuntu 26.04의 3.14 등)에서는 소스를 컴파일해야 하는데, 서버에 컴파일러가 없고 `/tmp`가 작은 메모리 디스크(약 450MB)라서 `Disk quota exceeded`로 실패합니다. 3.11은 [uv](https://docs.astral.sh/uv/)로 내려받으며 시스템 파이썬은 건드리지 않습니다. 새 가상환경이 완성되기 전에는 예전 것을 지우지 않고, 실패하면 되돌립니다.
+- **배포가 `Disk quota exceeded`로 실패하면**: `df -h /`로 디스크를, `findmnt /tmp`로 임시 공간을 확인하세요. 스크립트는 `TMPDIR`을 `~/.tmp`(디스크)로 돌려 두었습니다.
 - 로그 보기: `sudo journalctl -u game-hub -f`
 - 끝말잇기 전체 사전은 git에 없으므로 서버에 따로 올립니다.
   - `scp -i <키> wordchain/data/words.txt <user>@<서버IP>:~/Game_hub/wordchain/data/`

@@ -47,11 +47,9 @@ else
   exit 1
 fi
 
-echo "==> 가상환경"
+echo "==> 가상환경과 패키지 (파이썬 3.11, 요트 다이스의 pybullet 때문)"
 cd "$APP_DIR"
-[ -d .venv ] || "$PY" -m venv .venv
-.venv/bin/pip install -q --upgrade pip
-.venv/bin/pip install -q -r requirements.txt
+bash deploy/install_deps.sh
 
 WORDS=wordchain/data/words.txt
 if [ ! -f "$WORDS" ] && [ -f "$HOME/word-chain-online/data/words.txt" ]; then
