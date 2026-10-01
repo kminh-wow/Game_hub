@@ -157,24 +157,25 @@ function renderSheet(g, finished) {
   const cell = (id, cat) => {
     const written = g.sheets[id][cat];
     const td = el("td");
-    // 점수가 어떻게 계산됐는지 점수 아래에 작게 보여 준다 (예: 3+3+3+2+2, 2-3-4-5, 조건 안 맞음)
-    const withNote = (score, note) => {
-      td.title = `${LABELS[cat]}: ${note}`;
-      td.append(score, el("span", { className: "note", textContent: note }));
-    };
+    // 점수 바로 옆에 어떤 눈으로 그 점수가 나왔는지 괄호로 보여 준다 (예: 10 (5+5), 13 (2+2+3+3+3), 15 (2-3-4-5))
+    const noteNode = (note) => (note ? el("span", { className: "note", textContent: `(${note})` }) : "");
     if (written !== null) {
+      const note = g.notes?.[id]?.[cat] ?? "";
       td.className = "written" + (lastWrite === `${id}:${cat}` ? " just" : "");
-      withNote(el("b", { textContent: written }), g.notes?.[id]?.[cat] ?? "");
+      td.title = `${LABELS[cat]}: ${note}`;
+      td.append(el("b", { textContent: written }), " ", noteNode(note));
     } else if (!finished && id === g.current_id && g.preview && !rolling && !g.rolling) {
       const pts = g.preview[cat];
       const note = g.preview_notes?.[cat] ?? "";
+      td.title = `${LABELS[cat]}: ${note}`;
       if (isMyTurn(g)) {
-        const b = el("button", { type: "button", className: `pick${pts ? "" : " zero"}`, textContent: pts });
+        // 누르면 이 칸에 적는 버튼. 점수와 계산 근거가 한 덩어리로 보이게 버튼 안에 함께 넣는다.
+        const b = el("button", { type: "button", className: `pick${pts ? "" : " zero"}` }, el("b", { textContent: pts }), " ", noteNode(note));
         b.onclick = () => lobby.send("write", { category: cat });
-        withNote(b, note);
+        td.append(b);
       } else {
         td.className = `preview${pts ? "" : " zero"}`;
-        withNote(el("b", { textContent: pts }), note);
+        td.append(el("b", { textContent: pts }), " ", noteNode(note));
       }
     }
     return td;
