@@ -6,12 +6,14 @@ from typing import Any
 
 from common.multiplayer import BaseRoom
 
+from .ai import DEFAULT_LEVEL, LEVEL_NAMES
 from .game import Game
 
 
 @dataclass
 class RoomSettings:
     turn_time: int = 30   # 한 수 제한 시간(초). 넘기면 패배
+    ai_level: int = DEFAULT_LEVEL   # AI 난이도 (0 하 ~ 4 최상)
 
     def copy(self) -> RoomSettings:
         return replace(self)
@@ -19,7 +21,7 @@ class RoomSettings:
 
 class Room(BaseRoom):
     settings_class = RoomSettings
-    setting_limits = {"turn_time": (10, 120)}
+    setting_limits = {"turn_time": (10, 120), "ai_level": (0, len(LEVEL_NAMES) - 1)}
     min_players = 1          # 혼자면 AI 와 대결
     max_players_limit = 2
     default_max_players = 2

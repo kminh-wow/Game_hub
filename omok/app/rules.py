@@ -1,7 +1,5 @@
-"""오목 규칙(자유룰: 5개 이상 이으면 승리)과 간단한 AI."""
+"""오목 규칙(자유룰: 5개 이상 이으면 승리)."""
 from __future__ import annotations
-
-import random
 
 SIZE = 15
 EMPTY, BLACK, WHITE = 0, 1, 2
@@ -46,61 +44,3 @@ def winning_line(board: Board, x: int, y: int) -> list[tuple[int, int]] | None:
 
 def is_full(board: Board) -> bool:
     return all(cell != EMPTY for row in board for cell in row)
-
-
-# ---- AI ----
-# 빈 칸마다 "내가 두면 얼마나 좋은가(공격)"와 "상대가 두면 얼마나 위험한가(수비)"를 더해 가장 높은 칸에 둔다.
-# 이어진 돌 수와 양끝이 열려 있는지만 보는 단순한 방식이다 (띈 모양은 보지 않는다).
-
-_SCORES = {
-    # (이어진 수, 열린 끝 수): 점수
-    (4, 2): 100_000, (4, 1): 10_000,
-    (3, 2): 5_000, (3, 1): 500,
-    (2, 2): 200, (2, 1): 50,
-    (1, 2): 10, (1, 1): 2,
-}
-FIVE = 1_000_000
-
-
-def _point_score(board: Board, x: int, y: int, color: int) -> int:
-    total = 0
-    for dx, dy in LINES:
-        count, open_ends = 1, 0
-        for sx, sy in ((dx, dy), (-dx, -dy)):
-            run = _run(board, x, y, sx, sy, color)
-            count += len(run)
-            ex, ey = x + sx * (len(run) + 1), y + sy * (len(run) + 1)
-            if in_bounds(ex, ey) and board[ey][ex] == EMPTY:
-                open_ends += 1
-        if count >= 5:
-            total += FIVE
-        elif open_ends:
-            total += _SCORES.get((count, open_ends), 0)
-    return total
-
-
-def candidates(board: Board, reach: int = 2) -> list[tuple[int, int]]:
-    """이미 놓인 돌 근처(reach 칸 이내)의 빈 칸. 판이 비어 있으면 가운데."""
-    near = set()
-    for y in range(SIZE):
-        for x in range(SIZE):
-            if board[y][x] == EMPTY:
-                continue
-            for ny in range(y - reach, y + reach + 1):
-                for nx in range(x - reach, x + reach + 1):
-                    if in_bounds(nx, ny) and board[ny][nx] == EMPTY:
-                        near.add((nx, ny))
-    return sorted(near) or [(SIZE // 2, SIZE // 2)]
-
-
-def ai_move(board: Board, color: int, rng: random.Random | None = None) -> tuple[int, int]:
-    rng = rng or random.Random()
-    best: list[tuple[int, int]] = []
-    best_score = -1.0
-    for x, y in candidates(board):
-        score = _point_score(board, x, y, color) * 1.1 + _point_score(board, x, y, other(color))
-        if score > best_score:
-            best, best_score = [(x, y)], score
-        elif score == best_score:
-            best.append((x, y))
-    return rng.choice(best)

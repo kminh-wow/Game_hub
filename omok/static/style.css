@@ -138,8 +138,8 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .settings label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .settings label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--text); }
 .settings.editable label { color: var(--text); font-weight: 600; }
-.settings.editable input { color: var(--text); font-weight: 600; border-color: var(--muted); }
-.settings.editable input:focus { border-color: var(--accent); }
+.settings.editable input, .settings.editable select { color: var(--text); font-weight: 600; border-color: var(--muted); }
+.settings.editable input:focus, .settings.editable select:focus { border-color: var(--accent); }
 #waiting-view { display: flex; flex-direction: column; }
 #waiting-view .big { align-self: center; margin-top: 12px; }
 .bar-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin: 6px 0; }
