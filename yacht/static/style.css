@@ -192,6 +192,7 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .sheet th, .sheet td { border-bottom: 1px solid var(--line); padding: 5px 8px; text-align: center; }
 .sheet th:first-child, .sheet td:first-child { text-align: left; }
 .sheet thead th.turn { color: var(--accent); }
+.sheet td .hint { color: var(--muted); font-size: 12px; font-weight: 400; }
 .sheet tr.sum td { background: var(--bg); font-weight: 600; }
 .sheet tr.total td { font-weight: 700; font-size: 15px; }
 .sheet td.written { font-weight: 600; }
