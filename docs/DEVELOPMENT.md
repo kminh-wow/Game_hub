@@ -134,10 +134,12 @@ Amazon Linux와 Ubuntu에서 동작합니다. systemd 서비스(`game-hub`)로 �
 ```bash
 git clone https://github.com/kminh-wow/Game_hub.git
 cd Game_hub
-bash deploy/setup.sh              # 기본 8000번 포트 (nginx가 80 → 8000 전달)
+bash deploy/setup.sh              # 게임 서버는 127.0.0.1:8000, nginx가 80 → 8000 전달
 ```
 
-- nginx 없이 80번으로 바로 띄우려면: `PORT=80 bash deploy/setup.sh`
+- 게임 서버는 기본으로 **서버 안(127.0.0.1)에서만** 받습니다. 밖에서는 nginx(80번)로만 들어오므로 보안 그룹에서 8000번을 열 필요가 없습니다.
+- nginx 없이 80번으로 바로 띄우려면: `PORT=80 bash deploy/setup.sh` (이때는 밖에서 직접 받도록 `0.0.0.0`으로 띄웁니다. `HOST=`로 직접 지정할 수도 있습니다)
+- 서버 설정(`/etc/systemd/system/game-hub.service`)은 `setup.sh`가 만듭니다. `update.sh`는 코드만 갱신하므로, 포트나 주소를 바꿀 때는 `setup.sh`를 다시 실행하세요 (여러 번 실행해도 안전합니다).
 - 코드 업데이트: `bash deploy/update.sh` (git pull 후 `deploy/post_update.sh`로 의존성 설치, 끄투 단어 생성, 재시작)
 - 로그 보기: `sudo journalctl -u game-hub -f`
 - 끝말잇기 전체 사전은 git에 없으므로 서버에 따로 올립니다.

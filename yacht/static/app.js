@@ -8,6 +8,21 @@ const UPPER = [["aces", "에이스"], ["deuces", "듀스"], ["threes", "트레�
 const LOWER = [["choice", "초이스"], ["four_kind", "포 카인드"], ["full_house", "풀 하우스"],
                ["small_straight", "S. 스트레이트"], ["large_straight", "L. 스트레이트"], ["yacht", "요트"]];
 const LABELS = Object.fromEntries([...UPPER, ...LOWER]);
+// 점수판에서 족보 이름 옆에 보여 줄 설명
+const HINTS = {
+  aces: "1의 눈만 더하기",
+  deuces: "2의 눈만 더하기",
+  threes: "3의 눈만 더하기",
+  fours: "4의 눈만 더하기",
+  fives: "5의 눈만 더하기",
+  sixes: "6의 눈만 더하기",
+  choice: "아무 조합, 눈 전부 더하기",
+  four_kind: "같은 눈 4개 이상, 눈 전부 더하기",
+  full_house: "같은 눈 3개 + 다른 눈 2개, 눈 전부 더하기",
+  small_straight: "4개 이어진 숫자, 예: 2-3-4-5, 15점",
+  large_straight: "5개 이어진 숫자, 1-5 또는 2-6, 30점",
+  yacht: "5개 모두 같은 눈, 50점",
+};
 // 주사위 눈 위치 (3×3 칸 번호)
 const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 
@@ -158,7 +173,10 @@ function renderSheet(g, finished) {
     }
     return td;
   };
-  const row = (label, cat) => el("tr", {}, el("td", { textContent: label }), ...ids.map((id) => cell(id, cat)));
+  const row = (label, cat) =>
+    el("tr", {},
+      el("td", {}, label, el("span", { className: "hint", textContent: ` (${HINTS[cat]})` })),
+      ...ids.map((id) => cell(id, cat)));
   const sumRow = (label, fn, cls) => el("tr", { className: cls }, el("td", { textContent: label }), ...ids.map((id) => el("td", { textContent: fn(g.totals[id]) })));
 
   $("#sheet").replaceChildren(
