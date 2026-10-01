@@ -9,6 +9,8 @@ const LABEL_CLASS = {
 const DIFFICULTY_LABEL = { easy: "하", medium: "중", hard: "상" };
 
 let myPlayer = null;
+let spectating = false;   // 관전 상태
+const SIDE_NAME = { 1: "1P(빨강)", 2: "2P(파랑)" };
 let currentState = null;
 let board;
 let pending = false;
@@ -56,7 +58,7 @@ function showScreen(name) {
 }
 
 function updateInput() {
-  board?.setInteractive(!pending && !processing && currentState?.turn === myPlayer && !currentState?.winner);
+  board?.setInteractive(!spectating && !pending && !processing && currentState?.turn === myPlayer && !currentState?.winner);
 }
 
 async function consumeStates() {
@@ -91,26 +93,33 @@ function appendChatMessage(kind, text) {
 
 function render(state) {
   currentState = state;
-  el("chat-panel").classList.toggle("hidden", state.mode !== "pvp");
-  el("algo-info").classList.toggle("hidden", state.mode !== "learn");
-  el("trace-panel").classList.toggle("hidden", state.mode !== "learn");
-  el("pseudocode-panel").classList.toggle("hidden", state.mode !== "learn");
+  // 관전자는 채팅과 학습 패널을 쓰지 않는다
+  el("chat-panel").classList.toggle("hidden", state.mode !== "pvp" || spectating);
+  el("algo-info").classList.toggle("hidden", state.mode !== "learn" || spectating);
+  el("trace-panel").classList.toggle("hidden", state.mode !== "learn" || spectating);
+  el("pseudocode-panel").classList.toggle("hidden", state.mode !== "learn" || spectating);
+  el("board-controls").classList.toggle("hidden", spectating);
+  el("board-help").classList.toggle("hidden", spectating);
   hideTip(); resetTrace();
-  const turnText = state.turn === myPlayer ? "당신의 차례입니다" : "상대의 차례를 기다리는 중...";
+  const turnText = spectating
+    ? `${SIDE_NAME[state.turn]}의 차례 (관전 중)`
+    : state.turn === myPlayer ? "당신의 차례입니다" : "상대의 차례를 기다리는 중...";
   el("turn-indicator").textContent = state.winner ? "" : turnText;
-  el("walls-left").textContent = `남은 벽 — 나: ${state.wallsLeft[myPlayer]} / 상대: ${state.wallsLeft[myPlayer === 1 ? 2 : 1]}`;
+  el("walls-left").textContent = spectating
+    ? `남은 벽 — 1P: ${state.wallsLeft[1]} / 2P: ${state.wallsLeft[2]}`
+    : `남은 벽 — 나: ${state.wallsLeft[myPlayer]} / 상대: ${state.wallsLeft[myPlayer === 1 ? 2 : 1]}`;
   el("difficulty-indicator").textContent =
     state.mode === "ai" || state.mode === "learn" ? `난이도: ${DIFFICULTY_LABEL[state.difficulty] || state.difficulty}` : "";
 
   if (state.winner) {
     const won = state.winner === myPlayer;
-    el("result-text").textContent = won ? "승리했습니다!" : "패배했습니다.";
+    el("result-text").textContent = spectating ? `${SIDE_NAME[state.winner]} 승리!` : won ? "승리했습니다!" : "패배했습니다.";
     el("result-modal").classList.remove("hidden");
   }
 }
 
 function handleCellClick(r, c) {
-  if (!currentState || pending || processing || currentState.turn !== myPlayer || currentState.winner) return;
+  if (spectating || !currentState || pending || processing || currentState.turn !== myPlayer || currentState.winner) return;
   const isLegal = currentState.legalMoves.some(([lr, lc]) => lr === r && lc === c);
   if (!isLegal) return;
   el("game-error").textContent = "";
@@ -119,7 +128,7 @@ function handleCellClick(r, c) {
 }
 
 function handleWallClick(r, c, orientation) {
-  if (!currentState || pending || processing || currentState.turn !== myPlayer || currentState.winner) return;
+  if (spectating || !currentState || pending || processing || currentState.turn !== myPlayer || currentState.winner) return;
   el("game-error").textContent = "";
   pending = true; updateInput();
   Net.send({ type: "place_wall", r, c, orientation });
@@ -127,10 +136,13 @@ function handleWallClick(r, c, orientation) {
 
 function resetToMenu() {
   session++; queue = []; pending = false; processing = false; board?.reset();
+  if (spectating) Net.send({ type: "leave_watch" });
+  spectating = false;
   myPlayer = null;
   currentState = null;
   el("menu-error").textContent = "";
   el("join-code").value = "";
+  el("watch-code").value = "";
   el("chat-log").innerHTML = "";
   hideTip();
   resetTrace();
@@ -147,6 +159,12 @@ Net.on("room_created", (msg) => {
 
 Net.on("joined", (msg) => {
   myPlayer = msg.player;
+});
+
+// 관전 시작 (시점은 항상 1P 쪽)
+Net.on("watching", () => {
+  spectating = true;
+  myPlayer = 1;
 });
 
 Net.on("state", (msg) => {
@@ -167,7 +185,13 @@ Net.on("chat", (msg) => {
 });
 
 Net.on("opponent_left", () => {
-  alert("상대가 게임을 떠났습니다.");
+  alert(spectating ? "참가자가 게임을 떠나서 관전을 마칩니다." : "상대가 게임을 떠났습니다.");
+  resetToMenu();
+});
+
+// 관전하던 방이 닫힘
+Net.on("room_closed", () => {
+  alert("참가자가 모두 나가서 방이 닫혔습니다.");
   resetToMenu();
 });
 
@@ -194,6 +218,19 @@ el("btn-join").addEventListener("click", async () => {
   try {
     await Net.connect();
     Net.send({ type: "join_room", code });
+  } catch {
+    el("menu-error").textContent = "서버에 연결할 수 없습니다.";
+  }
+});
+
+// 방 코드로 관전
+el("btn-watch").addEventListener("click", async () => {
+  const code = el("watch-code").value.trim().toUpperCase();
+  if (!code) return;
+  el("menu-error").textContent = "";
+  try {
+    await Net.connect();
+    Net.send({ type: "watch_room", code });
   } catch {
     el("menu-error").textContent = "서버에 연결할 수 없습니다.";
   }

@@ -9,6 +9,13 @@ from fastapi.staticfiles import StaticFiles
 from . import ai, analysis, game
 from .rooms import RoomManager
 
+# 연결이 끊겼다는 예외. 새 Starlette(1.x)는 이미 끊긴 연결에서 다시 받으려 하면
+# WebSocketDisconnect 와는 다른 WebSocketDisconnected 를 던지므로 둘 다 잡는다.
+try:
+    from starlette.websockets import WebSocketDisconnected
+except ImportError:  # 예전 Starlette
+    WebSocketDisconnected = WebSocketDisconnect
+
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 manager = RoomManager()
 
@@ -49,6 +56,20 @@ async def maybe_run_ai(room):
             game.apply_wall(room.state, 2, r, c, orientation)
 
 
+# 연결 정리 (남은 참가자·관전자에게 알림)
+async def release(ws: WebSocket) -> None:
+    entry = manager.lookup(ws)
+    orphans = manager.disconnect(ws)
+    if entry is not None:
+        room, _player = entry
+        await room.broadcast({"type": "opponent_left"})
+    for watcher in orphans:
+        try:
+            await watcher.send_json({"type": "room_closed"})
+        except Exception:
+            pass
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
@@ -69,6 +90,17 @@ async def websocket_endpoint(ws: WebSocket):
                     continue
                 await ws.send_json({"type": "joined", "code": room.code, "player": 2})
                 await room.broadcast(state_message(room))
+
+            elif msg_type == "watch_room":
+                room = manager.watch_room(str(data.get("code", "")).upper(), ws)
+                if room is None:
+                    await ws.send_json({"type": "error", "message": "관전할 수 있는 방을 찾을 수 없습니다."})
+                    continue
+                await ws.send_json({"type": "watching", "code": room.code, "mode": room.mode})
+                await ws.send_json(state_message(room))
+
+            elif msg_type == "leave_watch":
+                manager.stop_watching(ws)
 
             elif msg_type == "start_ai_game":
                 difficulty = data.get("difficulty")
@@ -128,12 +160,11 @@ async def websocket_endpoint(ws: WebSocket):
             else:
                 await ws.send_json({"type": "error", "message": f"알 수 없는 메시지 타입: {msg_type}"})
 
-    except WebSocketDisconnect:
-        entry = manager.lookup(ws)
-        manager.disconnect(ws)
-        if entry is not None:
-            room, player = entry
-            await room.broadcast({"type": "opponent_left"})
+    except (WebSocketDisconnect, WebSocketDisconnected):
+        pass
+    finally:
+        # 연결 작업이 취소되더라도(서버 종료 등) 정리와 알림은 끝까지 한다.
+        await asyncio.shield(release(ws))
 
 
 app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
