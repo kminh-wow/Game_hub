@@ -1,3 +1,4 @@
+/* 공통 팔레트 */
 :root {
   --bg: #f5f5ed;
   --panel: #fcfcf7;
@@ -6,9 +7,9 @@
   --line: #cdd4c7;
   --accent: #245442;
   --accent-soft: #e3eacb;
-  --good: #1f9d63;
-  --bad: #e0474c;
-  --warn: #f0a020;
+  --good: #28724f;
+  --bad: #bd3e43;
+  --warn: #a66a17;
   --radius: 12px;
 }
 
@@ -42,12 +43,13 @@ button:disabled { opacity: .45; cursor: default; }
 button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
 button.big { padding: 12px 28px; font-size: 16px; font-weight: 600; }
 
+/* 입력 필드 */
 input, select {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 10px;
   font: inherit;
-  background: #fff;
+  background: var(--panel);
   color: inherit;
 }
 input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
@@ -136,7 +138,7 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .settings label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .settings label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--text); }
 .settings.editable label { color: var(--text); font-weight: 600; }
-.settings.editable input { color: var(--text); font-weight: 600; border-color: #a5aec2; }
+.settings.editable input { color: var(--text); font-weight: 600; border-color: var(--muted); }
 .settings.editable input:focus { border-color: var(--accent); }
 #waiting-view { display: flex; flex-direction: column; }
 #waiting-view .big { align-self: center; margin-top: 12px; }
@@ -155,13 +157,15 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 
 /* ---- 모달/토스트 ---- */
 
-.modal { position: fixed; inset: 0; background: rgba(20,24,35,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+/* 결과 창 */
+.modal { position: fixed; inset: 0; background: rgba(23,61,51,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .modal-card { background: var(--panel); border-radius: 16px; padding: 24px; width: min(360px, 100%); text-align: center; }
 .result-list { margin: 16px 0; text-align: left; }
 .result-list li { display: flex; justify-content: space-between; padding: 8px 10px; border-radius: 8px; }
-.result-list li:first-child { background: #fff6dc; font-weight: 700; }
+.result-list li:first-child { background: var(--accent-soft); font-weight: 700; }
 
-.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #2a2f3d; color: #fff; padding: 10px 18px; border-radius: 99px; font-size: 14px; }
+/* 알림 */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 18px; border-radius: 99px; font-size: 14px; }
 
 /* ---- 요트 다이스 ---- */
 
@@ -169,7 +173,7 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .game-status { text-align: center; min-height: 1.4em; margin: 8px 0; font-weight: 600; }
 
 .tray { display: flex; justify-content: center; gap: 12px; margin: 16px 0 6px; flex-wrap: wrap; }
-.die { width: 64px; height: 64px; padding: 8px; border-radius: 12px; border: 2px solid var(--line); background: #fff;
+.die { width: 64px; height: 64px; padding: 8px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel);
        display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); cursor: pointer;
        box-shadow: 0 3px 0 var(--line); transition: transform .12s, border-color .12s; }
 .die i { width: 11px; height: 11px; border-radius: 50%; background: var(--text); place-self: center; visibility: hidden; }
@@ -201,7 +205,7 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .sheet button.pick { background: var(--accent-soft); color: var(--accent); padding: 3px 10px; border-radius: 6px; font-weight: 700; }
 .sheet button.pick.zero { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
 .sheet td.just { animation: flash 1s; }
-@keyframes flash { from { background: #fff3b0; } to { background: transparent; } }
+@keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
 
 /* Multiplayer table: shared dice above scorecard, people and chat at right. */
 #screen-room { max-width:1240px; }
@@ -216,14 +220,16 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .room-sidebar .player-list li { padding:7px 8px; }
 .game-top { color:var(--text); font-weight:600; }
 #turn-info { color:var(--accent); }
-.dice-stage { position:relative; width:100%; height:240px; border-radius:14px; background:linear-gradient(135deg,#f5f7fc,#e9edf7); margin-top:10px; overflow:hidden; }
+/* 주사위 배경 */
+.dice-stage { position:relative; width:100%; height:240px; border-radius:14px; background:linear-gradient(135deg,var(--bg),var(--accent-soft)); margin-top:10px; overflow:hidden; }
 .tray-canvas { display:block; width:100%; height:100%; pointer-events:none; }
 .has-3d .tray { position:absolute; inset:0; display:block; margin:0; }
 .has-3d .die { position:absolute; transform:translate(-50%,-50%); padding:0; border:2px solid transparent; background:transparent; box-shadow:none; border-radius:12px; }
 .has-3d .die i { visibility:hidden !important; }
 .has-3d .die.rolling { animation:none; }
-.has-3d .die.held { border-color:#9fbdff; background:#779fff18; box-shadow:0 0 0 3px #6088ff35; }
-.has-3d .die.held::after { content:'고정'; position:absolute; bottom:-23px; left:0; right:0; font-size:11px; font-weight:700; color:#e0eaff; text-shadow:0 1px 3px #13264c; }
+/* 주사위 고정 표시 */
+.has-3d .die.held { border-color:var(--accent); background:rgba(36,84,66,.10); box-shadow:0 0 0 3px rgba(36,84,66,.22); }
+.has-3d .die.held::after { content:'고정'; position:absolute; bottom:-23px; left:0; right:0; font-size:11px; font-weight:700; color:var(--panel); text-shadow:0 1px 3px var(--text); }
 .has-3d .die:focus-visible { outline:3px solid white; outline-offset:3px; }
 .dice-stage:not(.has-3d) { height:auto; min-height:116px; padding:16px 0; }
 .roll-row { margin:10px 0 6px; }
@@ -232,13 +238,17 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .sheet-wrap { overflow:auto; border:1px solid var(--line); border-radius:12px; isolation:isolate; }
 .sheet { table-layout:fixed; min-width:540px; font-size:13px; border-collapse:separate; border-spacing:0; }
 .sheet th,.sheet td { height:31px; padding:4px 6px; background:var(--panel); }
-.sheet th:first-child,.sheet td:first-child { position:sticky; left:0; z-index:2; width:148px; background:#f6f8fc; font-weight:600; }
+/* 점수표 항목 */
+.sheet th:first-child,.sheet td:first-child { position:sticky; left:0; z-index:2; width:148px; background:var(--bg); font-weight:600; }
 .sheet thead th { height:42px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.sheet .mine { background:#f5f7ff; }
-.sheet .current { box-shadow:inset 1px 0 #c8d3ff,inset -1px 0 #c8d3ff; }
+/* 내 점수 */
+.sheet .mine { background:var(--accent-soft); }
+/* 현재 차례 */
+.sheet .current { box-shadow:inset 1px 0 var(--line),inset -1px 0 var(--line); }
 .sheet thead .current { color:var(--accent); background:var(--accent-soft); }
 .sheet .sum td { font-size:11px; }
-.sheet .total td { height:38px; color:var(--accent); background:#eef2ff; }
+/* 총점 */
+.sheet .total td { height:38px; color:var(--accent); background:var(--accent-soft); }
 .sheet button.pick { min-width:38px; width:100%; max-width:64px; }
 .sheet button.pick:focus-visible { outline:2px solid var(--accent); }
 @media(max-width:800px) {

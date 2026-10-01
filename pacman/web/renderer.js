@@ -42,12 +42,14 @@ export async function createRenderer(canvas) {
     });
     return result;
   }
-  const floor = new THREE.Mesh(new THREE.BoxGeometry(W+1,.45,H+1),new THREE.MeshStandardMaterial({color:0xe4e9f3,roughness:.65}));
+  // 미로 바닥
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(W+1,.45,H+1),new THREE.MeshStandardMaterial({color:0xe3eacb,roughness:.65}));
   floor.position.y=-.32;
   floor.receiveShadow=true;
   scene.add(floor);
   const theme = matchMedia('(prefers-color-scheme: dark)');
-  function applyTheme() { floor.material.color.set(theme.matches?0x272e42:0xe4e9f3); }
+  // 바닥 팔레트
+  function applyTheme() { floor.material.color.set(theme.matches?0x35473f:0xe3eacb); }
   applyTheme(); theme.addEventListener('change',applyTheme);
   const tile = asset('WallTile');
   tile.material.color.setHex(0x4b6bdb);

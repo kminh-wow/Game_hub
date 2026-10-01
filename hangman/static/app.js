@@ -419,6 +419,7 @@ const GALLOWS_SVG = `<svg class="gallows" viewBox="0 0 170 190" aria-hidden="tru
   </g>
 </svg>`;
 
+// 행맨 렌더링
 function renderGallows(g) {
   const list = $("#gallows-list");
   const guessers = g.order.filter((id) => id !== g.setter_id);
@@ -455,10 +456,11 @@ function renderGallows(g) {
       if (!fresh && amount !== previous) {
         part.getAnimations().forEach((animation) => animation.cancel());
         if (!reducedMotion && amount > previous) {
+          // 오답 색상 전환
           part.animate([
-            { strokeDashoffset: 1 - previous, stroke: "#e0474c" },
-            { strokeDashoffset: 1 - amount, stroke: "#e0474c", offset: .65 },
-            { strokeDashoffset: 1 - amount, stroke: "#343d54" },
+            { strokeDashoffset: 1 - previous, stroke: getComputedStyle(part).getPropertyValue("--bad").trim() },
+            { strokeDashoffset: 1 - amount, stroke: getComputedStyle(part).getPropertyValue("--bad").trim(), offset: .65 },
+            { strokeDashoffset: 1 - amount, stroke: getComputedStyle(part).getPropertyValue("--text").trim() },
           ], { duration: 600, easing: "ease-out" });
         }
       }
