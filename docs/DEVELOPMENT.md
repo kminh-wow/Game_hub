@@ -36,6 +36,7 @@ pacman/          팩맨     (FastAPI 앱: pacman/app.py, 정적 파일만 제공
 hangman/         행맨     (FastAPI 앱: hangman/app/main.py)
 omok/            오목     (FastAPI 앱: omok/app/main.py)
 yacht/           요트 다이스 (FastAPI 앱: yacht/app/main.py)
+fortress/        포트리스 (FastAPI 앱: fortress/app/main.py)
 deploy/          서버 설치, 업데이트 스크립트
 docs/            이 문서, README용 스크린샷
 tests/           허브 통합 테스트
@@ -50,6 +51,7 @@ tests/           허브 통합 테스트
 | `/hangman/` | 행맨 |
 | `/omok/` | 오목 |
 | `/yacht/` | 요트 다이스 |
+| `/fortress/` | 포트리스 |
 | `/common/` | 공통 프론트엔드 파일 (`lobby.js`) |
 
 - 각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
@@ -433,3 +435,25 @@ yacht/
 `yacht/app/physics.py`는 PyBullet DIRECT 월드에서 240Hz로 낙하·충돌을 계산하고, 30Hz 위치/쿼터니언 궤적을 전달합니다. 초기 자세·속도만 무작위이며, 최종 면의 월드 Y축 법선으로 눈을 판정합니다. 클라이언트가 눈을 제출하지 않습니다. `tray3d.js`는 같은 궤적을 보간하고, WebGL 미지원 시에도 서버 결과를 사용합니다. 재생 중 서버에서 고정·굴리기·기록을 거부하며, 제한 시간이 끝나면 정지 후 기록합니다. 물리 계산은 작업 스레드에서 수행하고 퇴장·차례 변경 시 오래된 결과를 폐기합니다.
 
 `pip install -r requirements.txt`로 PyBullet도 설치해야 합니다. 플랫폼에 맞는 wheel이 없으면 C++ 빌드 도구가 필요합니다. 검증: `cd yacht && python -m pytest tests`.
+
+---
+
+## 포트리스
+
+```
+fortress/
+  app/
+    main.py     GameServer·앱 생성 (게임 메시지: aim, move, fire)
+    room.py     방 설정(한 차례 제한 시간), 1~4명 (혼자면 허수아비)
+    game.py     차례 진행: 바람·연료, 조준, 이동, 발사, 포탄 재생 대기, 퇴장, 순위
+    world.py    산 지형(높이맵) 생성, 포탄 궤적, 폭발(지형 파괴·피해·떨어짐), 탱크 이동
+  static/       index.html, style.css, app.js (lobby.js 사용, 캔버스 2D)
+  tests/
+```
+
+- 좌표는 왼쪽 아래가 (0, 0), 전장은 1200×700입니다. 지형은 열마다 땅 높이 하나인 높이맵이고, 폭발하면 원 안의 흙이 사라지면서 그 위의 흙은 내려앉습니다(동굴은 생기지 않습니다).
+- 포탄은 서버가 1/120초 단위로 계산하고(중력 + 바람), 30Hz 궤적(`frames`)을 `shot` 이벤트로 보냅니다. 화면은 궤적을 재생하는 동안 터지기 전 지형을 보여 주고, 터지는 순간 새 지형과 체력으로 바꿉니다. 서버는 재생 시간(`duration_ms`)이 지난 뒤 다음 차례로 넘깁니다.
+- 파워는 화면의 게이지에서 정해 `fire {power, weapon}`으로 보냅니다(0~100 중 어떤 값이든 정당한 선택이라 서버는 범위만 확인합니다). 각도·방향은 `aim {angle, facing}`, 이동은 `move {dir}` 한 번에 3씩이며 연료를 씁니다. 서버는 다른 사람에게 `aim`·`tank` 메시지로 바로 알려 줍니다.
+- 메시지: `game`(상태 + `events`: turn, shot, timeout, left), `aim`, `tank`, `game_over`(`ranking`, `winner`).
+- 검증: `cd fortress && python -m pytest tests` (물리 엔진이 필요 없습니다).
+

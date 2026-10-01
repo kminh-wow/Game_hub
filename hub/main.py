@@ -7,6 +7,7 @@
     /hangman/    행맨
     /omok/       오목
     /yacht/      요트 다이스
+    /fortress/   포트리스
     /common/     게임들이 함께 쓰는 프론트엔드 파일 (lobby.js 등)
 
 게임 상태가 각 앱의 메모리에 있으므로 uvicorn 워커는 반드시 1개로 실행한다.
@@ -35,6 +36,7 @@ GAME_MODULES = {
     "hangman": "hangman.app.main",
     "omok": "omok.app.main",
     "yacht": "yacht.app.main",
+    "fortress": "fortress.app.main",
 }
 
 

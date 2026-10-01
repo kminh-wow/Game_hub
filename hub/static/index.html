@@ -108,6 +108,12 @@
     .dice { display: flex; gap: 8px; }
     .dice b { width: 34px; height: 34px; border-radius: 8px; background: var(--panel); border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 22px; }
     .dice b.held { border-color: var(--accent); transform: translateY(-5px); }
+    /* 포트리스 카드 그림 */
+    .hills { position: relative; width: 150px; height: 64px; overflow: hidden; border-radius: 8px; background: linear-gradient(#8ccaf2, #eaf6ff); }
+    .hills::before { content: ""; position: absolute; left: -10px; right: -10px; bottom: -40px; height: 90px; background: #8a5a33; border-top: 5px solid #5aa340; border-radius: 50% 50% 0 0; }
+    .hills i { position: absolute; bottom: 30px; width: 16px; height: 8px; border-radius: 4px 4px 2px 2px; }
+    .hills i.a { left: 26px; background: #d64545; }
+    .hills i.b { right: 26px; background: #2f6fd6; }
 
     footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
   </style>
@@ -186,6 +192,16 @@
       <h2>요트 다이스</h2>
       <p>주사위 5개를 최대 3번 굴려 족보를 채워요. 풀 하우스, 스트레이트, 그리고 꿈의 요트!</p>
       <div class="tags"><span>1~5명</span><span>멀티플레이</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
+    <a class="card" href="fortress/">
+      <div class="art" aria-hidden="true">
+        <div class="hills"><i class="a"></i><i class="b"></i></div>
+      </div>
+      <h2>포트리스</h2>
+      <p>산 너머 탱크를 향해 각도와 파워를 맞춰 쏴요. 바람을 읽고 지형을 부수며 끝까지 살아남아라!</p>
+      <div class="tags"><span>1~4명</span><span>멀티플레이</span></div>
       <span class="play">플레이 →</span>
     </a>
   </main>
