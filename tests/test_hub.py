@@ -105,3 +105,13 @@ def test_one_broken_game_does_not_take_down_the_hub():
     games, failed = load_games({"ok": "pacman.app", "broken": "no_such_module_for_test"})
     assert "ok" in games
     assert list(failed) == ["broken"] and "ModuleNotFoundError" in failed["broken"]
+
+
+def test_pybullet_requirement_declares_numpy():
+    """pybullet 은 numpy 를 선언하지 않고 쓴다. requirements.txt 에 numpy 가 없으면 서버에서 import 가 실패한다."""
+    from pathlib import Path
+
+    lines = [ln.strip().lower() for ln in (Path(__file__).parent.parent / "requirements.txt").read_text(encoding="utf-8").splitlines()]
+    names = {ln.split("=")[0].split(">")[0].split("<")[0].strip() for ln in lines if ln and not ln.startswith("#")}
+    assert "pybullet" not in names or "numpy" in names
+

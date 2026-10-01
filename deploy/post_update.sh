@@ -15,7 +15,10 @@ fi
 # 하나라도 못 불러오면 재시작하지 않고, 지금 돌고 있는 서버를 그대로 둔다.
 echo "==> 새 코드 점검"
 if ! .venv/bin/python - <<'PY'
+import random
 import sys
+import time
+
 from hub.main import FAILED_GAMES
 
 if FAILED_GAMES:
@@ -23,6 +26,21 @@ if FAILED_GAMES:
         print(f"!! 게임 '{name}' 을(를) 불러오지 못했어요: {why}", file=sys.stderr)
     sys.exit(1)
 print("모든 게임을 불러왔어요.")
+
+# 요트 다이스의 물리 계산이 이 서버에서 실제로 되는지 주사위를 한 번 굴려 본다 (드물게 못 멈추면 3번까지 다시).
+from yacht.app.physics import initial_poses, throw_dice
+
+for attempt in range(3):
+    started = time.time()
+    try:
+        result = throw_dice(random.Random(attempt), initial_poses(), [False] * 5)
+    except RuntimeError:
+        continue
+    print(f"주사위 물리 계산 OK: {result['dice']} ({time.time() - started:.1f}초)")
+    break
+else:
+    print("!! 주사위 물리 계산이 3번 모두 실패했어요.", file=sys.stderr)
+    sys.exit(1)
 PY
 then
   echo "!! 점검에 실패해서 재시작하지 않았어요. 서버는 예전 코드로 계속 돌고 있어요." >&2
