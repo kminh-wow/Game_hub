@@ -149,7 +149,7 @@ const GameLobby = (() => {
       renderRoom();
     },
     chat(msg) {
-      logChat(msg.scope === "room" ? $("#room-chat-log") : $("#lobby-chat-log"), msg.from.name, msg.text);
+      logChat(msg.scope === "room" ? $("#room-chat-log") : $("#lobby-chat-log"), msg.from.name + (msg.spectator ? " (관전)" : ""), msg.text);
     },
     system(msg) {
       logSystem(msg.text);
@@ -173,19 +173,22 @@ const GameLobby = (() => {
     } else {
       list.replaceChildren(
         ...state.rooms.map((r) => {
+          // 게임 중이거나 꽉 찬 방은 들어갈 수 없으므로 눌러서 관전한다
           const blocked = r.playing || r.players >= r.max_players;
+          const watching = r.spectators ? ` · 👀 ${r.spectators}` : "";
+          const badge = r.playing ? "게임 중 · 관전하기" : blocked ? "꽉 참 · 관전하기" : "대기 중";
           const card = el(
             "li",
-            { className: `room-card${blocked ? " disabled" : ""}` },
+            { className: `room-card${blocked ? " watchable" : ""}` },
             el("div", { className: "title", textContent: `#${r.id} ${r.title}` }),
             el(
               "div",
               { className: "meta" },
-              el("span", { textContent: `방장 ${r.host} · ${r.players}/${r.max_players}` }),
-              el("span", { className: `badge${r.playing ? " playing" : ""}`, textContent: r.playing ? "게임 중" : "대기 중" })
+              el("span", { textContent: `방장 ${r.host} · ${r.players}/${r.max_players}${watching}` }),
+              el("span", { className: `badge${r.playing ? " playing" : ""}`, textContent: badge })
             )
           );
-          if (!blocked) card.onclick = () => send("join_room", { room_id: r.id });
+          card.onclick = () => send(blocked ? "spectate_room" : "join_room", { room_id: r.id });
           return card;
         })
       );
@@ -197,7 +200,7 @@ const GameLobby = (() => {
           "li",
           {},
           el("span", { textContent: u.name + (isMe(u.id) ? " (나)" : "") }),
-          el("span", { className: "where", textContent: u.room_id ? `#${u.room_id}번 방` : "로비" })
+          el("span", { className: "where", textContent: u.room_id ? `#${u.room_id}번 방${u.spectating ? " 관전" : ""}` : "로비" })
         )
       )
     );
@@ -209,11 +212,24 @@ const GameLobby = (() => {
     const room = state.room;
     if (!room) return;
     const amHost = room.host_id === state.me.id;
+    const watchers = room.spectators || [];
+    const amSpectator = watchers.some((s) => isMe(s.id));
     const inGame = room.playing && !!state.game;
     const showGame = !!state.game && (room.playing || !!cfg.showLastGame);
 
     $("#room-title").textContent = `#${room.id} ${room.title}`;
-    $("#room-info").textContent = `${room.players.length}/${room.max_players}명`;
+    $("#room-info").textContent = `${room.players.length}/${room.max_players}명${watchers.length ? ` · 👀 관전 ${watchers.length}` : ""}${amSpectator ? " (내가 관전 중)" : ""}`;
+    $("#btn-leave").textContent = amSpectator ? "관전 끝내기" : "나가기";
+
+    // 관전자 목록
+    const watchBox = $("#spectator-box");
+    if (watchBox) {
+      watchBox.classList.toggle("hidden", !watchers.length);
+      $("#spectator-count").textContent = watchers.length;
+      $("#spectator-list").replaceChildren(
+        ...watchers.map((s) => el("li", {}, el("span", { className: "name", textContent: s.name + (isMe(s.id) ? " (나)" : "") })))
+      );
+    }
 
     $("#player-list").replaceChildren(
       ...room.players.map((p) => {
@@ -253,6 +269,13 @@ const GameLobby = (() => {
 
     const btn = $("#btn-ready");
     const others = room.players.filter((p) => p.id !== room.host_id);
+    // 관전자는 준비·시작을 못 하므로 안내만 보여 준다
+    const spectating = (room.spectators || []).some((s) => isMe(s.id));
+    btn.classList.toggle("hidden", spectating);
+    if (spectating) {
+      $("#settings-note").textContent = "관전 중이에요. 게임이 시작되면 이 화면에서 바로 볼 수 있어요.";
+      return;
+    }
     let note;
     if (amHost) {
       const canStart = cfg.canStart ? cfg.canStart(room, others) : others.length >= 1 && others.every((p) => p.ready);

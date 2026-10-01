@@ -51,6 +51,36 @@ class Game:
             "scores": self.scores,
         }
 
+    # 관전자 입장 시 진행 상황 (시작 → 라운드 → 지금 차례)
+    def watch_messages(self, player: Player) -> list[dict[str, Any]]:
+        msgs: list[dict[str, Any]] = [{
+            "type": "game_start",
+            "order": [p.id for p in self.order],
+            "scores": self.scores,
+        }]
+        if not self.round:
+            return msgs
+        msgs.append({
+            "type": "round_start",
+            "round": self.round,
+            "rounds": self.settings.rounds,
+            "start_word": self.chain[0] if self.chain else "",
+            "chain": self.chain[-CHAIN_HISTORY:],
+            "chars": list(self.chars),
+        })
+        if self.accepting:
+            elapsed = asyncio.get_running_loop().time() - self.turn_started
+            msgs.append({
+                "type": "turn",
+                "player_id": self.current.id,
+                "chars": list(self.chars),
+                "turn_limit_ms": int(self.turn_limit * 1000),
+                "turn_left_ms": int(max(self.turn_limit - elapsed, 0) * 1000),
+                "round_left_ms": int(max(self.round_left - elapsed, 0) * 1000),
+                "round_time_ms": self.settings.round_time * 1000,
+            })
+        return msgs
+
     # ---- 진행 ----
 
     async def start(self) -> None:

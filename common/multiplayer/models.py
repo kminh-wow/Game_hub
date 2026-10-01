@@ -18,6 +18,7 @@ class Player:
     ws: WebSocket
     token: str = ""  # 브라우저별 식별값. 같은 브라우저의 재접속을 알아보는 데 쓴다.
     room: Room | None = None
+    spectating: bool = False   # 관전 중 (방에는 있지만 참가자는 아님)
 
     def public(self) -> dict[str, Any]:
         return {"id": self.id, "name": self.name}

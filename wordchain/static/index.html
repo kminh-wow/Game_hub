@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>끝말잇기 온라인</title>
-  <link rel="stylesheet" href="static/style.css?v=2">
+  <link rel="stylesheet" href="static/style.css?v=spectate">
 </head>
 <body>
   <!-- 로그인 -->
@@ -72,6 +72,10 @@
       <div class="panel side">
         <h3>참가자</h3>
         <ul id="player-list" class="player-list"></ul>
+        <div id="spectator-box" class="hidden">
+          <h3>관전 <span id="spectator-count" class="muted"></span></h3>
+          <ul id="spectator-list" class="player-list"></ul>
+        </div>
       </div>
 
       <div class="panel grow">
@@ -127,6 +131,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="static/app.js?v=3"></script>
+  <script src="static/app.js?v=spectate"></script>
 </body>
 </html>
