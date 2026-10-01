@@ -1,3 +1,6 @@
 fastapi>=0.115
 uvicorn[standard]>=0.30
 pybullet==3.2.7
+# pybullet 은 numpy 를 필요로 하면서 의존성에 선언하지 않는다. 없으면 import 때
+# "numpy._core.multiarray failed to import" 로 실패한다. 설치 파일(wheel)이 numpy 2 용으로 빌드돼 있어 2.x 를 쓴다.
+numpy>=2.0,<3
