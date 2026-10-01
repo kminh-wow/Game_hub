@@ -1,13 +1,13 @@
 :root {
   --board-bg: #e8d5b5;
-  --pawn1: #4b6bfb;
-  --bg: #eef1f6;
-  --panel: #ffffff;
-  --text: #1f2430;
-  --muted: #7a8194;
-  --line: #e1e5ee;
-  --accent: #4b6bfb;
-  --accent-soft: #e6ebff;
+  --pawn1: #245442;
+  --bg: #f5f5ed;
+  --panel: #fcfcf7;
+  --text: #173d33;
+  --muted: #53665c;
+  --line: #cdd4c7;
+  --accent: #245442;
+  --accent-soft: #e3eacb;
   --bad: #e0474c;
   --radius: 12px;
 }

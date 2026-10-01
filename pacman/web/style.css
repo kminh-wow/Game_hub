@@ -1,5 +1,5 @@
-:root { color-scheme:light dark; --bg:#eef1f6; --panel:#fff; --text:#1f2430; --muted:#6f7689; --line:#e1e5ee; --accent:#4b6bfb; --shadow:0 1px 2px rgba(20,24,35,.05),0 8px 24px rgba(20,24,35,.06); }
-@media(prefers-color-scheme:dark) { :root { --bg:#14171f; --panel:#1d212c; --text:#e9ecf3; --muted:#9aa1b3; --line:#2b3040; --accent:#7b93ff; --shadow:0 1px 2px #0005; } }
+:root { color-scheme:light dark; --bg:#f5f5ed; --panel:#fcfcf7; --text:#173d33; --muted:#53665c; --line:#cdd4c7; --accent:#245442; --shadow:0 1px 2px rgba(20,24,35,.05),0 8px 24px rgba(20,24,35,.06); }
+@media(prefers-color-scheme:dark) { :root { --bg:#1c2425; --panel:#263032; --text:#edf2e8; --muted:#b6c5bd; --line:#4d6057; --accent:#b9d787; --shadow:0 1px 2px #0005; } }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--text); font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif; min-height:100svh; padding:12px 12px; }
 .game-shell { width:min(920px,100%); margin:auto; }
