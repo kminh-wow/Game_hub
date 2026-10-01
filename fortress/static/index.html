@@ -78,6 +78,14 @@
           <h3>게임 설정</h3>
           <form id="settings-form" class="settings">
             <label>한 차례 제한 시간(초) <input type="number" name="turn_time" min="10" max="60" step="5"></label>
+            <label id="solo-row">혼자일 때 상대
+              <select name="solo_opponent">
+                <option value="0">허수아비 (연습)</option>
+                <option value="1">AI · 하</option>
+                <option value="2">AI · 중</option>
+                <option value="3">AI · 상</option>
+              </select>
+            </label>
           </form>
           <p class="muted">2~4명이 돌아가며 한 발씩 쏴요. 바람과 산을 보고 각도·파워를 맞추세요. 마지막까지 남은 탱크가 이겨요.</p>
           <p id="settings-note" class="muted"></p>
@@ -135,6 +143,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="../common/lobby.js?v=spectate"></script>
-  <script src="static/app.js?v=3"></script>
+  <script src="static/app.js?v=5"></script>
 </body>
 </html>

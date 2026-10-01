@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
 from typing import TYPE_CHECKING, Any
 
+from . import ai
 from .world import (
     HEIGHT, MAX_FUEL, MAX_WIND, SEA, WEAPONS, WIDTH, Tank, explode, fly, generate_terrain, ground,
     move_tank, spawn_points,
@@ -16,6 +18,9 @@ if TYPE_CHECKING:
 
 EXPLOSION_MS = 900       # 터진 뒤 다음 차례까지 기다리는 시간
 DUMMY_ID = "dummy"
+AI_ID = "ai"
+AI_THINK = 1.0           # AI 가 조준하기 전 기다리는 시간(초)
+AI_AIM = .7              # AI 가 포신을 돌린 뒤 쏘기까지 기다리는 시간(초)
 
 
 class Game:
@@ -23,12 +28,17 @@ class Game:
         self.room = room
         self.settings = room.settings.copy()
         self.rng = rng or random.Random()
-        self.order: list[Player] = list(room.players)
+        self.players: dict[str, Player] = {p.id: p for p in room.players}
         self.terrain = generate_terrain(self.rng)
 
-        names = [(p.id, p.name) for p in self.order]
+        names = [(p.id, p.name) for p in room.players]
+        self.ai_level = 0
         if len(names) == 1:
-            names.append((DUMMY_ID, "허수아비"))       # 혼자면 연습용 과녁
+            self.ai_level = self.settings.solo_opponent
+            if self.ai_level:                             # 혼자면 AI 와 대결
+                names.append((AI_ID, f"AI · {ai.LEVEL_NAMES[self.ai_level]}"))
+            else:                                         # 혼자면 연습용 과녁
+                names.append((DUMMY_ID, "허수아비"))
         xs = spawn_points(self.rng, self.terrain, len(names))
         self.tanks: dict[str, Tank] = {}
         for i, ((pid, name), x) in enumerate(zip(names, xs)):
@@ -37,6 +47,7 @@ class Game:
             tank.facing = 1 if x < WIDTH / 2 else -1
             self.tanks[pid] = tank
 
+        self.order: list[str] = [pid for pid, _ in names if pid != DUMMY_ID]   # 차례 순서 (탱크 id)
         self.turn_idx = self.rng.randrange(len(self.order))
         self.turn = 0
         self.wind = 0
@@ -52,7 +63,7 @@ class Game:
     # ---- 조회 ----
 
     @property
-    def current(self) -> Player:
+    def current_id(self) -> str:
         return self.order[self.turn_idx]
 
     def state(self) -> dict[str, Any]:
@@ -62,7 +73,7 @@ class Game:
             "terrain": self.terrain,
             "tanks": [t.public() for t in self.tanks.values()],
             "weapons": {k: {"name": w["name"], "radius": w["radius"]} for k, w in WEAPONS.items()},
-            "current_id": None if self.finished else self.current.id,
+            "current_id": None if self.finished else self.current_id,
             "turn": self.turn,
             "wind": self.wind,
             "fuel": round(self.fuel),
@@ -95,8 +106,9 @@ class Game:
         self.wind = self.rng.randint(-MAX_WIND, MAX_WIND)
         self.fuel = MAX_FUEL
         self.deadline = asyncio.get_running_loop().time() + self.settings.turn_time
-        self._timer = asyncio.create_task(self._turn_timer())
-        self.events.append({"kind": "turn", "player_id": self.current.id, "wind": self.wind})
+        turn = self._ai_turn() if self.current_id == AI_ID else self._turn_timer()
+        self._timer = asyncio.create_task(turn)
+        self.events.append({"kind": "turn", "player_id": self.current_id, "wind": self.wind})
         await self.broadcast_state()
 
     async def _turn_timer(self) -> None:
@@ -105,8 +117,27 @@ class Game:
         except asyncio.CancelledError:
             return
         self._timer = None
-        self.events.append({"kind": "timeout", "player_id": self.current.id})
+        self.events.append({"kind": "timeout", "player_id": self.current_id})
         await self._next_turn()
+
+    # AI 차례 (궤적 계산 → 포신 돌리기 → 발사)
+    async def _ai_turn(self) -> None:
+        tank = self.tanks[AI_ID]
+        try:
+            await asyncio.sleep(AI_THINK)
+            try:
+                angle, facing, power, weapon = await asyncio.to_thread(
+                    ai.plan, [*self.terrain], list(self.tanks.values()), tank, self.wind, self.ai_level, self.rng)
+            except Exception:
+                logging.getLogger(__name__).exception("AI 조준 실패")
+                angle, facing, power, weapon = tank.angle, tank.facing, 50.0, "normal"
+            tank.angle, tank.facing = angle, facing
+            await self.room.broadcast({"type": "aim", "id": tank.id, "angle": angle, "facing": facing})
+            await asyncio.sleep(AI_AIM)
+        except asyncio.CancelledError:
+            return
+        self._timer = None
+        await self._fire(tank, power, weapon)
 
     def _cancel_timer(self) -> None:
         if self._timer:
@@ -120,18 +151,18 @@ class Game:
             return
         for _ in range(len(self.order)):
             self.turn_idx = (self.turn_idx + 1) % len(self.order)
-            if self.tanks[self.current.id].alive:
+            if self.tanks[self.current_id].alive:
                 break
         await self._start_turn()
 
     def _game_over(self) -> bool:
         alive = self._alive_players()
-        return len(alive) <= 1 or not any(self.tanks[p.id].alive for p in self.order)
+        return len(alive) <= 1 or not any(self.tanks[pid].alive for pid in self.players)
 
     # ---- 입력 ----
 
     def _check_turn(self, player: Player) -> str | None:
-        if self.finished or player is not self.current:
+        if self.finished or player.id != self.current_id:
             return "지금은 내 차례가 아니에요."
         if self.flying:
             return "포탄이 떨어질 때까지 기다려 주세요."
@@ -177,9 +208,13 @@ class Game:
             power = max(0.0, min(100.0, float(power)))
         except (TypeError, ValueError):
             return "잘못된 파워예요."
+        await self._fire(tank, power, weapon)
+        return None
+
+    # 포탄 계산과 재생 예약
+    async def _fire(self, tank: Tank, power: float, weapon: str) -> None:
         if weapon in tank.stock:
             tank.stock[weapon] -= 1
-
         self._cancel_timer()
         tanks = list(self.tanks.values())
         shot = fly(self.terrain, tanks, tank, power, self.wind)
@@ -193,7 +228,7 @@ class Game:
         duration = (len(shot["frames"]) - 1) * frame_ms + (EXPLOSION_MS if shot["hit"] else 300)
         self.events.append({
             "kind": "shot",
-            "player_id": player.id,
+            "player_id": tank.id,
             "weapon": weapon,
             "power": round(power, 1),
             "frames": shot["frames"],
@@ -207,7 +242,6 @@ class Game:
         self.flying = True
         await self.broadcast_state()
         self._after = asyncio.create_task(self._after_shot(duration / 1000))
-        return None
 
     async def _after_shot(self, seconds: float) -> None:
         try:
@@ -222,18 +256,19 @@ class Game:
     # ---- 종료 / 퇴장 ----
 
     async def remove_player(self, player: Player) -> None:
-        if self.finished or player not in self.order:
+        if self.finished or player.id not in self.order:
             return
-        was_current = player is self.current
-        idx = self.order.index(player)
+        was_current = player.id == self.current_id
+        idx = self.order.index(player.id)
+        self.players.pop(player.id, None)
         tank = self.tanks[player.id]
         if tank.alive:
             tank.alive = False
             tank.hp = 0
             self.deaths.append(tank.id)
         self.events.append({"kind": "left", "player_id": player.id})
-        self.order.remove(player)
-        if not self.order:
+        self.order.remove(player.id)
+        if not self.players:
             await self.finish()
             return
         if idx < self.turn_idx:
