@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>요트 다이스</title>
-  <link rel="stylesheet" href="static/style.css?v=1">
+  <link rel="stylesheet" href="static/style.css?v=3d-tray">
+  <script type="importmap">{"imports":{"three":"./static/vendor/three/build/three.module.js","three/addons/":"./static/vendor/three/examples/jsm/"}}</script>
 </head>
 <body>
   <!-- 로그인 -->
@@ -67,13 +68,10 @@
       <span id="room-info" class="muted"></span>
       <button id="btn-leave" class="ghost">나가기</button>
     </header>
-    <div class="layout">
-      <div class="panel side">
-        <h3>참가자 <span class="muted">(들어온 순)</span></h3>
-        <ul id="player-list" class="player-list"></ul>
-      </div>
+    <div class="layout yacht-layout">
 
-      <div class="panel grow">
+
+      <div class="panel grow play-column">
         <!-- 대기 화면 -->
         <div id="waiting-view">
           <h3>게임 설정</h3>
@@ -94,22 +92,30 @@
           </div>
           <div class="bar-row"><span>시간</span><div class="bar"><div id="time-bar"></div></div><span id="time-sec"></span></div>
 
-          <div id="tray" class="tray"></div>
+          <div id="dice-stage" class="dice-stage"><div id="tray" class="tray"></div></div>
           <div id="held-labels" class="held-labels"></div>
           <div class="roll-row"><button id="btn-roll" class="big">굴리기</button></div>
           <p id="game-status" class="game-status"></p>
 
-          <table id="sheet" class="sheet"></table>
+          <div class="sheet-wrap" tabindex="0" role="region" aria-label="전체 참가자 점수표"><table id="sheet" class="sheet"></table></div>
         </div>
       </div>
-    </div>
+      <aside class="room-sidebar">
+      <div class="panel side">
+        <h3>참가자 <span class="muted">(총점)</span></h3>
+        <ul id="player-list" class="player-list"></ul>
+      </div>
     <div class="panel chat">
+      <h3>채팅</h3>
       <ul id="room-chat-log" class="chat-log"></ul>
       <form id="room-chat-form" class="chat-form">
         <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
         <button type="submit">전송</button>
       </form>
     </div>
+      </aside>
+    </div>
+
   </section>
 
   <!-- 결과 -->
@@ -124,6 +130,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="../common/lobby.js?v=1"></script>
-  <script src="static/app.js?v=1"></script>
+  <script src="static/app.js?v=physics-rounded"></script>
 </body>
 </html>

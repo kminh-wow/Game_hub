@@ -19,6 +19,8 @@ const REASONS = {
 
 const canvas = $("#board");
 const ctx = canvas.getContext("2d");
+const boardHost = canvas.parentElement;
+let boardView = null;
 canvas.width = canvas.height = PAD * 2 + CELL * (SIZE - 1);
 
 let deadline = 0;
@@ -101,7 +103,7 @@ function renderGame(g, room) {
 
   $("#btn-resign").classList.toggle("hidden", !(room.playing && myColor(g) && !g.reason));
   $("#game-view .bar-row").classList.toggle("hidden", !!finished);
-  canvas.style.cursor = isMyTurn(g) ? "pointer" : "default";
+  boardHost.style.cursor = isMyTurn(g) ? "pointer" : "default";
   drawBoard(g);
 }
 
@@ -110,6 +112,10 @@ function renderGame(g, room) {
 const pos = (i) => PAD + i * CELL;
 
 function drawBoard(g) {
+  if (boardView) {
+    boardView.draw(g, hover, isMyTurn(g) ? myColor(g) : null);
+    return;
+  }
   ctx.fillStyle = "#dcb35c";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -178,6 +184,7 @@ function drawStone(x, y, color) {
 // ---------- 입력 ----------
 
 function cellFromEvent(e) {
+  if (boardView) return boardView.cellFromEvent(e);
   const rect = canvas.getBoundingClientRect();
   const scale = canvas.width / rect.width;
   const x = Math.round(((e.clientX - rect.left) * scale - PAD) / CELL);
@@ -185,17 +192,17 @@ function cellFromEvent(e) {
   return x >= 0 && x < SIZE && y >= 0 && y < SIZE ? [x, y] : null;
 }
 
-canvas.addEventListener("mousemove", (e) => {
+boardHost.addEventListener("mousemove", (e) => {
   const cell = cellFromEvent(e);
   if (String(cell) === String(hover)) return;
   hover = cell;
   if (lobby.state.game) drawBoard(lobby.state.game);
 });
-canvas.addEventListener("mouseleave", () => {
+boardHost.addEventListener("mouseleave", () => {
   hover = null;
   if (lobby.state.game) drawBoard(lobby.state.game);
 });
-canvas.addEventListener("click", (e) => {
+boardHost.addEventListener("click", (e) => {
   const g = lobby.state.game;
   const cell = cellFromEvent(e);
   if (!g || !cell || !isMyTurn(g) || g.board[cell[1]][cell[0]]) return;
@@ -223,3 +230,10 @@ function tick() {
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
+
+// Keep the existing 2D board usable if WebGL or asset loading is unavailable.
+import('./board3d.js?v=wood-stones').then(({ createBoardView }) => createBoardView(boardHost)).then((view) => {
+  boardView = view;
+  canvas.classList.add('hidden');
+  if (lobby.state.game) drawBoard(lobby.state.game);
+}).catch((error) => console.warn('3D board unavailable; using 2D board.', error));

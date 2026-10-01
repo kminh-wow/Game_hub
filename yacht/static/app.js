@@ -10,10 +10,11 @@ const LOWER = [["choice", "초이스"], ["four_kind", "포 카인드"], ["full_h
 const LABELS = Object.fromEntries([...UPPER, ...LOWER]);
 // 주사위 눈 위치 (3×3 칸 번호)
 const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-const ROLL_MS = 700;
+
 
 let deadline = 0;
 let rolling = null;        // 굴러가는 중: { rolled: [bool], timer }
+let trayView = null;
 let lastWrite = null;      // 방금 적은 칸 (반짝임 표시): "playerId:category"
 
 const lobby = GameLobby.init({
@@ -25,7 +26,8 @@ const lobby = GameLobby.init({
       for (const ev of msg.events) showEvent(ev);
       const roll = msg.events.find((ev) => ev.kind === "roll");
       lobby.state.game = msg.game;
-      if (roll) startRolling(roll.rolled);
+      if (roll) startRolling(roll);
+      if (!msg.game.rolling) stopRolling();
       lobby.render();
     },
     game_over(msg) {
@@ -59,17 +61,18 @@ function showEvent(ev) {
 }
 
 // ---------- 주사위 굴리기 연출 ----------
-// 값은 서버가 정한다. 굴러간 주사위만 잠깐 무작위 눈을 보여 주다가 실제 값에 멈춘다.
-
-function startRolling(rolledMask) {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  clearInterval(rolling?.timer);
-  rolling = { rolled: rolledMask, timer: setInterval(() => renderTray(lobby.state.game), 70) };
-  setTimeout(() => {
-    clearInterval(rolling?.timer);
-    rolling = null;
+// 서버가 계산한 물리 궤적을 재생하고 정지한 자세로 결과를 표시한다.
+function stopRolling() {
+  clearTimeout(rolling?.timer);
+  rolling = null;
+}
+function startRolling(event) {
+  stopRolling();
+  rolling = {...event, start: performance.now()};
+  rolling.timer = setTimeout(() => {
+    stopRolling();
     lobby.render();
-  }, ROLL_MS);
+  }, event.duration_ms);
 }
 
 // ---------- 그리기 (디자인은 나중에 교체) ----------
@@ -82,14 +85,16 @@ function dieNode(face, cls) {
 
 function renderTray(g) {
   const mine = isMyTurn(g);
-  const canHold = mine && g.rolled && g.rolls_left > 0 && !rolling;
+  const canHold = mine && g.rolled && g.rolls_left > 0 && !rolling && !g.rolling;
   $("#tray").replaceChildren(
     ...g.dice.map((face, i) => {
       const spinning = rolling?.rolled[i];
-      const shown = spinning ? 1 + Math.floor(Math.random() * 6) : face;
+      const shown = spinning ? 0 : face;
       const cls = [!g.rolled && "blank", g.held[i] && g.rolled && "held", spinning && "rolling"].filter(Boolean).join(" ");
       const die = dieNode(shown, cls);
       die.disabled = !canHold;
+      die.setAttribute('aria-label', `주사위 ${i+1}: ${g.rolling ? '굴러가는 중' : g.rolled ? face+'눈' : '굴리기 전'}`);
+      die.setAttribute('aria-pressed', String(!!(g.held[i] && g.rolled)));
       die.onclick = () => {
         const held = [...g.held];
         held[i] = !held[i];
@@ -98,6 +103,7 @@ function renderTray(g) {
       return die;
     })
   );
+  if (trayView) trayView.update(g, rolling);
   $("#held-labels").replaceChildren(...g.held.map((h) => lobby.el("span", { textContent: h && g.rolled ? "고정" : "" })));
 }
 
@@ -113,7 +119,7 @@ function renderGame(g, room) {
   const btn = $("#btn-roll");
   const mine = isMyTurn(g);
   btn.classList.toggle("hidden", finished);
-  btn.disabled = !mine || g.rolls_left <= 0 || (g.rolled && g.held.every(Boolean)) || !!rolling;
+  btn.disabled = !mine || g.rolls_left <= 0 || (g.rolled && g.held.every(Boolean)) || !!rolling || g.rolling;
   btn.textContent = g.rolled ? `다시 굴리기 (${g.rolls_left}번 남음)` : "굴리기";
 
   let status = "";
@@ -121,14 +127,15 @@ function renderGame(g, room) {
     if (mine) status = !g.rolled ? "주사위를 굴려 주세요." : g.rolls_left ? "고정할 주사위를 누르거나, 점수판에서 적을 칸을 고르세요." : "적을 칸을 고르세요.";
     else status = g.rolled ? `${currentName}님이 고민 중…` : `${currentName}님이 굴릴 차례예요.`;
   }
-  $("#game-status").textContent = status;
+  $("#game-status").textContent = g.rolling ? "주사위가 떨어지고 있어요…" : status;
 
   renderSheet(g, finished);
 }
 
 function renderSheet(g, finished) {
   const el = lobby.el;
-  const ids = g.order;
+  const mine = g.order.find(id => lobby.isMe(id));
+  const ids = mine ? [mine, ...g.order.filter(id => id !== mine)] : [...g.order];
   const head = el("tr", {}, el("th", { textContent: "족보" }),
     ...ids.map((id) => el("th", { className: id === g.current_id && !finished ? "turn" : "", textContent: g.names[id] + (lobby.isMe(id) ? " (나)" : "") })));
 
@@ -138,7 +145,7 @@ function renderSheet(g, finished) {
     if (written !== null) {
       td.textContent = written;
       td.className = "written" + (lastWrite === `${id}:${cat}` ? " just" : "");
-    } else if (!finished && id === g.current_id && g.preview && !rolling) {
+    } else if (!finished && id === g.current_id && g.preview && !rolling && !g.rolling) {
       const pts = g.preview[cat];
       if (isMyTurn(g)) {
         const b = el("button", { type: "button", className: `pick${pts ? "" : " zero"}`, textContent: pts });
@@ -164,6 +171,12 @@ function renderSheet(g, finished) {
       sumRow("합계", (t) => t.total, "total"),
     )
   );
+  for (const row of $("#sheet").rows) {
+    ids.forEach((id,i) => {
+      row.cells[i+1].classList.toggle('mine', lobby.isMe(id));
+      row.cells[i+1].classList.toggle('current', id===g.current_id && !finished);
+    });
+  }
   lastWrite = null;
 }
 
@@ -183,3 +196,10 @@ function tick() {
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
+
+// Native buttons remain the accessible controls; 3D supplies their visual dice.
+import('./tray3d.js?v=physics-rounded').then(({createTrayView})=>createTrayView($('#dice-stage'))).then(view=>{
+  trayView=view;
+  $('#held-labels').classList.add('hidden');
+  if(lobby.state.game)renderTray(lobby.state.game);
+}).catch(error=>console.warn('3D tray unavailable; using standard dice.',error));
