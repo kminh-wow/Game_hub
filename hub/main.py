@@ -13,6 +13,8 @@
 """
 from __future__ import annotations
 
+import importlib
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -20,24 +22,40 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import MutableHeaders
 
-from hangman.app.main import app as hangman_app
-from omok.app.main import app as omok_app
-from yacht.app.main import app as yacht_app
-from pacman.app import app as pacman_app
-from quoridor.server.main import app as quoridor_app
-from wordchain.app.main import app as wordchain_app
+log = logging.getLogger("hub")
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 COMMON_WEB_DIR = Path(__file__).resolve().parent.parent / "common" / "web"
 
-GAMES = {
-    "wordchain": wordchain_app,
-    "quoridor": quoridor_app,
-    "pacman": pacman_app,
-    "hangman": hangman_app,
-    "omok": omok_app,
-    "yacht": yacht_app,
+# 경로 이름 -> 그 게임의 FastAPI 앱이 있는 모듈
+GAME_MODULES = {
+    "wordchain": "wordchain.app.main",
+    "quoridor": "quoridor.server.main",
+    "pacman": "pacman.app",
+    "hangman": "hangman.app.main",
+    "omok": "omok.app.main",
+    "yacht": "yacht.app.main",
 }
+
+
+def load_games(modules: dict[str, str]) -> tuple[dict[str, FastAPI], dict[str, str]]:
+    """게임 앱들을 불러온다. 한 게임이 실패해도(예: 필요한 패키지가 없음) 나머지는 계속 뜬다.
+
+    돌려주는 값: (불러온 앱들, 실패한 게임 -> 오류 설명). 실패는 로그에도 남긴다.
+    배포 스크립트(deploy/post_update.sh)는 실패한 게임이 있으면 재시작하지 않는다.
+    """
+    games: dict[str, FastAPI] = {}
+    failed: dict[str, str] = {}
+    for name, module in modules.items():
+        try:
+            games[name] = importlib.import_module(module).app
+        except Exception as exc:
+            failed[name] = f"{type(exc).__name__}: {exc}"
+            log.error("게임 '%s'을(를) 불러오지 못했어요 — 이 게임만 빼고 계속합니다.", name, exc_info=True)
+    return games, failed
+
+
+GAMES, FAILED_GAMES = load_games(GAME_MODULES)
 
 app = FastAPI(title="Game Hub", docs_url=None, redoc_url=None, openapi_url=None)
 

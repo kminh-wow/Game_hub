@@ -89,3 +89,19 @@ def test_omok_websocket(client):
 def test_yacht_websocket(client):
     with client.websocket_connect("/yacht/ws?name=hubyacht&token=t") as ws:
         assert ws.receive_json()["type"] == "welcome"
+
+
+def test_all_games_loaded():
+    """배포 전에 이 테스트가 실패하면 어떤 게임이 왜 못 뜨는지 알 수 있다 (예: 요트 다이스의 pybullet 누락)."""
+    from hub.main import FAILED_GAMES, GAME_MODULES, GAMES
+
+    assert FAILED_GAMES == {}
+    assert set(GAMES) == set(GAME_MODULES)
+
+
+def test_one_broken_game_does_not_take_down_the_hub():
+    from hub.main import load_games
+
+    games, failed = load_games({"ok": "pacman.app", "broken": "no_such_module_for_test"})
+    assert "ok" in games
+    assert list(failed) == ["broken"] and "ModuleNotFoundError" in failed["broken"]
