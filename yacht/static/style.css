@@ -201,3 +201,59 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .sheet button.pick.zero { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
 .sheet td.just { animation: flash 1s; }
 @keyframes flash { from { background: #fff3b0; } to { background: transparent; } }
+
+/* Multiplayer table: shared dice above scorecard, people and chat at right. */
+#screen-room { max-width:1240px; }
+.yacht-layout { display:grid; grid-template-columns:minmax(0,1fr) 260px; align-items:start; flex:initial; }
+.play-column { min-width:0; }
+.room-sidebar { display:flex; flex-direction:column; gap:12px; position:sticky; top:16px; min-width:0; }
+.room-sidebar .panel.side { width:auto; }
+.room-sidebar .chat { height:clamp(300px,50vh,560px); }
+.room-sidebar .chat-log { flex:1; height:auto; min-height:0; }
+.room-sidebar .chat-form input { width:0; }
+.room-sidebar h3 { margin-bottom:8px; }
+.room-sidebar .player-list li { padding:7px 8px; }
+.game-top { color:var(--text); font-weight:600; }
+#turn-info { color:var(--accent); }
+.dice-stage { position:relative; width:100%; height:240px; border-radius:14px; background:linear-gradient(135deg,#f5f7fc,#e9edf7); margin-top:10px; overflow:hidden; }
+.tray-canvas { display:block; width:100%; height:100%; pointer-events:none; }
+.has-3d .tray { position:absolute; inset:0; display:block; margin:0; }
+.has-3d .die { position:absolute; transform:translate(-50%,-50%); padding:0; border:2px solid transparent; background:transparent; box-shadow:none; border-radius:12px; }
+.has-3d .die i { visibility:hidden !important; }
+.has-3d .die.rolling { animation:none; }
+.has-3d .die.held { border-color:#9fbdff; background:#779fff18; box-shadow:0 0 0 3px #6088ff35; }
+.has-3d .die.held::after { content:'고정'; position:absolute; bottom:-23px; left:0; right:0; font-size:11px; font-weight:700; color:#e0eaff; text-shadow:0 1px 3px #13264c; }
+.has-3d .die:focus-visible { outline:3px solid white; outline-offset:3px; }
+.dice-stage:not(.has-3d) { height:auto; min-height:116px; padding:16px 0; }
+.roll-row { margin:10px 0 6px; }
+.roll-row .big { min-width:210px; padding:10px 24px; }
+.game-status { margin:6px 0 14px; color:var(--muted); font-size:13px; font-weight:400; }
+.sheet-wrap { overflow:auto; border:1px solid var(--line); border-radius:12px; isolation:isolate; }
+.sheet { table-layout:fixed; min-width:540px; font-size:13px; border-collapse:separate; border-spacing:0; }
+.sheet th,.sheet td { height:31px; padding:4px 6px; background:var(--panel); }
+.sheet th:first-child,.sheet td:first-child { position:sticky; left:0; z-index:2; width:148px; background:#f6f8fc; font-weight:600; }
+.sheet thead th { height:42px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sheet .mine { background:#f5f7ff; }
+.sheet .current { box-shadow:inset 1px 0 #c8d3ff,inset -1px 0 #c8d3ff; }
+.sheet thead .current { color:var(--accent); background:var(--accent-soft); }
+.sheet .sum td { font-size:11px; }
+.sheet .total td { height:38px; color:var(--accent); background:#eef2ff; }
+.sheet button.pick { min-width:38px; width:100%; max-width:64px; }
+.sheet button.pick:focus-visible { outline:2px solid var(--accent); }
+@media(max-width:800px) {
+  .yacht-layout { grid-template-columns:minmax(0,1fr); }
+  .room-sidebar { position:static; display:grid; grid-template-columns:1fr 1fr; }
+  .room-sidebar .chat { height:260px; }
+}
+@media(max-width:520px) {
+  #screen-room { padding:10px; }
+  .play-column { padding:10px; }
+  .dice-stage { height:180px; }
+  .room-sidebar { grid-template-columns:1fr; }
+  .sheet { min-width:530px; }
+  .sheet th:first-child,.sheet td:first-child { width:126px; }
+  .sheet .mine { position:sticky; left:126px; z-index:1; }
+  .sheet thead th { font-size:12px; }
+  .game-top { gap:6px; font-size:12px; }
+  .game-status { font-size:12px; }
+}

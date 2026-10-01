@@ -170,8 +170,9 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .side-info span { padding: 6px 12px; border-radius: 99px; border: 1px solid var(--line); font-weight: 600; }
 .side-info span.turn { border-color: var(--accent); background: var(--accent-soft); }
 .side-info .me { color: var(--accent); }
-.board-wrap { display: flex; justify-content: center; margin: 12px 0; }
-#board { max-width: 100%; height: auto; border-radius: 8px; cursor: pointer; touch-action: manipulation; }
+.board-wrap { position:relative; width:min(100%, 620px, max(360px, calc(100svh - 220px))); margin:12px auto; aspect-ratio:1; border-radius:18px; background:linear-gradient(145deg,#f7f8fb,#edf0f6); overflow:hidden; }
+.board-3d { display:block; width:100%; height:100%; touch-action:manipulation; }
+#board { width:100%; max-width: 100%; height: auto; border-radius: 8px; cursor: pointer; touch-action: manipulation; }
 .game-status { text-align: center; min-height: 1.4em; margin: 8px 0; font-weight: 600; }
 .game-status.ok { color: var(--good); }
 .game-status.fail { color: var(--bad); }

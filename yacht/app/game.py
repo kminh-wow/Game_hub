@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
 from typing import TYPE_CHECKING, Any
 
 from .rules import CATEGORY_IDS, DICE, MAX_ROLLS, ROUNDS, all_scores, best_category, score, totals
+from .physics import initial_poses, throw_dice
 
 if TYPE_CHECKING:
     from common.multiplayer import Player
@@ -30,6 +32,10 @@ class Game:
         self._timer: asyncio.Task | None = None
         self.deadline = 0.0
         self.events: list[dict[str, Any]] = []
+        self.poses = initial_poses()
+        self.rolling = False
+        self._settler: asyncio.Task | None = None
+        self._generation = 0
 
     # ---- 조회 ----
 
@@ -50,10 +56,12 @@ class Game:
             "names": self.names,
             "current_id": None if self.finished else self.current.id,
             "dice": self.dice,
+            "poses": self.poses,
+            "rolling": self.rolling,
             "held": self.held,
             "rolls_left": self.rolls_left,
             "rolled": self.rolled,
-            "preview": all_scores(self.dice) if self.rolled else None,
+            "preview": all_scores(self.dice) if self.rolled and not self.rolling else None,
             "sheets": self.sheets,
             "totals": {pid: totals(sheet) for pid, sheet in self.sheets.items()},
             "time_left_ms": 0 if self.finished else max(int((self.deadline - loop.time()) * 1000), 0),
@@ -70,6 +78,8 @@ class Game:
         await self._start_turn()
 
     async def _start_turn(self) -> None:
+        self._cancel_roll()
+        self.poses = initial_poses()
         self.dice = [1] * DICE
         self.held = [False] * DICE
         self.rolls_left = MAX_ROLLS
@@ -85,9 +95,27 @@ class Game:
         except asyncio.CancelledError:
             return
         self._timer = None
+        generation = self._generation
+        while self.rolling:
+            await asyncio.sleep(.05)
+            if generation != self._generation or self.finished:
+                return
         # 시간 초과: 한 번도 안 굴렸으면 굴리고, 점수가 가장 높은 칸에 자동으로 적는다.
         if not self.rolled:
-            self._roll()
+            error = await self._roll()
+            if generation != self._generation or self.finished:
+                return
+            if error:
+                # A failed simulation consumes no roll and gives time to retry.
+                self.deadline = asyncio.get_running_loop().time() + self.settings.turn_time
+                self._timer = asyncio.create_task(self._turn_timer())
+                await self.broadcast_state()
+                return
+            await self.broadcast_state()
+            while self.rolling:
+                await asyncio.sleep(.05)
+                if generation != self._generation or self.finished:
+                    return
         category = best_category(self.sheets[self.current.id], self.dice)
         self.events.append({"kind": "timeout", "player_id": self.current.id})
         await self._write(category)
@@ -97,21 +125,54 @@ class Game:
             self._timer.cancel()
             self._timer = None
 
-    def _roll(self) -> None:
-        self.dice = [d if h else self.rng.randint(1, 6) for d, h in zip(self.dice, self.held)]
+    def _cancel_roll(self) -> None:
+        self._generation += 1
+        self.rolling = False
+        if self._settler:
+            self._settler.cancel()
+            self._settler = None
+
+    async def _settle(self, duration: float, generation: int) -> None:
+        await asyncio.sleep(duration)
+        if generation == self._generation and not self.finished:
+            self.rolling = False
+            self._settler = None
+            await self.broadcast_state()
+
+    async def _roll(self) -> str | None:
+        self.rolling = True
+        generation = self._generation
+        try:
+            result = await asyncio.to_thread(throw_dice, self.rng, self.poses, self.held)
+        except Exception:
+            logging.getLogger(__name__).exception("Dice simulation failed")
+            if generation == self._generation:
+                self.rolling = False
+            return "주사위가 멈추지 않았어요. 다시 굴려 주세요."
+        if generation != self._generation or self.finished:
+            return "차례가 바뀌었어요."
+        self.dice = result["dice"]
+        self.poses = result["poses"]
         self.rolls_left -= 1
         self.events.append({
             "kind": "roll",
             "player_id": self.current.id,
             "dice": self.dice,
             "rolled": [not h for h in self.held],   # 이번에 굴러간 주사위 (애니메이션용)
+            "frames": result["frames"],
+            "frame_ms": result["frame_ms"],
+            "duration_ms": result["duration_ms"],
         })
+        self._settler = asyncio.create_task(self._settle(result["duration_ms"] / 1000, generation))
+        return None
 
     # ---- 입력 ----
 
     def _check_turn(self, player: Player) -> str | None:
         if self.finished or player is not self.current:
             return "지금은 내 차례가 아니에요."
+        if self.rolling:
+            return "주사위가 멈출 때까지 기다려 주세요."
         return None
 
     async def hold(self, player: Player, held: Any) -> str | None:
@@ -132,7 +193,8 @@ class Game:
             return "이번 차례에는 더 굴릴 수 없어요. 점수를 적어 주세요."
         if self.rolled and all(self.held):
             return "고정하지 않은 주사위가 없어요."
-        self._roll()
+        if err := await self._roll():
+            return err
         await self.broadcast_state()
         return None
 
@@ -188,6 +250,7 @@ class Game:
         if self.finished:
             return
         self.finished = True
+        self._cancel_roll()
         self._cancel_timer()
         ranking = sorted(
             ({**p.public(), "score": totals(self.sheets[p.id])["total"]} for p in self.order),
