@@ -380,7 +380,7 @@ function renderGame(g) {
   let hintText = "";
   if (g.hint) hintText = `힌트: <b>${escapeHtml(g.hint)}</b>`;
   else if (g.hint_letter) hintText = `힌트로 <b>${g.hint_letter}</b>를 열어 줬어요`;
-  else if (g.phase === "guessing") hintText = `힌트까지 추측 ${g.hint_in}번 남음`;
+  else if (g.phase === "guessing") hintText = `힌트까지 틀린 추측 ${g.hint_in}번 남음`;
   $("#hint-line").innerHTML = hintText;
 
   const wrong = [...g.wrong_letters, ...g.wrong_words];

@@ -14,7 +14,7 @@ class RoomSettings:
     cycles: int = 1       # 모두가 몇 번씩 출제할지
     lives: int = 6        # 각자 교수대 완성까지 틀릴 수 있는 횟수
     turn_time: int = 20   # 한 턴 제한 시간(초)
-    hint_turn: int = 4    # 추측이 몇 번 지나면 힌트를 공개할지
+    hint_turn: int = 4    # 틀린 추측이 몇 번이면 힌트를 공개할지
 
     def copy(self) -> RoomSettings:
         return replace(self)
