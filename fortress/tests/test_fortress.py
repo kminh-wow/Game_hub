@@ -172,3 +172,34 @@ def test_timeout_passes_the_turn_and_solo_gets_it_back(client, monkeypatch):
     shoot_self(me)                                              # 시간 초과 뒤에도 쏠 수 있다
     me.game(lambda g: g["flying"])
     me.close()
+
+
+def test_solo_against_ai_takes_turns(client, monkeypatch):
+    import app.game as game_module
+    monkeypatch.setattr(game_module, "AI_THINK", 0.05)
+    monkeypatch.setattr(game_module, "AI_AIM", 0.05)
+    me = Conn(client, "ai" + uuid.uuid4().hex[:4])
+    me.send("create_room", title="AI전")
+    me.until("room")
+    me.send("update_settings", settings={"solo_opponent": 3})
+    me.until("room", lambda m: m["room"]["settings"]["solo_opponent"] == 3)
+    me.send("start")
+    g = me.game()["game"]
+    ai_tank = next(t for t in g["tanks"] if t["id"] == "ai")
+    assert ai_tank["name"] == "AI · 상" and not any(t["dummy"] for t in g["tanks"])
+    if g["current_id"] == me.id:
+        shoot_self(me)
+        me.game(lambda g: g["current_id"] == "ai" and not g["flying"])
+    m = me.game(lambda g: g["flying"])                         # AI 가 스스로 쏜다
+    assert any(e["kind"] == "shot" and e["player_id"] == "ai" for e in m["events"])
+    m = me.game(lambda g: not g["flying"] and g["current_id"] in (me.id, None))
+    me.close()
+
+
+def test_solo_opponent_setting_is_limited(client):
+    me = Conn(client, "lim" + uuid.uuid4().hex[:4])
+    me.send("create_room", title="설정")
+    assert me.until("room")["room"]["settings"]["solo_opponent"] == 0     # 기본은 허수아비
+    me.send("update_settings", settings={"solo_opponent": 9})
+    assert me.until("room")["room"]["settings"]["solo_opponent"] == 3
+    me.close()

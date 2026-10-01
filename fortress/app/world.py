@@ -25,7 +25,9 @@ TANK_CENTER = 8          # 탱크 중심이 땅에서 떨어진 높이
 BARREL = 22              # 포신 길이 (포탄이 나오는 곳)
 MAX_FUEL = 120           # 한 차례에 움직일 수 있는 거리
 MOVE_STEP = 3
-MAX_CLIMB = 6            # 한 걸음에 오를 수 있는 높이
+MAX_CLIMB = 14           # 한 걸음에 오를 수 있는 높이 (오르막은 연료를 더 쓴다)
+CLIMB_FUEL = .5          # 오른 높이 1당 더 쓰는 연료
+REPOSE = 3               # 흙이 버틸 수 있는 옆 칸과의 높이 차 (넘으면 무너져 내린다)
 MAX_HP = 100
 
 # 포탄 종류: 폭발 반지름, 최대 피해, 판마다 쓸 수 있는 개수 (None 은 무제한)
@@ -51,6 +53,7 @@ def generate_terrain(rng: random.Random) -> list[int]:
         if h > 440:                                         # 높은 봉우리는 완만하게 눌러 평평한 꼭대기를 피한다
             h = 440 + (h - 440) * .45
         out.append(int(max(SEA + 30, min(HEIGHT - 120, h))))
+    slide(out, 0, WIDTH - 1)                              # 너무 가파른 비탈은 미리 무너뜨림
     return out
 
 
@@ -64,6 +67,7 @@ def spawn_points(rng: random.Random, terrain: list[int], count: int) -> list[flo
         flat = round(sum(terrain[lo:hi + 1]) / (hi - lo + 1))
         for c in range(lo, hi + 1):
             terrain[c] = flat
+        slide(terrain, lo - 40, hi + 40)
         xs.append(x)
     rng.shuffle(xs)
     return xs
@@ -97,16 +101,17 @@ class Tank:
         }
 
 
-# 탱크 이동 (움직인 거리, 막혔으면 0)
+# 탱크 이동 (쓴 연료, 막혔으면 0)
 def move_tank(terrain: list[int], tank: Tank, direction: int) -> float:
     nx = tank.x + direction * MOVE_STEP
     if not 10 <= nx <= WIDTH - 10:
         return 0.0
     gy = ground(terrain, nx)
-    if gy - tank.y > MAX_CLIMB or gy <= SEA:
+    climb = gy - tank.y
+    if climb > MAX_CLIMB or gy <= SEA:
         return 0.0
     tank.x, tank.y = nx, gy
-    return MOVE_STEP
+    return MOVE_STEP + max(0.0, climb) * CLIMB_FUEL
 
 
 # ---- 포탄 ----
@@ -158,6 +163,27 @@ def carve(terrain: list[int], cx: float, cy: float, radius: float) -> None:
         h = terrain[c]
         overlap = max(0.0, min(h, cy + s) - max(0.0, cy - s))
         terrain[c] = int(round(h - overlap))
+    slide(terrain, int(cx - radius) - 40, int(cx + radius) + 40)
+
+
+# 흙 무너짐 (옆 칸과 높이 차가 REPOSE 를 넘으면 흙이 낮은 쪽으로 흘러내린다)
+def slide(terrain: list[int], lo: int, hi: int) -> None:
+    lo, hi = max(0, lo), min(WIDTH - 1, hi)
+    for _ in range(5000):
+        moved = False
+        for c in range(lo, hi):
+            d = terrain[c] - terrain[c + 1]
+            if abs(d) > REPOSE:
+                amount = (abs(d) - REPOSE + 1) // 2
+                if d > 0:
+                    terrain[c] -= amount
+                    terrain[c + 1] += amount
+                else:
+                    terrain[c] += amount
+                    terrain[c + 1] -= amount
+                moved = True
+        if not moved:
+            break
 
 
 # 폭발 (피해, 지형 파괴, 떨어짐)

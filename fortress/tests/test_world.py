@@ -2,7 +2,7 @@
 import random
 
 from app.world import (
-    MAX_CLIMB, MOVE_STEP, SEA, WEAPONS, WIDTH, Tank, carve, explode, fly, generate_terrain, ground,
+    CLIMB_FUEL, MAX_CLIMB, MOVE_STEP, REPOSE, SEA, WEAPONS, WIDTH, Tank, carve, explode, fly, generate_terrain, ground,
     move_tank, spawn_points,
 )
 
@@ -13,6 +13,14 @@ def flat(h=200):
 
 def tank(x, terrain, tid="a", **kw):
     return Tank(id=tid, name=tid, color=0, x=x, y=ground(terrain, x), **kw)
+
+
+def test_starting_terrain_can_be_climbed_everywhere():
+    for seed in range(20):
+        rng = random.Random(seed)
+        t = generate_terrain(rng)
+        spawn_points(rng, t, 4)
+        assert max(abs(t[c] - t[c + MOVE_STEP]) for c in range(WIDTH - MOVE_STEP)) <= MAX_CLIMB
 
 
 def test_terrain_is_mountainous_and_in_bounds():
@@ -30,7 +38,8 @@ def test_spawn_points_are_spread_and_flat():
     xs = sorted(spawn_points(rng, t, 4))
     assert all(b - a > 150 for a, b in zip(xs, xs[1:]))
     for x in xs:
-        assert len(set(t[int(x) - 12:int(x) + 13])) == 1   # 발밑은 평평
+        pad = t[int(x) - 4:int(x) + 5]
+        assert max(pad) - min(pad) <= 1                     # 발밑은 평평 (가파른 비탈에서는 좁아진다)
 
 
 def test_shot_straight_up_falls_back_near_shooter():
@@ -66,13 +75,24 @@ def test_shell_leaving_the_map_hits_nothing():
 def test_carve_digs_a_crater_and_collapses_dirt_above():
     t = flat(200)
     carve(t, 600, 200, 40)
-    assert t[600] == 160 and t[560] >= 199 and t[620] < 200
+    assert 158 <= t[600] <= 165 and t[500] == 200 and t[620] < 200
     t = flat(300)
     carve(t, 600, 150, 40)                                # 땅속에서 터지면 위의 흙이 내려앉는다
-    assert t[600] == 220
+    assert 218 <= t[600] <= 225
     t = flat(30)
     carve(t, 600, 0, 80)
     assert min(t) >= 0
+
+
+def test_crater_walls_collapse_into_climbable_slopes():
+    for radius in (38, 62):
+        t = flat(200)
+        carve(t, 600, 200, radius)
+        assert max(abs(t[c] - t[c + 1]) for c in range(WIDTH - 1)) <= REPOSE
+        a = tank(600, t)
+        for _ in range(60):                               # 구덩이 바닥에서 걸어 나올 수 있다
+            move_tank(t, a, 1)
+        assert a.x > 600 + radius and a.y == 200
 
 
 def test_explosion_damage_falls_off_with_distance():
@@ -102,11 +122,13 @@ def test_tank_in_the_sea_is_destroyed():
     assert r["cause"] == "sea" and not a.alive and a.hp == 0
 
 
-def test_move_uses_steps_and_respects_slopes_and_edges():
+def test_move_uses_fuel_and_respects_slopes_and_edges():
     t = flat()
     a = tank(600, t)
     assert move_tank(t, a, 1) == MOVE_STEP and a.x == 600 + MOVE_STEP
-    t[int(a.x) + MOVE_STEP] = 200 + MAX_CLIMB + 5         # 너무 가파른 벽
+    t[int(a.x) + MOVE_STEP] = 210                         # 오르막은 연료를 더 쓴다
+    assert move_tank(t, a, 1) == MOVE_STEP + 10 * CLIMB_FUEL and a.y == 210
+    t[int(a.x) + MOVE_STEP] = 210 + MAX_CLIMB + 1         # 너무 가파른 벽
     assert move_tank(t, a, 1) == 0
     b = tank(11, flat())
     assert move_tank(flat(), b, -1) == 0                   # 맵 끝

@@ -74,7 +74,14 @@ const lobby = GameLobby.init({
   isTurn: (p, room) => room.playing && lobby.state.game?.current_id === p.id,
   canStart: (room, others) => others.every((p) => p.ready),
   waitingNote(room, amHost, others) {
-    if (others.length === 0) return amHost ? "혼자 시작하면 허수아비를 상대로 연습해요. 친구가 들어오면 함께 싸워요." : "";
+    // 혼자일 때 상대 고르기
+    $("#solo-row").classList.toggle("hidden", others.length > 0);
+    if (others.length === 0) {
+      if (!amHost) return "";
+      return room.settings.solo_opponent
+        ? "혼자 시작하면 AI와 번갈아 쏘며 대결해요. 친구가 들어오면 함께 싸워요."
+        : "혼자 시작하면 허수아비를 상대로 연습해요(허수아비는 쏘지 않아요). 친구가 들어오면 함께 싸워요.";
+    }
     if (amHost) return others.every((p) => p.ready) ? "모두 준비됐어요!" : "모두 준비하면 시작할 수 있어요.";
     return "방장이 게임을 시작할 때까지 기다려 주세요.";
   },
@@ -554,10 +561,10 @@ function draw(now) {
   for (const t of s.tanks) drawTank(t, t.id === current, now);
   const me = tankOf(g, lobby.state.me?.id);
   if (me && aim && myTurn(g)) drawAimGuide(s.tanks.find((t) => t.id === me.id) || me);
+  if (lobby.state.room?.playing) drawWind(g.wind);
   if (s.shell) drawShell(s.shell);
   if (s.blast) drawBlast(s.blast);
   drawPopups(now);
-  if (lobby.state.room?.playing) drawWind(g.wind);
 }
 
 // ---------- 매 프레임 ----------
