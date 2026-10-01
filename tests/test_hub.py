@@ -13,7 +13,7 @@ def client():
 @pytest.mark.parametrize(
     ("path", "needle"),
     [
-        ("/", "Game Hub"),
+        ("/", "Ddan Jit"),
         ("/wordchain/", "끝말잇기 온라인"),
         ("/wordchain/static/app.js", "new URL(\"ws\""),
         ("/quoridor/", "Quoridor"),

@@ -1,14 +1,15 @@
+/* 공통 팔레트 */
 :root {
-  --bg: #eef1f6;
-  --panel: #ffffff;
-  --text: #1f2430;
-  --muted: #7a8194;
-  --line: #e1e5ee;
-  --accent: #4b6bfb;
-  --accent-soft: #e6ebff;
-  --good: #1f9d63;
-  --bad: #e0474c;
-  --warn: #f0a020;
+  --bg: #f5f5ed;
+  --panel: #fcfcf7;
+  --text: #173d33;
+  --muted: #53665c;
+  --line: #cdd4c7;
+  --accent: #245442;
+  --accent-soft: #e3eacb;
+  --good: #28724f;
+  --bad: #bd3e43;
+  --warn: #a66a17;
   --radius: 12px;
 }
 
@@ -42,12 +43,13 @@ button:disabled { opacity: .45; cursor: default; }
 button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
 button.big { padding: 12px 28px; font-size: 16px; font-weight: 600; }
 
+/* 입력 필드 */
 input, select {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 10px;
   font: inherit;
-  background: #fff;
+  background: var(--panel);
   color: inherit;
 }
 input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
@@ -136,7 +138,7 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .settings label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .settings label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--text); }
 .settings.editable label { color: var(--text); font-weight: 600; }
-.settings.editable input { color: var(--text); font-weight: 600; border-color: #a5aec2; }
+.settings.editable input { color: var(--text); font-weight: 600; border-color: var(--muted); }
 .settings.editable input:focus { border-color: var(--accent); }
 #waiting-view { display: flex; flex-direction: column; }
 #waiting-view .big { align-self: center; margin-top: 12px; }
@@ -155,13 +157,15 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 
 /* ---- 모달/토스트 ---- */
 
-.modal { position: fixed; inset: 0; background: rgba(20,24,35,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+/* 결과 창 */
+.modal { position: fixed; inset: 0; background: rgba(23,61,51,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .modal-card { background: var(--panel); border-radius: 16px; padding: 24px; width: min(360px, 100%); text-align: center; }
 .result-list { margin: 16px 0; text-align: left; }
 .result-list li { display: flex; justify-content: space-between; padding: 8px 10px; border-radius: 8px; }
-.result-list li:first-child { background: #fff6dc; font-weight: 700; }
+.result-list li:first-child { background: var(--accent-soft); font-weight: 700; }
 
-.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #2a2f3d; color: #fff; padding: 10px 18px; border-radius: 99px; font-size: 14px; }
+/* 알림 */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 18px; border-radius: 99px; font-size: 14px; }
 
 /* ---- 행맨 ---- */
 
@@ -170,15 +174,17 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .gallows-list li { width: 110px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; text-align: center; font-size: 13px; }
 .gallows-list li.turn { border-color: var(--accent); background: var(--accent-soft); }
 .gallows-list li.me .name { color: var(--accent); }
-.gallows-list li.dead { background: #f7f8fb; border-color: #e1e5ee; }
+/* 탈락 상태 */
+.gallows-list li.dead { background: var(--bg); border-color: #cdd4c7; }
 .gallows-list .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gallows-list .count { color: var(--muted); }
 .gallows-list li.dead .count { color: var(--bad); font-weight: 600; }
 .gallows { width: 90px; height: 108px; overflow: visible; }
 .gallows path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.gallows .frame { stroke: #c3cada; stroke-width: 3.5; }
-.gallows .rope { stroke: #a0aabd; stroke-width: 3; }
-.gallows .part { stroke: #343d54; stroke-width: 5.5; stroke-dasharray: 1 1; stroke-dashoffset: 1; visibility: hidden; }
+/* 행맨 그림 */
+.gallows .frame { stroke: var(--line); stroke-width: 3.5; }
+.gallows .rope { stroke: var(--muted); stroke-width: 3; }
+.gallows .part { stroke: var(--text); stroke-width: 5.5; stroke-dasharray: 1 1; stroke-dashoffset: 1; visibility: hidden; }
 .gallows .figure { transform-origin: 120px 35px; }
 .gallows-list li.dead .count { display: inline-block; padding: 1px 8px; border-radius: 99px; background: #fdecec; }
 .word-area { text-align: center; padding-top: 16px; }
@@ -202,6 +208,7 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 
 .keyboard { display: grid; grid-template-columns: repeat(13, 1fr); gap: 6px; margin-top: 10px; }
 .keyboard button { padding: 8px 0; background: var(--panel); color: var(--text); border: 1px solid var(--line); font-weight: 700; }
+/* 정답 상태 */
 .keyboard button.ok { background: var(--good); color: #fff; border-color: var(--good); }
 .keyboard button.bad { background: var(--bad); color: #fff; border-color: var(--bad); }
 .keyboard button.ok:disabled, .keyboard button.bad:disabled { opacity: 1; }  /* 나온 글자는 흐리지 않게 */
