@@ -106,9 +106,22 @@ app = create_app(server, STATIC_DIR, "My Game")
 - 게임 폴더 안에서 `pytest`를 돌리려면 `conftest.py`로 저장소 루트를 경로에 추가합니다 (`omok/conftest.py` 참고).
 - 테스트에서 여러 WebSocket을 열 때는 `with TestClient(app) as client:`로 열어야 모든 연결이 이벤트 루프 하나를 공유합니다.
 
+#### 관전
+
+`BaseRoom`이 관전자를 처리하므로 **게임은 따로 할 일이 거의 없습니다.**
+
+- 클라이언트가 `spectate_room {room_id}`를 보내면 `room.spectators`에 들어갑니다. 관전자는 `max_players`에 들어가지 않고, 방마다 `MAX_SPECTATORS`(20)명까지입니다.
+- `room.broadcast()`는 참가자와 관전자 모두(`room.audience`)에게 보냅니다. 게임이 참가자에게 직접 보내는 곳이 있으면 `room.players` 대신 `room.audience`를 쓰세요(행맨의 `broadcast_state` 참고).
+- 방 상태(`room` 메시지)에 `spectators` 목록이 들어가고, 로비의 방 카드(`rooms[].spectators`)와 접속자(`users[].spectating`)에도 표시됩니다.
+- 관전 중인 사람(`player.spectating`)은 `chat`과 `leave_room`만 보낼 수 있습니다. 게임 조작·준비·시작·설정은 `관전 중에는 할 수 없어요.` 오류로 막힙니다. 채팅에는 `spectator: true`가 붙습니다.
+- **늦게 들어온 관전자에게 지금 상태를 보내려면** 게임에 `watch_messages(player) -> list[dict]`를 만듭니다. 입장 직후 이 메시지들을 관전자에게만 보냅니다. 숨겨야 할 정보(행맨의 정답 등)는 여기서 가립니다.
+- 참가자가 모두 나가면 방이 닫히고, 관전자는 `room: null`과 안내 오류를 받고 로비로 돌아갑니다.
+
 ### 화면: `common/web/lobby.js`
 
 로그인 → 로비 → 대기실 → 게임 화면 전환, 방 목록, 참가자 목록, 설정 폼, 채팅, 결과 창을 처리합니다. 게임의 `app.js`는 게임 화면만 그립니다.
+
+관전을 위해 HTML에 `#spectator-box`(`#spectator-count`, `#spectator-list`)가 있어야 합니다(`omok/static/index.html` 참고). 게임 중이거나 꽉 찬 방 카드를 누르면 관전하고, 관전자의 대기실에는 준비·시작 버튼 대신 안내 문구가 나옵니다. 끝말잇기와 행맨은 같은 코드를 자기 `app.js`에 갖고 있습니다.
 
 ```html
 <script src="../common/lobby.js"></script>
@@ -276,6 +289,17 @@ python wordchain/scripts/import_kkutu.py db.sql     # 이미 받은 파일로 �
 ---
 
 ## 쿼리도
+
+### 관전 프로토콜
+
+쿼리도는 공개 로비 없이 **방 코드**로 들어가므로, 관전도 코드로 합니다.
+
+| 클라이언트 → 서버 | 설명 |
+|---|---|
+| `watch_room` `{code}` | 관전 시작. 없는 방이거나 관전석(20명)이 가득 차면 `error` |
+| `leave_watch` | 관전을 끝낸다 (연결은 그대로) |
+
+서버는 `watching {code, mode}` 다음에 지금 `state`를 보내고, 이후 `state`를 계속 보냅니다. 참가자가 나가면 `opponent_left`, 모두 나가서 방이 닫히면 `room_closed`를 받습니다. 관전자의 `move`·`place_wall`·`chat`은 `게임에 참가하지 않았습니다.`로 거절됩니다. 화면은 관전 중이면 시점을 1P로 고정하고 조작·채팅·학습 패널을 숨깁니다.
 
 ### 코드 구조
 
