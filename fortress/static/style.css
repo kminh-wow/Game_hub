@@ -175,6 +175,27 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 
 /* ---- 포트리스 ---- */
 
+/* 전장과 채팅 배치 */
+#screen-room { max-width: 1400px; }
+.room-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; align-content: start; }
+.room-game { min-width: 0; }
+/* 채팅 패널 높이 */
+.room-chat { min-width: 0; height: clamp(300px, 50vh, 560px); align-self: start; }
+.room-chat .chat-log { flex: 1; height: auto; min-height: 0; }
+.room-chat .chat-form button { flex-shrink: 0; }
+
+/* 하단 참가자 목록 */
+.room-players { grid-column: 1 / -1; }
+.room-players .player-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.room-players .player-list li { margin-bottom: 0; gap: 12px; min-width: 0; overflow-wrap: anywhere; }
+
+/* 좁은 화면 배치 */
+@media (max-width: 900px) {
+  .room-layout { grid-template-columns: minmax(0, 1fr); }
+  .room-players { grid-row: 2; }
+  .room-chat { height: 260px; }
+}
+
 .game-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .tank-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .tank-chips span { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); font-size: 13px; font-weight: 600; }
@@ -187,22 +208,34 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 #field { display: block; width: 100%; height: auto; aspect-ratio: 12 / 7; touch-action: none; }
 
 /* 조작 패널 */
-.controls { display: grid; grid-template-columns: auto 1fr auto; gap: 10px 14px; align-items: center; }
+.controls { display: grid; grid-template-columns: auto minmax(60px, 1fr) auto; gap: 10px 14px; align-items: center; padding: 14px; margin: 12px 0; border: 2px solid #b5baa9; border-radius: 16px; background: linear-gradient(180deg, #fffdf1, #e9e9d9); box-shadow: 0 4px 0 #d0d4c3; }
 .controls .stat { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .controls .stat b { color: var(--text); font-variant-numeric: tabular-nums; }
-.gauge { position: relative; height: 18px; background: var(--bg); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
+.gauge { position: relative; height: 22px; background: #d6dbc9; border: 2px solid #698075; border-radius: 8px; overflow: hidden; }
+/* 게이지 눈금 */
+.gauge::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), #173d3340 calc(10% - 1px), #173d3340 10%); pointer-events: none; }
 .gauge > div { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, #f2c94c, #eb5757); }
 .gauge > i { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); display: none; }
 .fuel > div { background: var(--good); }
 .pad { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
-.pad button { min-width: 44px; padding: 10px 12px; user-select: none; -webkit-user-select: none; touch-action: none; }
-.pad button.fire { min-width: 96px; background: var(--bad); font-weight: 700; }
+.pad button { min-width: 48px; min-height: 44px; padding: 10px 12px; border: 2px solid #173d33; box-shadow: 0 3px 0 #122e27; user-select: none; -webkit-user-select: none; touch-action: none; }
+.pad button.fire { min-width: 148px; background: #d56722; border-color: #874016; box-shadow: 0 3px 0 #874016; font-weight: 800; }
+/* 조작 버튼 상태 */
+.pad button:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+button:focus-visible { outline: 3px solid #dd8a28; outline-offset: 3px; }
 .weapons { display: flex; gap: 6px; }
-.weapons button { background: transparent; color: var(--text); border: 1px solid var(--line); }
+.weapons button { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 5px 8px; background: #fffdf5; color: var(--text); border: 1px solid var(--line); white-space: nowrap; }
+/* 조작부 아이콘 */
+.weapons img { width: 30px; height: 34px; object-fit: contain; }
+.fuel-label { display: inline-flex; align-items: center; gap: 4px; }
+.fuel-label img { width: 24px; height: 28px; object-fit: contain; }
 .weapons button.on { border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
 .help { font-size: 12px; color: var(--muted); text-align: center; margin: 6px 0 0; }
 .game-status { text-align: center; min-height: 1.4em; margin: 6px 0; font-weight: 600; }
 
 @media (max-width: 720px) {
-  .controls { grid-template-columns: 1fr; }
+  .controls { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; padding: 10px; }
+  .controls .fuel { grid-column: 2 / -1; }
+  .weapons { grid-column: 1 / -1; justify-content: center; }
+  .controls .stat { font-size: 12px; }
 }

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>오목</title>
-  <link rel="stylesheet" href="static/style.css?v=spectate">
+  <link rel="stylesheet" href="static/style.css?v=room-layout">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/build/three.module.js","three/addons/":"./static/vendor/three/examples/jsm/"}}</script>
 </head>
 <body>
@@ -63,17 +63,9 @@
       <span id="room-info" class="muted"></span>
       <button id="btn-leave" class="ghost">나가기</button>
     </header>
-    <div class="layout">
-      <div class="panel side">
-        <h3>참가자 <span class="muted">(방 전적)</span></h3>
-        <ul id="player-list" class="player-list"></ul>
-        <div id="spectator-box" class="hidden">
-          <h3>관전 <span id="spectator-count" class="muted"></span></h3>
-          <ul id="spectator-list" class="player-list"></ul>
-        </div>
-      </div>
-
-      <div class="panel grow">
+    <!-- 게임과 채팅 배치 -->
+    <div class="room-layout">
+      <div class="panel room-game">
         <!-- 대기 화면 -->
         <div id="waiting-view">
           <h3>게임 설정</h3>
@@ -108,13 +100,23 @@
           </div>
         </div>
       </div>
-    </div>
-    <div class="panel chat">
-      <ul id="room-chat-log" class="chat-log"></ul>
-      <form id="room-chat-form" class="chat-form">
-        <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
-        <button type="submit">전송</button>
-      </form>
+      <div class="panel chat room-chat">
+        <h3>채팅</h3>
+        <ul id="room-chat-log" class="chat-log"></ul>
+        <form id="room-chat-form" class="chat-form">
+          <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+          <button type="submit">전송</button>
+        </form>
+      </div>
+      <!-- 하단 참가자 목록 -->
+      <div class="panel room-players">
+        <h3>참가자 <span class="muted">(방 전적)</span></h3>
+        <ul id="player-list" class="player-list"></ul>
+        <div id="spectator-box" class="hidden">
+          <h3>관전 <span id="spectator-count" class="muted"></span></h3>
+          <ul id="spectator-list" class="player-list"></ul>
+        </div>
+      </div>
     </div>
   </section>
 
