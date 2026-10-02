@@ -390,20 +390,7 @@ function columns(terrain) {
 
 // 지형 렌더링
 function drawTerrain(terrain, sea) {
-  const cols = columns(terrain);
-  const dirt = ctx.createLinearGradient(0, sy(560), 0, H);
-  dirt.addColorStop(0, "#9b6b3f");
-  dirt.addColorStop(1, "#5a3a20");
-  ctx.fillStyle = dirt;
-  cols.forEach((segs, x) => {
-    for (const [lo, hi] of segs) ctx.fillRect(x, sy(hi), 1.4, hi - lo);
-  });
-  ctx.fillStyle = "#5aa340";
-  cols.forEach((segs, x) => {
-    for (const [lo, hi] of segs) {
-      if (!grassTops || grassTops[x] === hi) ctx.fillRect(x, sy(hi), 1.4, Math.min(6, hi - lo));
-    }
-  });
+  FortressTerrain.draw(ctx, terrain, grassTops, W, H);
 
   ctx.fillStyle = "rgba(37, 105, 190, .78)";
   ctx.fillRect(0, sy(sea), W, sea);
@@ -435,7 +422,7 @@ function drawTank(t, current, now) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(facing, 1);
-    FortressArt.sprite(ctx, "tank-body", -24, -23, 48, 25);
+    FortressArt.sprite(ctx, FortressArt.body(t.color, t.dummy), -24, -23, 48, 25);
     ctx.fillStyle = color;
     ctx.strokeStyle = "#173d33";
     ctx.lineWidth = 1;
@@ -583,7 +570,9 @@ function drawBlast(b) {
         const px = b.x + Math.cos(angle) * speed * seconds;
         const py = sy(b.y) - Math.sin(angle) * speed * seconds + 160 * seconds * seconds;
         ctx.fillStyle = i % 2 ? "#714a2d" : "#b88b53";
-        ctx.fillRect(px, py, 3 + i % 3, 3 + i % 2);
+        if (!FortressArt.decoration(ctx, "rocks", i % 3, px, py, 5 + i % 4, seconds * (i % 2 ? 3 : -3))) {
+          ctx.fillRect(px, py, 3 + i % 3, 3 + i % 2);
+        }
       }
       ctx.restore();
       return;
