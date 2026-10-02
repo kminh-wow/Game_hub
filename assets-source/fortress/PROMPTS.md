@@ -24,3 +24,15 @@ Game VFX sprite sheet, four animation frames in EXACT equal 2 by 2 grid on squar
 
 Eight frame explosion animation sprite sheet for cute cartoon artillery game. EXACT 4 columns by 2 rows equally sized cells on a wide 2:1 canvas. Playback left to right top row then bottom row. Every effect centered at exact cell center with generous 15 percent transparent margin, no overlap. Frame 1 tiny cream yellow star; frame 2 expanding yellow orange burst; frame 3 full rounded orange fireball; frame 4 largest bright orange fireball; frame 5 orange flame mixed tan smoke; frame 6 round tan smoke cloud; frame 7 separated smaller pale smoke puffs; frame 8 very faint tiny residual puffs. Clean cel shaded cartoon effects, warm cream gold orange taupe. True transparent background, no ground, no objects, no text, no numbers, no grid lines, no labels. All eight frames visible and strictly separated.
 
+
+## 4인 차체 변형
+내장 image_gen 편집으로 원본 차체의 실루엣·회색 기계부·아이보리 바퀴를 유지하고 포탑과 장갑판만 cobalt blue / golden yellow / emerald green으로 변경. 실제 투명 배경, 포신 제외, 같은 캔버스와 여백.
+출력: tank-body-blue.png, tank-body-yellow.png, tank-body-green.png (fortress/static/assets).
+
+## 랜덤 지형 에셋
+내장 image_gen 사용.
+soil.png: Seamless warm muted brown clay, subtle small rounded pebbles, low contrast, flat uniform lighting, no grass or horizon.
+bedrock.png: Seamless dark warm umber underground rock, small rounded stone facets, quiet cel shading, no distinct large features.
+grass.png: Three side-view grass tuft variants in equal horizontal cells, muted green and lime highlights, transparent background, no soil or shadows.
+rocks.png: Three side-view rock variants in equal horizontal cells (rounded pebble, paired stones, faceted stone), warm taupe, transparent background.
+실사용: fortress/static/assets. 텍스처는 렌더링 시 거울 반복으로 경계를 연결하고, 장식 시트는 알파 경계로 프레임을 추출한다. 원본 PNG는 보존한다.

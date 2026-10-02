@@ -22,6 +22,7 @@
 <body><main>
   <a href="../">← 포트리스 플레이</a>
   <h1>장난감 탱크 작업실</h1>
+  <p><a href="terrain-preview.html">랜덤 지형과 파괴 미리보기 →</a></p>
   <p>차체·포신 조립과 포탄 아이콘, 발사·타격 효과 미리보기</p>
   <div class="grid">
     <article class="wide"><canvas id="tank" width="900" height="220" aria-label="차체와 포신 조립 미리보기"></canvas><p>차체 + 회전 포신 · 플레이어 색상 표식</p></article>
@@ -30,7 +31,7 @@
     <article><img src="assets/fuel.png" alt="연료통"><h2>연료</h2></article>
     <article class="wide"><canvas id="effects" width="900" height="230" aria-label="왼쪽 포구 섬광, 오른쪽 폭발 효과"></canvas><p>포구 섬광 4프레임 · 폭발 8프레임</p><button id="replay">효과 재생</button></article>
   </div>
-  <script src="art.js?v=toy-1"></script>
+  <script src="art.js?v=terrain-1"></script>
   <script>
     // 에셋 조립 미리보기
     const tank = document.querySelector('#tank').getContext('2d');
@@ -41,7 +42,7 @@
       tank.clearRect(0, 0, 900, 220);
       ['#d64545', '#2f6fd6', '#e0a020', '#3a9a5a'].forEach((color, i) => {
         tank.save(); tank.translate(115 + i * 220, 170); tank.scale(3.6, 3.6);
-        FortressArt.sprite(tank, 'tank-body', -24, -23, 48, 25);
+        FortressArt.sprite(tank, FortressArt.body(i), -24, -23, 48, 25);
         tank.fillStyle = color; tank.strokeStyle = '#173d33'; tank.lineWidth = 1;
         tank.beginPath(); tank.roundRect(-7, -11, 14, 5, 2); tank.fill(); tank.stroke();
         tank.translate(0, -18); tank.rotate(-Math.PI / 4);
