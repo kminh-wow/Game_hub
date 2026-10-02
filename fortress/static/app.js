@@ -9,6 +9,7 @@ const COLORS = ["#d64545", "#2f6fd6", "#e0a020", "#3a9a5a"];
 const DUMMY_COLOR = "#8b8b8b";
 const TANK_CENTER = 8;
 const BARREL = 22;
+const ART_PIVOT = 18;          // 포탑 회전축
 const GAUGE_MS = 1500;          // 파워 게이지가 0에서 100까지 가는 시간
 const MOVE_EVERY = 60;          // 이동 키를 누르고 있을 때 서버로 보내는 간격(ms)
 const ANGLE_EVERY = 40;
@@ -181,6 +182,12 @@ function renderControls(g) {
         textContent: left === undefined ? w.name : `${w.name} ${left}`,
         disabled: !mine || left === 0,
       });
+      // 포탄 선택 아이콘
+      const icon = document.createElement("img");
+      icon.src = `static/assets/${id === "normal" ? "normal" : "heavy"}.png`;
+      icon.alt = "";
+      b.prepend(icon);
+      b.setAttribute("aria-pressed", String(weapon === id));
       b.onclick = () => {
         weapon = id;
         renderControls(g);
@@ -344,7 +351,7 @@ function pick(obj, keys, use) {
   return Object.fromEntries(keys.map((k) => [k, obj[k]]));
 }
 
-// ---------- 그리기 (디자인은 나중에 교체) ----------
+// ---------- 전장 그리기 ----------
 
 const sy = (y) => H - y;
 let ui = 1;                     // 화면이 작을 때 글자·표시를 키우는 배율
@@ -383,20 +390,7 @@ function columns(terrain) {
 
 // 지형 렌더링
 function drawTerrain(terrain, sea) {
-  const cols = columns(terrain);
-  const dirt = ctx.createLinearGradient(0, sy(560), 0, H);
-  dirt.addColorStop(0, "#9b6b3f");
-  dirt.addColorStop(1, "#5a3a20");
-  ctx.fillStyle = dirt;
-  cols.forEach((segs, x) => {
-    for (const [lo, hi] of segs) ctx.fillRect(x, sy(hi), 1.4, hi - lo);
-  });
-  ctx.fillStyle = "#5aa340";
-  cols.forEach((segs, x) => {
-    for (const [lo, hi] of segs) {
-      if (!grassTops || grassTops[x] === hi) ctx.fillRect(x, sy(hi), 1.4, Math.min(6, hi - lo));
-    }
-  });
+  FortressTerrain.draw(ctx, terrain, grassTops, W, H);
 
   ctx.fillStyle = "rgba(37, 105, 190, .78)";
   ctx.fillRect(0, sy(sea), W, sea);
@@ -422,7 +416,35 @@ function drawTank(t, current, now) {
   // 포신
   const rad = (angle * Math.PI) / 180;
   const cx = x;
-  const cy = y - TANK_CENTER - 4;
+  const cy = y - (FortressArt.ready() ? ART_PIVOT : TANK_CENTER + 4);
+  if (FortressArt.ready()) {
+    // 차체와 플레이어 표식
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(facing, 1);
+    FortressArt.sprite(ctx, FortressArt.body(t.color, t.dummy), -24, -23, 48, 25);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "#173d33";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(-7, -11, 14, 5, 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    // 포신 반동과 포구 섬광
+    const age = anim && anim.shot.player_id === t.id ? now - anim.start : Infinity;
+    const recoil = !FortressArt.reduced.matches && age < 180 ? 3 * Math.sin(age / 180 * Math.PI) : 0;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(facing, 1);
+    ctx.rotate(-rad);
+    FortressArt.sprite(ctx, "tank-barrel", -5 - recoil, -4.5, BARREL + 5, 9);
+    if (age < 280 && !FortressArt.reduced.matches) {
+      FortressArt.effect(ctx, "muzzle", Math.min(3, Math.floor(age / 70)), BARREL + 11, -3, 44);
+    }
+    ctx.restore();
+  } else {
+  // 기본 탱크 대체 표시
   ctx.strokeStyle = "#2b2b2b";
   ctx.lineWidth = 4;
   ctx.lineCap = "round";
@@ -443,6 +465,7 @@ function drawTank(t, current, now) {
   ctx.beginPath();
   ctx.roundRect(x - 16, y - 5, 32, 6, 3);
   ctx.fill();
+  }
   ctx.restore();
   ctx.globalAlpha = 1;
   if (!t.alive) return;
@@ -465,7 +488,7 @@ function drawTank(t, current, now) {
   ctx.fillRect(x - bw / 2, top - 6 * ui, bw * (t.hp / 100), bh);
 
   if (current) {
-    const bob = Math.sin(now / 180) * 3 * ui;
+    const bob = FortressArt.reduced.matches ? 0 : Math.sin(now / 180) * 3 * ui;
     const ty = top - 46 * ui + bob;
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -479,13 +502,14 @@ function drawTank(t, current, now) {
 // 조준선 (내 차례)
 function drawAimGuide(t) {
   const rad = (aim.angle * Math.PI) / 180;
+  const scale = Math.min(ui, 1.5);
   const cx = t.x;
-  const cy = sy(t.y) - TANK_CENTER - 4;
+  const cy = sy(t.y) - (FortressArt.ready() ? ART_PIVOT : TANK_CENTER + 4) * scale;
   ctx.setLineDash([4, 6]);
   ctx.strokeStyle = "rgba(23, 61, 51, .55)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(cx + Math.cos(rad) * aim.facing * (BARREL + 6), cy - Math.sin(rad) * (BARREL + 6));
+  ctx.moveTo(cx + Math.cos(rad) * aim.facing * (BARREL + 6) * scale, cy - Math.sin(rad) * (BARREL + 6) * scale);
   ctx.lineTo(cx + Math.cos(rad) * aim.facing * 80, cy - Math.sin(rad) * 80);
   ctx.stroke();
   ctx.setLineDash([]);
@@ -506,8 +530,9 @@ function drawWind(wind) {
 }
 
 function drawShell(shell) {
-  ctx.strokeStyle = "rgba(60, 60, 60, .35)";
-  ctx.lineWidth = 2;
+  // 포탄 궤적
+  ctx.strokeStyle = "rgba(255, 236, 186, .8)";
+  ctx.lineWidth = 3;
   ctx.beginPath();
   shell.trail.forEach(([x, y], i) => ctx[i ? "lineTo" : "moveTo"](x, sy(y)));
   ctx.lineTo(shell.x, sy(shell.y));
@@ -522,13 +547,46 @@ function drawShell(shell) {
     ctx.fill();
     return;
   }
-  ctx.fillStyle = "#222";
+  ctx.fillStyle = "#ffbd57";
+  ctx.strokeStyle = "#173d33";
+  ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(shell.x, sy(shell.y), 5, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
 }
 
 function drawBlast(b) {
+  // 폭발 프레임과 흙 파편
+  if (b.t < 720 && !FortressArt.reduced.matches) {
+    const frame = Math.min(7, Math.floor(b.t / 90));
+    if (FortressArt.effect(ctx, "explosion", frame, b.x, sy(b.y), b.radius * 3.2)) {
+      const seconds = b.t / 1000;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - b.t / 720);
+      for (let i = 0; i < 12; i++) {
+        const angle = Math.PI * (0.12 + i / 14);
+        const speed = 65 + (i * 31 % 90);
+        const px = b.x + Math.cos(angle) * speed * seconds;
+        const py = sy(b.y) - Math.sin(angle) * speed * seconds + 160 * seconds * seconds;
+        ctx.fillStyle = i % 2 ? "#714a2d" : "#b88b53";
+        if (!FortressArt.decoration(ctx, "rocks", i % 3, px, py, 5 + i % 4, seconds * (i % 2 ? 3 : -3))) {
+          ctx.fillRect(px, py, 3 + i % 3, 3 + i % 2);
+        }
+      }
+      ctx.restore();
+      return;
+    }
+  }
+  if (b.t >= 720) return;
+  // 기본 폭발 대체 표시
+  if (FortressArt.reduced.matches) {
+    ctx.fillStyle = "rgba(255, 190, 80, .25)";
+    ctx.beginPath();
+    ctx.arc(b.x, sy(b.y), b.radius, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
   const grow = Math.min(1, b.t / 220);
   const fade = Math.max(0, 1 - b.t / 750);
   if (fade <= 0) return;
@@ -552,8 +610,9 @@ function drawPopups(now) {
     ctx.fillStyle = "#d63030";
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 3 * ui;
-    ctx.strokeText(p.text, p.x, sy(p.y + t * 30));
-    ctx.fillText(p.text, p.x, sy(p.y + t * 30));
+    const rise = FortressArt.reduced.matches ? 0 : t * 30;
+    ctx.strokeText(p.text, p.x, sy(p.y + rise));
+    ctx.fillText(p.text, p.x, sy(p.y + rise));
   }
   ctx.globalAlpha = 1;
 }
