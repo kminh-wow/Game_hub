@@ -29,7 +29,7 @@ CLOSE_REPLACED = 4002
 Action = Callable[[Any, Player, dict], Awaitable[str | None]]
 
 # 관전 중에도 할 수 있는 메시지 (그 밖의 게임 조작·준비·설정·시작은 막는다)
-SPECTATOR_ALLOWED = {"chat", "leave_room"}
+SPECTATOR_ALLOWED = {"chat", "leave_room", "ping"}
 
 
 def valid_name(name: str) -> bool:
@@ -102,6 +102,8 @@ class GameServer:
         if not isinstance(msg, dict):
             return
         kind = msg.get("type")
+        if kind == "ping":                     # 연결 유지 신호
+            return
         if player.spectating and kind not in SPECTATOR_ALLOWED:
             return await self._error(player, "관전 중에는 할 수 없어요.")
         if handler := self._handlers.get(kind):

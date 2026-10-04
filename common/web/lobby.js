@@ -114,8 +114,17 @@ const GameLobby = (() => {
     url.search = new URLSearchParams({ name, token: token() }).toString();
     const ws = new WebSocket(url);
     state.ws = ws;
-    ws.onmessage = (e) => handle(JSON.parse(e.data));
+    // 연결 유지 신호 (오래 조용하면 공유기·프록시가 연결을 끊는 것을 막는다)
+    const ping = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send('{"type":"ping"}'), 25000);
+    ws.onmessage = (e) => {
+      try {
+        handle(JSON.parse(e.data));
+      } catch (err) {
+        console.error(err);
+      }
+    };
     ws.onclose = (e) => {
+      clearInterval(ping);
       if (state.ws !== ws) return;
       Object.assign(state, { ws: null, me: null, room: null, game: null });
       show("login");

@@ -3,14 +3,25 @@
 // 파괴 지형 렌더링 캐시
 const FortressTerrain = (() => {
   let cache = null;
+  // 캔버스 재사용 (새로 만들면 일부 브라우저에서 캔버스 메모리가 쌓인다)
+  const surface = document.createElement("canvas");
+  const rock = document.createElement("canvas");
+  const fit = (canvas, width, height) => {
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width; canvas.height = height;
+    }
+    const painter = canvas.getContext("2d");
+    painter.setTransform(1, 0, 0, 1, 0, 0);
+    painter.globalCompositeOperation = "source-over";
+    painter.clearRect(0, 0, width, height);
+    return painter;
+  };
 
   // 지형 표면 구성
   function build(terrain, tops, width, height) {
-    const surface = document.createElement("canvas");
-    surface.width = width; surface.height = height;
-    const painter = surface.getContext("2d");
+    const painter = fit(surface, width, height);
     const cols = terrain.map(c => typeof c === "number" ? [[0, c]] : c);
-    const original = tops || cols.map(c => c.at(-1)?.[1]);
+    const original = tops || cols.map(c => c[c.length - 1]?.[1]);
     const mask = new Path2D();
     cols.forEach((segments, x) => {
       for (const [lo, hi] of segments) mask.rect(x, height - hi, 1, hi - lo);
@@ -20,9 +31,7 @@ const FortressTerrain = (() => {
     painter.fillRect(0, 0, width, height);
 
     // 지하 암석층 혼합
-    const rock = document.createElement("canvas");
-    rock.width = width; rock.height = height;
-    const rp = rock.getContext("2d");
+    const rp = fit(rock, width, height);
     original.forEach((top, x) => {
       if (top === undefined) return;
       const depth = rp.createLinearGradient(0, height - top + 45, 0, height - top + 220);
@@ -64,7 +73,7 @@ const FortressTerrain = (() => {
       if (left === undefined || right === undefined || Math.abs(right - left) > size * .5) continue;
       let intact = true;
       for (let c = x - half; c <= x + half; c++) {
-        if (cols[c].at(-1)?.[1] !== original[c] || Math.abs(original[c] - top) > size * .4) { intact = false; break; }
+        if (cols[c][cols[c].length - 1]?.[1] !== original[c] || Math.abs(original[c] - top) > size * .4) { intact = false; break; }
       }
       if (!intact) continue;
       FortressArt.decoration(painter, isRock ? "rocks" : "grass", variant, x, height - top,
