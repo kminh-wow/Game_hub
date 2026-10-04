@@ -145,6 +145,13 @@ def test_spectator_sees_shots_but_cannot_act(client):
     spec = Conn(client, "w" + uuid.uuid4().hex[:4])
     spec.send("spectate_room", room_id=room_id)
     assert spec.game()["game"]["terrain"]
+    spec.send("ping")                                          # 연결 유지 신호는 오류 없이 무시
+    spec.send("chat", text="구경")
+    for _ in range(50):
+        m = spec.ws.receive_json()
+        assert m["type"] != "error", m
+        if m["type"] == "chat":
+            break
     for kind, data in [("fire", {"power": 50}), ("move", {"dir": 1}), ("aim", {"angle": 30})]:
         spec.send(kind, **data)
         assert "관전 중" in spec.until("error")["message"]

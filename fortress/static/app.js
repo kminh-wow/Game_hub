@@ -40,11 +40,16 @@ const lobby = GameLobby.init({
     game(msg) {
       const prev = lobby.state.game;
       const shot = msg.events.find((e) => e.kind === "shot");
-      if (shot && prev) startShot(prev, shot);
-      for (const e of msg.events) logEvent(e, msg.game);
-      if (msg.events.some((e) => e.kind === "turn")) resetAim(msg.game);
-      if (msg.game.turn === 1 && !shot) grassTops = columns(msg.game.terrain).map((c) => c.at(-1)?.[1]);
       deadline = performance.now() + msg.game.time_left_ms;
+      // 연출 준비가 실패해도 상태는 항상 새로 반영
+      try {
+        if (shot && prev) startShot(prev, shot);
+        for (const e of msg.events) logEvent(e, msg.game);
+        if (msg.events.some((e) => e.kind === "turn")) resetAim(msg.game);
+        if (msg.game.turn === 1 && !shot) grassTops = columns(msg.game.terrain).map((c) => c[c.length - 1]?.[1]);
+      } catch (err) {
+        reportError(err);
+      }
       lobby.setGame(msg.game);
     },
     aim(msg) {
@@ -306,7 +311,7 @@ for (const b of document.querySelectorAll("#pad button")) {
 function startShot(prev, shot) {
   stopAll();
   const flight = (shot.frames.length - 1) * shot.frame_ms;
-  anim = { prev: structuredClone(prev), shot, start: performance.now(), flight };
+  anim = { prev: JSON.parse(JSON.stringify(prev)), shot, start: performance.now(), flight };
 }
 
 // 지금 그릴 지형과 탱크 (재생 중이면 터지기 전 모습)
@@ -656,7 +661,22 @@ function tick(now) {
     $("#power-bar").style.width = `${p}%`;
     $("#power-val").textContent = Math.round(p);
   }
-  draw(now);
+  // 그리기 오류가 나도 다음 프레임은 계속
+  try {
+    draw(now);
+  } catch (err) {
+    anim = null;
+    reportError(err);
+  }
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
+
+// 화면 오류 알림 (한 번만)
+let reported = false;
+function reportError(err) {
+  console.error(err);
+  if (reported) return;
+  reported = true;
+  lobby.toast(`화면 오류: ${err?.message || err}`);
+}
