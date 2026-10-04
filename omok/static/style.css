@@ -163,6 +163,11 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .result-list { margin: 16px 0; text-align: left; }
 .result-list li { display: flex; justify-content: space-between; padding: 8px 10px; border-radius: 8px; }
 .result-list li:first-child { background: var(--accent-soft); font-weight: 700; }
+/* 승패 강조 */
+#result-title { font-size: 22px; }
+#result-title.win { color: var(--good); }
+#result-title.lose { color: var(--bad); }
+.result-list li:first-child { font-size: 17px; padding: 12px; outline: 2px solid var(--accent); }
 
 /* 알림 */
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 18px; border-radius: 99px; font-size: 14px; }

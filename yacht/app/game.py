@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from .rules import CATEGORY_IDS, DICE, MAX_ROLLS, ROUNDS, all_notes, all_scores, best_category, explain, score, totals
 from .physics import initial_poses, throw_dice
 
-YACHT_ASSIST = 0.5   # 같은 눈을 모으는 중일 때 두 번 던지는 비율 (요트 확률 약 +3%p)
+YACHT_ASSIST = 0.25  # 같은 눈을 모으는 중일 때 두 번 던지는 비율 (요트 확률 약 +1.5%p)
 
 if TYPE_CHECKING:
     from common.multiplayer import Player

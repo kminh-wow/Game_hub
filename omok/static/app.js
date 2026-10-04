@@ -37,11 +37,8 @@ const lobby = GameLobby.init({
     game_over(msg) {
       const g = lobby.state.game;
       const reason = REASONS[msg.reason] || msg.reason;
-      let title = "무승부";
-      if (msg.winner) title = lobby.isMe(msg.winner.id) ? "승리!" : `${msg.winner.name} 승리`;
       lobby.logSystem(msg.winner ? `${msg.winner.name}님 승리 (${reason})` : `무승부 (${reason})`);
-      const rows = g ? [["흑", g.black.name], ["백", g.white.name], ["결과", reason], ["수", `${g.move_count}수`]] : [["결과", reason]];
-      lobby.showResult(title, rows);
+      showOmokResult(g, msg.winner, reason);
     },
   },
   renderGame,
@@ -57,6 +54,30 @@ const lobby = GameLobby.init({
     return "방장이 게임을 시작할 때까지 기다려 주세요.";
   },
 });
+
+// 결과 창 (승자를 맨 위에 크게)
+function showOmokResult(g, winner, reason) {
+  const stone = (p) => (g && p.id === g.black.id ? "⚫ 흑" : "⚪ 백");
+  const label = (p) => `${p.name}${lobby.isMe(p.id) ? " (나)" : ""} · ${stone(p)}`;
+  let title = "무승부";
+  let cls = "";
+  const rows = [];
+  if (winner) {
+    const loser = g && (winner.id === g.black.id ? g.white : g.black);
+    const mine = lobby.isMe(winner.id);
+    const played = g && (lobby.isMe(g.black.id) || lobby.isMe(g.white.id));
+    title = mine ? "🎉 내가 이겼어요!" : played ? `😢 졌어요` : `🏆 ${winner.name} 승리!`;
+    cls = mine ? "win" : played ? "lose" : "";
+    rows.push(["🏆 승리", label(winner)]);
+    if (loser) rows.push(["패배", label(loser)]);
+  } else if (g) {
+    rows.push(["무승부", `${g.black.name} · ${g.white.name}`]);
+  }
+  rows.push(["결과", reason]);
+  if (g) rows.push(["수", `${g.move_count}수`]);
+  lobby.showResult(title, rows);
+  $("#result-title").className = cls;
+}
 
 function myColor(g) {
   if (lobby.isMe(g.black.id)) return "black";
