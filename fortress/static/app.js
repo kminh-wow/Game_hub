@@ -224,7 +224,7 @@ function sendAim(force = false) {
 }
 
 function powerAt(now) {
-  const p = ((now - charging) / GAUGE_MS) * 100 % 200;
+  const p = (Math.max(0, now - charging) / GAUGE_MS) * 100 % 200;
   return p > 100 ? 200 - p : p;
 }
 
@@ -317,11 +317,11 @@ function startShot(prev, shot) {
 // 지금 그릴 지형과 탱크 (재생 중이면 터지기 전 모습)
 function scene(g, now) {
   if (!anim) return { terrain: g.terrain, tanks: g.tanks, shell: null, blast: null };
-  const t = now - anim.start;
+  const t = Math.max(0, now - anim.start);
   const { prev, shot, flight } = anim;
   if (t < flight) {
     const f = t / shot.frame_ms;
-    const i = Math.floor(f);
+    const i = Math.min(Math.floor(f), shot.frames.length - 1);
     const a = shot.frames[i];
     const b = shot.frames[Math.min(i + 1, shot.frames.length - 1)];
     const k = f - i;
@@ -642,7 +642,9 @@ function draw(now) {
 
 // ---------- 매 프레임 ----------
 
-function tick(now) {
+function tick() {
+  // 프레임 시각 대신 지금 시각 (프레임 시각은 메시지를 받은 시각보다 앞설 수 있다)
+  const now = performance.now();
   const g = lobby.state.game;
   const bar = $("#time-bar");
   if (g && lobby.state.room?.playing && !g.flying && !anim && g.time_total_ms) {
@@ -679,4 +681,5 @@ function reportError(err) {
   if (reported) return;
   reported = true;
   lobby.toast(`화면 오류: ${err?.message || err}`);
+  lobby.logSystem(`화면 오류: ${err?.message || err}`, "fail");
 }
