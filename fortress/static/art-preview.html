@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>포트리스 에셋 미리보기</title>
+  <style>
+    /* 에셋 미리보기 */
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 32px; background: #f5f5ed; color: #173d33; font: 16px "Malgun Gothic", sans-serif; }
+    main { max-width: 1050px; margin: auto; }
+    h1 { margin: 12px 0; } p { color: #53665c; line-height: 1.6; }
+    a { color: #245442; } .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    article { padding: 20px; border: 1px solid #cdd4c7; border-radius: 16px; background: #fcfcf7; text-align: center; }
+    .wide { grid-column: 1 / -1; } canvas { max-width: 100%; height: auto; }
+    article img { width: 150px; max-width: 100%; }
+    button { padding: 12px 20px; color: white; background: #245442; border: 0; border-radius: 8px; font: inherit; cursor: pointer; }
+    button:focus-visible { outline: 3px solid #d56722; outline-offset: 3px; }
+    @media(max-width: 600px) { body { padding: 16px; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body><main>
+  <a href="../">← 포트리스 플레이</a>
+  <h1>장난감 탱크 작업실</h1>
+  <p><a href="terrain-preview.html">랜덤 지형과 파괴 미리보기 →</a></p>
+  <p>차체·포신 조립과 포탄 아이콘, 발사·타격 효과 미리보기</p>
+  <div class="grid">
+    <article class="wide"><canvas id="tank" width="900" height="220" aria-label="차체와 포신 조립 미리보기"></canvas><p>차체 + 회전 포신 · 플레이어 색상 표식</p></article>
+    <article><img src="assets/normal.png" alt="기본탄"><h2>기본탄</h2></article>
+    <article><img src="assets/heavy.png" alt="대형탄"><h2>대형탄</h2></article>
+    <article><img src="assets/fuel.png" alt="연료통"><h2>연료</h2></article>
+    <article class="wide"><canvas id="effects" width="900" height="230" aria-label="왼쪽 포구 섬광, 오른쪽 폭발 효과"></canvas><p>포구 섬광 4프레임 · 폭발 8프레임</p><button id="replay">효과 재생</button></article>
+  </div>
+  <script src="art.js?v=terrain-1"></script>
+  <script>
+    // 에셋 조립 미리보기
+    const tank = document.querySelector('#tank').getContext('2d');
+    const effects = document.querySelector('#effects').getContext('2d');
+    let start = -Infinity;
+    document.querySelector('#replay').onclick = () => { start = performance.now(); };
+    function preview(now) {
+      tank.clearRect(0, 0, 900, 220);
+      ['#d64545', '#2f6fd6', '#e0a020', '#3a9a5a'].forEach((color, i) => {
+        tank.save(); tank.translate(115 + i * 220, 170); tank.scale(3.6, 3.6);
+        FortressArt.sprite(tank, FortressArt.body(i), -24, -23, 48, 25);
+        tank.fillStyle = color; tank.strokeStyle = '#173d33'; tank.lineWidth = 1;
+        tank.beginPath(); tank.roundRect(-7, -11, 14, 5, 2); tank.fill(); tank.stroke();
+        tank.translate(0, -18); tank.rotate(-Math.PI / 4);
+        FortressArt.sprite(tank, 'tank-barrel', -5, -4.5, 27, 9);
+        tank.restore();
+      });
+      effects.clearRect(0, 0, 900, 230);
+      const age = now - start;
+      const playing = age < 900 && !FortressArt.reduced.matches;
+      FortressArt.effect(effects, 'muzzle', playing ? Math.min(3, Math.floor(age / 150)) : 1, 230, 115, 220);
+      FortressArt.effect(effects, 'explosion', playing ? Math.min(7, Math.floor(age / 112.5)) : 3, 670, 115, 220);
+      requestAnimationFrame(preview);
+    }
+    requestAnimationFrame(preview);
+  </script>
+</main></body>
+</html>

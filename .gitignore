@@ -10,3 +10,5 @@ node_modules/
 .npm-cache/
 test-results/
 *.blend1
+fortress/static/terrain-preview.html
+assets-source/fortress/preview-four-players.jpg
