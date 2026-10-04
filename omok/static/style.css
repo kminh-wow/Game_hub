@@ -174,6 +174,27 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 
 /* ---- 오목 ---- */
 
+/* 게임과 채팅 배치 */
+.room-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; align-content: start; }
+.room-game { min-width: 0; }
+
+/* 채팅 패널 높이 */
+.room-chat { min-width: 0; height: clamp(300px, 50vh, 560px); align-self: start; }
+.room-chat .chat-log { flex: 1; height: auto; min-height: 0; }
+.room-chat .chat-form button { flex-shrink: 0; }
+
+/* 하단 참가자 목록 */
+.room-players { grid-column: 1 / -1; }
+.room-players .player-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.room-players .player-list li { margin-bottom: 0; gap: 12px; min-width: 0; overflow-wrap: anywhere; }
+
+/* 좁은 화면 배치 */
+@media (max-width: 900px) {
+  .room-layout { grid-template-columns: minmax(0, 1fr); }
+  .room-players { grid-row: 2; }
+  .room-chat { height: 260px; }
+}
+
 .game-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .side-info { display: flex; gap: 10px; }
 .side-info span { padding: 6px 12px; border-radius: 99px; border: 1px solid var(--line); font-weight: 600; }
