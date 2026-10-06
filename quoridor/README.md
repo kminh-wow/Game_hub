@@ -4,7 +4,7 @@
 
 **벽을 세워 길을 막고, 먼저 건너편에 닿아라**
 
-### [▶ 지금 플레이하기](http://100.53.186.9/quoridor/)
+### [▶ 지금 플레이하기](http://52.200.153.207/quoridor/)
 
 <img src="../docs/images/quoridor-game.png" alt="쿼리도 3D 보드" width="760">
 

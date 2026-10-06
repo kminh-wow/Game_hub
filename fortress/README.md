@@ -4,7 +4,7 @@
 
 **산 너머 탱크를 향해, 각도와 파워를 맞춰 한 방!**
 
-### [▶ 지금 플레이하기](http://100.53.186.9/fortress/)
+### [▶ 지금 플레이하기](http://52.200.153.207/fortress/)
 
 <img src="../docs/images/fortress-game.png" alt="포트리스 게임 화면" width="760">
 
