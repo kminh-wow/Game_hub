@@ -76,3 +76,78 @@ def test_chat_is_classified(monkeypatch, text, kind):
         await asyncio.sleep(0.01)
         assert room.sent[0]["text"] in [line.format(name="영희") for line in LINES[kind]]
     run(scenario())
+
+
+# ---- 로컬 LLM ----
+
+@pytest.fixture
+def fake_llm(monkeypatch):
+    """OpenAI 호환 /v1/chat/completions 를 흉내 내는 작은 서버."""
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    import common.multiplayer.llm as llm
+
+    state = {"reply": "오늘 바람은 제 편이네요!", "requests": []}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            state["requests"].append(body)
+            out = json.dumps({"choices": [{"message": {"content": state["reply"]}}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(out)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setenv("BANTER_LLM_URL", f"http://127.0.0.1:{server.server_port}")
+    monkeypatch.setattr(llm, "_down_until", 0.0)
+    yield state
+    server.shutdown()
+
+
+def _one_line(state, kind="hit", **kw):
+    async def scenario():
+        room = RoomStub()
+        b = Banter(room, {"id": "ai", "name": "AI · 상"}, LINES, random.Random(0), game="포트리스",
+                   situations={"hit": "네 포탄이 맞았다"})
+        assert b.say(kind, important=True, **kw)
+        for _ in range(80):                             # LLM 이 늦거나 실패해도 결국 한 마디는 한다
+            if room.sent:
+                break
+            await asyncio.sleep(0.1)
+        return room.sent[0]["text"]
+    return asyncio.run(scenario())
+
+
+def test_llm_line_is_used_when_available(fake_llm):
+    assert _one_line(fake_llm) == "오늘 바람은 제 편이네요!"
+    req = fake_llm["requests"][0]
+    assert req["chat_template_kwargs"] == {"enable_thinking": False}
+    assert "포트리스" in req["messages"][0]["content"] and "AI · 상" in req["messages"][0]["content"]
+    assert "네 포탄이 맞았다" in req["messages"][1]["content"]
+
+
+@pytest.mark.parametrize("reply", ["<think>음</think>야 이 ***아", "", "아" * 100])
+def test_bad_llm_lines_fall_back_to_written_lines(fake_llm, reply):
+    fake_llm["reply"] = reply
+    assert _one_line(fake_llm) in LINES["hit"]
+
+
+def test_llm_output_is_cleaned(fake_llm):
+    fake_llm["reply"] = "<think>\n</think>\n\nAI: \"명중이죠, 계산대로!\"\n(설명)"
+    assert _one_line(fake_llm) == "명중이죠, 계산대로!"
+
+
+def test_unreachable_llm_falls_back_and_backs_off(monkeypatch):
+    import common.multiplayer.llm as llm
+    monkeypatch.setenv("BANTER_LLM_URL", "http://127.0.0.1:9")      # 아무도 안 받는 포트
+    monkeypatch.setattr(llm, "_down_until", 0.0)
+    assert _one_line(None) in LINES["hit"]
+    assert not llm.enabled()                                          # 한동안 부르지 않는다
