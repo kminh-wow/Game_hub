@@ -122,8 +122,13 @@ class Game:
     # 발사 결과에 대한 AI 반응
     def _react(self, tank: Tank, shot: dict[str, Any], results: list[dict[str, Any]], landed: float) -> None:
         hurt = {r["id"]: r for r in results if r["damage"] > 0}
-        say = lambda kind, chance: self.banter.say(kind, chance=chance, after=landed)
         foe = self.human.id
+        hit = hurt.get(foe) or hurt.get(AI_ID)
+        values = {"name": self.human.name, "power": round(shot.get("power", 0)), "wind": abs(self.wind),
+                  "hp": self.tanks[foe].hp, "my_hp": self.tanks[AI_ID].hp}
+        if hit:
+            values["damage"] = hit["damage"]
+        say = lambda kind, chance: self.banter.say(kind, chance=chance, after=landed, **values)
         if tank.id == AI_ID:
             if foe in hurt:
                 say("ai_direct" if shot["direct"] and shot["direct"].id == foe else "ai_hit", .9)
@@ -163,7 +168,7 @@ class Game:
         self._timer = None
         room_event(self.room, f"시간 초과 {self.tanks[self.current_id].name}")
         if self.banter and self.current_id != AI_ID:
-            self.banter.say("player_timeout", chance=.7)
+            self.banter.say("player_timeout", chance=.7, name=self.human.name)
         self.events.append({"kind": "timeout", "player_id": self.current_id})
         await self._next_turn()
 
@@ -288,6 +293,7 @@ class Game:
             "duration_ms": round(duration),
         })
         if self.banter:
+            shot["power"] = power
             self._react(tank, shot, results, (len(shot["frames"]) - 1) / 30)
         self.flying = True
         await self.broadcast_state()
@@ -368,7 +374,8 @@ class Game:
         ranking = self.ranking()
         winner = ranking[0] if ranking and ranking[0]["alive"] else None
         if self.banter and self.players:
-            self.banter.say("ai_win" if winner and winner["id"] == AI_ID else "ai_lose", important=True)
+            self.banter.say("ai_win" if winner and winner["id"] == AI_ID else "ai_lose", important=True,
+                            name=self.human.name, turn=self.turn)
         await self.broadcast_state()
         await self.room.broadcast({"type": "game_over", "ranking": ranking, "winner": winner})
         await self.room.end_game(self)
