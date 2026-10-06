@@ -19,6 +19,7 @@ class RoomStub:
 @pytest.fixture(autouse=True)
 def no_delay(monkeypatch):
     monkeypatch.setattr(banter_module, "DELAY", (0, 0))
+    monkeypatch.setenv("BANTER_LLM_URL", "off")       # LLM 테스트만 따로 켠다
 
 
 def run(coro):
@@ -151,3 +152,11 @@ def test_unreachable_llm_falls_back_and_backs_off(monkeypatch):
     monkeypatch.setattr(llm, "_down_until", 0.0)
     assert _one_line(None) in LINES["hit"]
     assert not llm.enabled()                                          # 한동안 부르지 않는다
+
+
+def test_default_address_and_off(monkeypatch):
+    import common.multiplayer.llm as llm
+    monkeypatch.delenv("BANTER_LLM_URL", raising=False)
+    assert llm.url() == "http://127.0.0.1:18080"                      # PC 터널이 붙는 곳
+    monkeypatch.setenv("BANTER_LLM_URL", "off")
+    assert llm.url() == "" and not llm.enabled()
