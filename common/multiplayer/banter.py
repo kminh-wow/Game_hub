@@ -53,6 +53,7 @@ class Banter:
         spicy = dict(spicy or {})
         self.prefixes = spicy.pop("_prefix", [])   # 대사 앞에 붙이는 말 (매운맛)
         self.suffixes = spicy.pop("_suffix", [])   # 대사 뒤에 붙이는 말 (매운맛)
+        self.join = tuple(spicy.pop("_join", JOIN))  # 앞말·뒷말 붙이는 확률 (매운맛 파일에서 바꿀 수 있음)
         self.lines = {**lines, **spicy}
         self.game = game
         self.situations = situations or {}  # 상황 이름 -> LLM 에게 줄 설명
@@ -77,9 +78,9 @@ class Banter:
     def _decorate(self, text: str, values: dict[str, Any]) -> str:
         head = [p for p in self.prefixes if _fields(p) <= values.keys()]
         tail = [s for s in self.suffixes if _fields(s) <= values.keys()]
-        if head and self.rng.random() < JOIN[0] and not re.match(r"[ㅋㅎ아야와어헐씨시]", text):
+        if head and self.rng.random() < self.join[0] and not re.match(r"[ㅋㅎ아야와어헐씨시]", text):
             text = f"{self.rng.choice(head).format(**values)} {text}"
-        if tail and self.rng.random() < JOIN[1] and not re.search(r"[ㅋㅎ?!]$", text):
+        if tail and self.rng.random() < self.join[1] and not re.search(r"[ㅋㅎ?!]$", text):
             text = f"{text} {self.rng.choice(tail).format(**values)}"
         return text
 

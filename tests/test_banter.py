@@ -216,8 +216,10 @@ def test_private_spicy_lines_have_no_hate():
         pytest.skip("private/spicy.json 이 없다")
     hate = spicy.pattern("hate")
     for table in real["lines"].values():
-        for lines in table.values():
-            for line in lines:
+        for kind, lines in table.items():
+            if kind == "_join":
+                continue
+            for line in lines:                               # 대사와 앞말·뒷말 모두
                 assert not (hate and hate.search(line)), line
 
 
@@ -229,8 +231,7 @@ def test_odd_scripts_are_dropped():
 
 
 def test_lines_need_their_values_and_get_prefix_suffix(monkeypatch):
-    monkeypatch.setattr(banter_module, "JOIN", (1.0, 1.0))
-    spicy = {"_prefix": ["앞말"], "_suffix": ["뒷말", "파워 {power}"], "hit": ["파워 {power}로 맞혔다", "그냥 맞혔다"]}
+    spicy = {"_join": [1.0, 1.0], "_prefix": ["앞말"], "_suffix": ["뒷말", "파워 {power}"], "hit": ["파워 {power}로 맞혔다", "그냥 맞혔다"]}
     b = Banter(RoomStub(), {"id": "ai", "name": "AI"}, LINES, random.Random(0), spicy=spicy)
     for _ in range(10):
         text = b.pick("hit")                            # 값이 없으면 {power} 대사·뒷말은 안 고른다
