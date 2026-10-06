@@ -49,6 +49,7 @@ const lobby = GameLobby.init({
   waitingNote(room, amHost, others) {
     // AI 난이도 (혼자일 때만)
     $("#ai-level-row").classList.toggle("hidden", others.length > 0);
+    $("#ai-talk-row").classList.toggle("hidden", others.length > 0);
     if (others.length === 0) return amHost ? "혼자 시작하면 AI와 대결해요. 친구가 들어오면 1:1 대전이에요." : "";
     if (amHost) return others.every((p) => p.ready) ? "상대가 준비됐어요!" : "상대가 준비하면 시작할 수 있어요.";
     return "방장이 게임을 시작할 때까지 기다려 주세요.";

@@ -33,14 +33,23 @@ SYSTEM = (
     "방금 일어난 상황에 맞춰 상대를 장난스럽게 도발하거나 리액션하는 채팅을 한국어 한 문장(40자 이내)으로 써. "
     "친근한 존댓말을 쓰고, 욕설·비하·혐오 표현은 절대 쓰지 마. 이모지, 따옴표, 설명 없이 대사만 써."
 )
+# 매운맛: 친구끼리 하는 거친 반말 (욕설 허용, 비하·혐오·패드립·위협은 금지)
+SYSTEM_SPICY = (
+    "너는 온라인 {game} 게임에서 사람과 대결하는 AI 상대 '{name}'야. 친구끼리 게임하면서 막말하는 분위기야. "
+    "방금 일어난 상황에 맞춰 상대를 거칠게 도발하거나 리액션하는 채팅을 한국어 반말 한 문장(40자 이내)으로 써. "
+    "***, ***, 개- 같은 욕을 자연스럽게 섞어도 돼. "
+    "단, 장애·성별·지역·인종·성적지향 비하, 부모 욕(패드립), 죽이겠다는 위협은 절대 쓰지 마. 이모지, 따옴표, 설명 없이 대사만 써."
+)
 
 
 class Banter:
     def __init__(self, room: Any, speaker: dict[str, Any], lines: dict[str, list[str]],
-                 rng: random.Random | None = None, game: str = "", situations: dict[str, str] | None = None):
+                 rng: random.Random | None = None, game: str = "", situations: dict[str, str] | None = None,
+                 spicy: dict[str, list[str]] | None = None):
         self.room = room
         self.speaker = speaker              # {"id", "name"}
-        self.lines = lines
+        self.spicy = spicy is not None      # 매운맛 (욕설 섞인 말투)
+        self.lines = {**lines, **(spicy or {})}
         self.game = game
         self.situations = situations or {}  # 상황 이름 -> LLM 에게 줄 설명
         self.rng = rng or random.Random()
@@ -89,7 +98,8 @@ class Banter:
 
     # LLM 에게 줄 글 (시스템, 사용자)
     def _prompt(self, kind: str, example: str, chat: str, values: dict[str, Any]) -> tuple[str, str]:
-        system = SYSTEM.format(game=self.game or "보드", name=self.speaker.get("name", "AI"))
+        system = (SYSTEM_SPICY if self.spicy else SYSTEM).format(game=self.game or "보드",
+                                                                 name=self.speaker.get("name", "AI"))
         user = f"상황: {self.situations.get(kind, kind)}."
         if chat:
             who = values.get("name") or "상대"
@@ -99,7 +109,7 @@ class Banter:
 
     async def _send(self, text: str, after: float = 0.0, prompt: tuple[str, str] | None = None) -> None:
         try:
-            made = asyncio.create_task(llm.generate(*prompt)) if prompt and llm.enabled() else None
+            made = asyncio.create_task(llm.generate(*prompt, self.spicy)) if prompt and llm.enabled() else None
             await asyncio.sleep(after + self.rng.uniform(*DELAY))
             if made is not None:
                 text = await made or text

@@ -122,6 +122,7 @@ app = create_app(server, STATIC_DIR, "My Game")
 - AI 대사: `common/multiplayer/banter.py`의 `Banter`가 상황 이름별 대사 목록(`omok/app/banter.py`, `fortress/app/banter.py`)에서 골라 `bot: true` 채팅으로 보냅니다. 일반 대사는 6초 간격·확률·한 판 30마디 제한, 시작·승패는 항상 말합니다. 플레이어 채팅은 게임의 `hear_chat(player, text)`로 넘어오고, 욕·웃음·인사·GG·질문을 골라 2초 간격으로 대꾸합니다. 로컬 LLM이 연결돼 있으면 `common/multiplayer/llm.py`가 상황 설명(`SITUATIONS`)과 말투 예시를 넘겨 새 대사를 만듭니다. 4초 안에 답이 없거나, 60자를 넘거나, 욕설이 섞이면 미리 써 둔 대사를 쓰고, 연결이 실패하면 20초 동안은 부르지 않습니다(연결 상태가 바뀔 때만 `[LLM] 연결됨/연결 안 됨` 로그). Qwen3는 `chat_template_kwargs.enable_thinking=false`와 `/no_think`로 생각 모드를 끕니다(`llama-server --jinja` 필요).
   - **켜는 법**: 내 PC에서 `tools/ai-chat.bat`을 더블클릭합니다. PC의 llama-server(`127.0.0.1:18080`)를 띄우고, SSH 역방향 터널(`-R 127.0.0.1:18080:127.0.0.1:18080`)로 게임 서버의 `127.0.0.1:18080`에 붙입니다. 게임 서버는 기본으로 이 주소를 보므로 서버 설정은 필요 없습니다. 창을 닫으면 끊기고 미리 써 둔 대사로 돌아갑니다. 모델·키·서버 주소는 bat 파일 위쪽에서 바꿉니다.
   - 다른 주소를 쓰려면 서버 환경변수 `BANTER_LLM_URL`, 아예 끄려면 `BANTER_LLM_URL=off`.
+  - 방 설정 `ai_talk`(0 순한맛, 1 매운맛): 매운맛이면 미리 써 둔 대사를 각 게임의 `SPICY`로 바꾸고, LLM에게도 욕설을 허용하는 지시(`SYSTEM_SPICY`)를 줍니다. 비하·혐오·패드립·위협 표현(`llm.HATE`)과 한글·영문 밖의 이상한 글자(`llm.ODD`)는 말투와 상관없이 버립니다.
 - 기록: `common/multiplayer/log.py`의 `room_event(room, "글")`로 게임 안의 일을 로그에 남깁니다(포트리스 발사, 요트 점수 기록 참고). 화면은 25초마다 `ping`을 보내 연결을 유지하고, 오류가 나면 `client_error {message, stack, ua}`를 보냅니다(`lobby.reportError(err, "어디서")`로 직접 보낼 수도 있습니다).
 
 ### 화면: `common/web/lobby.js`
