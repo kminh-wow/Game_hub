@@ -100,13 +100,17 @@ class Game:
 
     async def start(self) -> None:
         if self.banter:
-            self.banter.say("start", important=True, name=self.human.name)
+            self.banter.say("start", important=True, **self._talk_values())
         await self._start_turn()
 
     # 플레이어 채팅에 AI 대꾸
     async def hear_chat(self, player: Player, text: str) -> None:
         if self.banter and not self.finished and player is self.human:
             self.banter.hear(player, text)
+
+    # 대사에 넣을 값 (상대 이름, 몇 수째)
+    def _talk_values(self) -> dict[str, Any]:
+        return {"name": self.human.name, "moves": len(self.moves)}
 
     # 이번 수로 이어진 가장 긴 줄
     def _longest(self, x: int, y: int) -> int:
@@ -192,12 +196,12 @@ class Game:
     def _react(self, x: int, y: int) -> None:
         by_ai = isinstance(self.current, AIPlayer)
         if self._longest(x, y) >= 4:
-            self.banter.say("ai_threat" if by_ai else "player_threat", chance=.8)
+            self.banter.say("ai_threat" if by_ai else "player_threat", chance=.8, **self._talk_values())
         elif by_ai:
-            self.banter.say("ai_move", chance=.12)
+            self.banter.say("ai_move", chance=.12, **self._talk_values())
         elif self._judged:                       # 사람 수마다 잘 뒀나 못 뒀나
             chance = {"blunder": 1.0, "bad": .75, "good": .65}[self._judged]
-            self.banter.say(f"player_{self._judged}", chance=chance, cooldown=MOVE_COOLDOWN)
+            self.banter.say(f"player_{self._judged}", chance=chance, cooldown=MOVE_COOLDOWN, **self._talk_values())
 
     async def resign(self, player: Player) -> str | None:
         if self.finished or player not in (self.black, self.white):
@@ -223,7 +227,7 @@ class Game:
                     else "ai_lose")
             if winner is not None and isinstance(winner, AIPlayer) and reason in ("resign", "timeout"):
                 kind = "player_resign" if reason == "resign" else "player_timeout"
-            self.banter.say(kind, important=True, name=self.human.name)
+            self.banter.say(kind, important=True, **self._talk_values())
         await self.broadcast_state()
         await self.room.broadcast({
             "type": "game_over",

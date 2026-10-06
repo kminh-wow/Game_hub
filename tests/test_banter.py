@@ -49,11 +49,11 @@ def test_cooldown_and_limit(monkeypatch):
         b = Banter(room, {"id": "ai", "name": "AI"}, LINES, random.Random(0))
         assert b.say("hit")
         assert not b.say("hit")                         # 간격 안에는 말하지 않는다
-        assert b.say("win", important=True)             # 중요한 말은 바로
+        assert b.say("win", important=True, name="철수")  # 중요한 말은 바로
         monkeypatch.setattr(banter_module, "COOLDOWN", 0)
         b.spoken = banter_module.LIMIT
         assert not b.say("hit")                         # 한 판 제한
-        assert b.say("win", important=True)
+        assert b.say("win", important=True, name="철수")
         await asyncio.sleep(0.01)
         assert len(room.sent) == 3
     run(scenario())
@@ -226,3 +226,16 @@ def test_odd_scripts_are_dropped():
     assert clean("아니" + chr(0x0E48) + ", 내가 몇살이지?") is None       # 섞여 나온 태국 글자
     assert clean("你好 반가워요") is None
     assert clean("와... 졌다 · 인정~ GG!") == "와... 졌다 · 인정~ GG!"
+
+
+def test_lines_need_their_values_and_get_prefix_suffix(monkeypatch):
+    monkeypatch.setattr(banter_module, "JOIN", (1.0, 1.0))
+    spicy = {"_prefix": ["앞말"], "_suffix": ["뒷말", "파워 {power}"], "hit": ["파워 {power}로 맞혔다", "그냥 맞혔다"]}
+    b = Banter(RoomStub(), {"id": "ai", "name": "AI"}, LINES, random.Random(0), spicy=spicy)
+    for _ in range(10):
+        text = b.pick("hit")                            # 값이 없으면 {power} 대사·뒷말은 안 고른다
+        assert "{" not in text and text.startswith("앞말 그냥 맞혔다")
+    texts = {b.pick("hit", power=73) for _ in range(30)}
+    assert any("파워 73로 맞혔다" in t for t in texts)
+    assert all(t.startswith("앞말 ") for t in texts)
+    assert "_prefix" not in b.lines

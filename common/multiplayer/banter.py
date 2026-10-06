@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import random
 import re
+import string
 import time
 from typing import Any
 
@@ -17,6 +18,8 @@ COOLDOWN = 6.0        # 일반 대사 사이 최소 간격(초)
 CHAT_COOLDOWN = 2.0   # 채팅 대꾸는 이 간격만 지나면 한다
 LIMIT = 30            # 한 판에 하는 말 수 제한
 DELAY = (0.6, 1.6)    # 일이 생기고 말하기까지 기다리는 시간(초)
+RECENT = 25           # 최근에 한 말은 이만큼 피한다
+JOIN = (.35, .4)      # 앞말·뒷말을 붙이는 확률
 
 # 플레이어 채팅 분류 (앞에서부터 먼저 맞는 것). 욕 단어는 비공개 파일(spicy.json 의 insult)에서 더한다
 INSULT = r"바보|멍청|못하|허접|노답|쓰레기"
@@ -36,6 +39,10 @@ SYSTEM = (
 )
 
 
+def _fields(line: str) -> set[str]:
+    return {name for _, name, _, _ in string.Formatter().parse(line) if name}
+
+
 class Banter:
     def __init__(self, room: Any, speaker: dict[str, Any], lines: dict[str, list[str]],
                  rng: random.Random | None = None, game: str = "", situations: dict[str, str] | None = None,
@@ -43,7 +50,10 @@ class Banter:
         self.room = room
         self.speaker = speaker              # {"id", "name"}
         self.spicy = spicy is not None      # 매운맛 (욕설 섞인 말투)
-        self.lines = {**lines, **(spicy or {})}
+        spicy = dict(spicy or {})
+        self.prefixes = spicy.pop("_prefix", [])   # 대사 앞에 붙이는 말 (매운맛)
+        self.suffixes = spicy.pop("_suffix", [])   # 대사 뒤에 붙이는 말 (매운맛)
+        self.lines = {**lines, **spicy}
         self.game = game
         self.situations = situations or {}  # 상황 이름 -> LLM 에게 줄 설명
         self.rng = rng or random.Random()
@@ -52,18 +62,26 @@ class Banter:
         self._recent: list[str] = []
         self._tasks: set[asyncio.Task] = set()
 
-    # 대사 고르기 (최근에 한 말은 피한다)
+    # 대사 고르기 (채울 수 있는 칸만 있는 대사 중, 최근에 한 말은 피한다)
     def pick(self, kind: str, **values: Any) -> str | None:
-        pool = self.lines.get(kind) or []
+        pool = [line for line in self.lines.get(kind) or [] if _fields(line) <= values.keys()]
         if not pool:
             return None
         fresh = [line for line in pool if line not in self._recent] or pool
         line = self.rng.choice(fresh)
-        self._recent = (self._recent + [line])[-6:]
-        try:
-            return line.format(**values)
-        except (KeyError, IndexError):
-            return line
+        self._recent = (self._recent + [line])[-RECENT:]
+        text = line.format(**values)
+        return self._decorate(text, values)
+
+    # 앞말·뒷말 붙이기 (매운맛)
+    def _decorate(self, text: str, values: dict[str, Any]) -> str:
+        head = [p for p in self.prefixes if _fields(p) <= values.keys()]
+        tail = [s for s in self.suffixes if _fields(s) <= values.keys()]
+        if head and self.rng.random() < JOIN[0] and not re.match(r"[ㅋㅎ아야와어헐씨시]", text):
+            text = f"{self.rng.choice(head).format(**values)} {text}"
+        if tail and self.rng.random() < JOIN[1] and not re.search(r"[ㅋㅎ?!]$", text):
+            text = f"{text} {self.rng.choice(tail).format(**values)}"
+        return text
 
     # 상황에 맞는 말 하기 (important 면 간격·확률 무시, after 초 뒤에 말함)
     def say(self, kind: str, chance: float = 1.0, important: bool = False, after: float = 0.0,
