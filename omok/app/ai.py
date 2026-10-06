@@ -303,6 +303,24 @@ def _expert_move(board: Board, color: int, rng: random.Random, limit: float) -> 
     return choice
 
 
+# ---- 사람 수 평가 (AI 대사용) ----
+
+# 둔 수 평가: "blunder"(지는 자리를 안 막음), "bad", "good", 또는 None(보통)
+def judge_move(board: Board, color: int, x: int, y: int) -> str | None:
+    ranked = _ranked(board, color, advanced=True)
+    best = ranked[0][0]
+    mine = next((r[0] for r in ranked if r[2] == (x, y)), 0.0)
+    if best >= FIVE and mine < FIVE:
+        return "blunder"
+    if best >= 5_000 and mine < best * .25:
+        return "bad"
+    if best >= 5_000 and mine >= best * .85:
+        return "good"
+    if best >= 200 and mine < best * .1:
+        return "bad"
+    return None
+
+
 # ---- 수 고르기 ----
 
 def ai_move(

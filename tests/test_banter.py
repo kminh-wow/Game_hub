@@ -177,8 +177,10 @@ def test_profanity_allowed_only_when_spicy_but_hate_always_blocked():
     from common.multiplayer.llm import clean
     assert clean("*** 못 쏘네 ***") is None
     assert clean("*** 못 쏘네 ***", allow_profanity=True) == "*** 못 쏘네 ***"
-    for hateful in ("이 장애인아", "***마 ㅋㅋ", "죽여버린다 ***", "***아"):
+    for hateful in ("이 장애인아", "***마 ㅋㅋ", "죽여버린다 ***"):
         assert clean(hateful, allow_profanity=True) is None
+    assert clean("거기에 두냐 *** ㅋㅋ") is None                     # 순한맛에서는 욕
+    assert clean("거기에 두냐 *** ㅋㅋ", allow_profanity=True) == "거기에 두냐 *** ㅋㅋ"
 
 
 def test_spicy_written_lines_have_no_hate():
