@@ -7,8 +7,10 @@ import random
 from typing import TYPE_CHECKING, Any
 
 from common.multiplayer import room_event
+from common.multiplayer.banter import Banter
 
 from . import ai
+from .banter import LINES
 from .world import (
     HEIGHT, MAX_FUEL, MAX_WIND, SEA, WEAPONS, WIDTH, Tank, explode, fly, generate_terrain, pack,
     move_tank, spawn_points, surface, to_columns,
@@ -51,6 +53,10 @@ class Game:
             self.tanks[pid] = tank
 
         self.order: list[str] = [pid for pid, _ in names if pid != DUMMY_ID]   # 차례 순서 (탱크 id)
+        self.banter = None                       # AI 대사 (AI 와 대결할 때만)
+        if AI_ID in self.tanks:
+            self.banter = Banter(room, {"id": AI_ID, "name": self.tanks[AI_ID].name}, LINES, self.rng)
+        self.human = room.players[0] if self.banter else None
         self.turn_idx = self.rng.randrange(len(self.order))
         self.turn = 0
         self.wind = 0
@@ -100,7 +106,38 @@ class Game:
     # ---- 진행 ----
 
     async def start(self) -> None:
+        if self.banter:
+            self.banter.say("start", important=True, name=self.human.name)
         await self._start_turn()
+
+    # 플레이어 채팅에 AI 대꾸
+    async def hear_chat(self, player: Player, text: str) -> None:
+        if self.banter and not self.finished and player is self.human:
+            self.banter.hear(player, text)
+
+    # 발사 결과에 대한 AI 반응
+    def _react(self, tank: Tank, shot: dict[str, Any], results: list[dict[str, Any]], landed: float) -> None:
+        hurt = {r["id"]: r for r in results if r["damage"] > 0}
+        say = lambda kind, chance: self.banter.say(kind, chance=chance, after=landed)
+        foe = self.human.id
+        if tank.id == AI_ID:
+            if foe in hurt:
+                say("ai_direct" if shot["direct"] and shot["direct"].id == foe else "ai_hit", .9)
+            elif AI_ID in hurt:
+                say("ai_self", .9)
+            else:
+                say("ai_miss", .5)
+        elif AI_ID in hurt and self.tanks[AI_ID].alive:
+            if self.tanks[AI_ID].hp < 30:
+                say("got_hit_low", .9)
+            elif shot["direct"] and shot["direct"].id == AI_ID:
+                say("got_direct", .9)
+            else:
+                say("got_hit", .8)
+        elif foe in hurt:
+            say("player_self", .8)
+        else:
+            say("player_miss", .35)
 
     # 차례 시작 (바람·연료 새로)
     async def _start_turn(self) -> None:
@@ -121,6 +158,8 @@ class Game:
             return
         self._timer = None
         room_event(self.room, f"시간 초과 {self.tanks[self.current_id].name}")
+        if self.banter and self.current_id != AI_ID:
+            self.banter.say("player_timeout", chance=.7)
         self.events.append({"kind": "timeout", "player_id": self.current_id})
         await self._next_turn()
 
@@ -244,6 +283,8 @@ class Game:
             "results": results,
             "duration_ms": round(duration),
         })
+        if self.banter:
+            self._react(tank, shot, results, (len(shot["frames"]) - 1) / 30)
         self.flying = True
         await self.broadcast_state()
         self._after = asyncio.create_task(self._after_shot(duration / 1000))
@@ -322,6 +363,8 @@ class Game:
             self._after = None
         ranking = self.ranking()
         winner = ranking[0] if ranking and ranking[0]["alive"] else None
+        if self.banter and self.players:
+            self.banter.say("ai_win" if winner and winner["id"] == AI_ID else "ai_lose", important=True)
         await self.broadcast_state()
         await self.room.broadcast({"type": "game_over", "ranking": ranking, "winner": winner})
         await self.room.end_game(self)

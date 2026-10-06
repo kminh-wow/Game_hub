@@ -174,7 +174,7 @@ const GameLobby = (() => {
       renderRoom();
     },
     chat(msg) {
-      logChat(msg.scope === "room" ? $("#room-chat-log") : $("#lobby-chat-log"), msg.from.name + (msg.spectator ? " (관전)" : ""), msg.text);
+      logChat(msg.scope === "room" ? $("#room-chat-log") : $("#lobby-chat-log"), (msg.bot ? "🤖 " : "") + msg.from.name + (msg.spectator ? " (관전)" : ""), msg.text);
     },
     system(msg) {
       logSystem(msg.text);

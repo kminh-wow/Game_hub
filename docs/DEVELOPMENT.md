@@ -119,6 +119,7 @@ app = create_app(server, STATIC_DIR, "My Game")
 - **늦게 들어온 관전자에게 지금 상태를 보내려면** 게임에 `watch_messages(player) -> list[dict]`를 만듭니다. 입장 직후 이 메시지들을 관전자에게만 보냅니다. 숨겨야 할 정보(행맨의 정답 등)는 여기서 가립니다.
 - 참가자가 모두 나가면 방이 닫히고, 관전자는 `room: null`과 안내 오류를 받고 로비로 돌아갑니다.
 
+- AI 대사: `common/multiplayer/banter.py`의 `Banter`가 상황 이름별 대사 목록(`omok/app/banter.py`, `fortress/app/banter.py`)에서 골라 `bot: true` 채팅으로 보냅니다. 일반 대사는 6초 간격·확률·한 판 30마디 제한, 시작·승패는 항상 말합니다. 플레이어 채팅은 게임의 `hear_chat(player, text)`로 넘어오고, 욕·웃음·인사·GG·질문을 골라 2초 간격으로 대꾸합니다. 나중에 로컬 LLM 등으로 바꾸려면 `Banter.pick()`만 바꾸면 됩니다.
 - 기록: `common/multiplayer/log.py`의 `room_event(room, "글")`로 게임 안의 일을 로그에 남깁니다(포트리스 발사, 요트 점수 기록 참고). 화면은 25초마다 `ping`을 보내 연결을 유지하고, 오류가 나면 `client_error {message, stack, ua}`를 보냅니다(`lobby.reportError(err, "어디서")`로 직접 보낼 수도 있습니다).
 
 ### 화면: `common/web/lobby.js`
