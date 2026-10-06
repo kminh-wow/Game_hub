@@ -4,7 +4,7 @@
 
 **점을 모두 먹어 치워라, 유령에게 잡히기 전에**
 
-### [▶ 지금 플레이하기](http://100.53.186.9/pacman/)
+### [▶ 지금 플레이하기](http://52.200.153.207/pacman/)
 
 <img src="../docs/images/pacman-game.png" alt="팩맨 게임 화면" width="480">
 

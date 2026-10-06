@@ -4,7 +4,7 @@
 
 **35만 단어 사전으로 겨루는 실시간 끝말잇기**
 
-### [▶ 지금 플레이하기](http://100.53.186.9/wordchain/)
+### [▶ 지금 플레이하기](http://52.200.153.207/wordchain/)
 
 <img src="../docs/images/wordchain-game.png" alt="끝말잇기 게임 화면" width="760">
 
