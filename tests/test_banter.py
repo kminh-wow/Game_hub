@@ -160,3 +160,39 @@ def test_default_address_and_off(monkeypatch):
     assert llm.url() == "http://127.0.0.1:18080"                      # PC 터널이 붙는 곳
     monkeypatch.setenv("BANTER_LLM_URL", "off")
     assert llm.url() == "" and not llm.enabled()
+
+
+# ---- 매운맛 ----
+
+def test_spicy_lines_replace_mild_ones():
+    spicy = {"hit": ["*** 정확하지 ***"]}
+    b = Banter(RoomStub(), {"id": "ai", "name": "AI"}, LINES, random.Random(0), spicy=spicy)
+    assert b.spicy and b.pick("hit") == "*** 정확하지 ***"
+    assert b.pick("chat_other") == "그렇군요."                   # 매운맛에 없는 상황은 원래 대사
+    system, _ = b._prompt("hit", "예시", "", {})
+    assert "욕을 자연스럽게" in system and "패드립" in system
+
+
+def test_profanity_allowed_only_when_spicy_but_hate_always_blocked():
+    from common.multiplayer.llm import clean
+    assert clean("*** 못 쏘네 ***") is None
+    assert clean("*** 못 쏘네 ***", allow_profanity=True) == "*** 못 쏘네 ***"
+    for hateful in ("이 장애인아", "***마 ㅋㅋ", "죽여버린다 ***", "***아"):
+        assert clean(hateful, allow_profanity=True) is None
+
+
+def test_spicy_written_lines_have_no_hate():
+    from common.multiplayer.llm import HATE
+    from fortress.app.banter import SPICY as fortress_spicy
+    from omok.app.banter import SPICY as omok_spicy
+    for table in (fortress_spicy, omok_spicy):
+        for lines in table.values():
+            for line in lines:
+                assert not HATE.search(line), line
+
+
+def test_odd_scripts_are_dropped():
+    from common.multiplayer.llm import clean
+    assert clean("아니" + chr(0x0E48) + ", 내가 몇살이지?") is None       # 섞여 나온 태국 글자
+    assert clean("你好 반가워요") is None
+    assert clean("와... 졌다 · 인정~ GG!") == "와... 졌다 · 인정~ GG!"

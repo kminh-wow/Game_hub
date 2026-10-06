@@ -84,6 +84,7 @@ const lobby = GameLobby.init({
   waitingNote(room, amHost, others) {
     // 혼자일 때 상대 고르기
     $("#solo-row").classList.toggle("hidden", others.length > 0);
+    $("#ai-talk-row").classList.toggle("hidden", others.length > 0 || !room.settings.solo_opponent);
     if (others.length === 0) {
       if (!amHost) return "";
       return room.settings.solo_opponent

@@ -82,3 +82,4 @@ SITUATIONS = {
     "chat_question": "상대가 질문했다. 짧게 대답해",
     "chat_other": "상대가 채팅을 쳤다. 짧게 대꾸해",
 }
+
