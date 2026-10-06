@@ -11,16 +11,17 @@ import re
 import time
 from typing import Any
 
-from . import llm
+from . import llm, spicy as spicy_data
 
 COOLDOWN = 6.0        # 일반 대사 사이 최소 간격(초)
 CHAT_COOLDOWN = 2.0   # 채팅 대꾸는 이 간격만 지나면 한다
 LIMIT = 30            # 한 판에 하는 말 수 제한
 DELAY = (0.6, 1.6)    # 일이 생기고 말하기까지 기다리는 시간(초)
 
-# 플레이어 채팅 분류 (앞에서부터 먼저 맞는 것)
+# 플레이어 채팅 분류 (앞에서부터 먼저 맞는 것). 욕 단어는 비공개 파일(spicy.json 의 insult)에서 더한다
+INSULT = r"바보|멍청|못하|허접|노답|쓰레기"
 CHAT_KINDS = [
-    ("chat_insult", r"바보|멍청|못하|허접|노답|쓰레기"),
+    ("chat_insult", INSULT + ("|" + spicy_data.data()["insult"] if spicy_data.data().get("insult") else "")),
     ("chat_laugh", r"ㅋㅋ|ㅎㅎ|lol|웃기"),
     ("chat_hello", r"안녕|ㅎㅇ|하이|hi|hello|반가"),
     ("chat_gg", r"\bgg\b|ㅈㅈ|졌|항복|잘했|굿"),
@@ -32,13 +33,6 @@ SYSTEM = (
     "너는 온라인 {game} 게임에서 사람과 대결하는 AI 상대 '{name}'야. "
     "방금 일어난 상황에 맞춰 상대를 장난스럽게 도발하거나 리액션하는 채팅을 한국어 한 문장(40자 이내)으로 써. "
     "친근한 존댓말을 쓰고, 욕설·비하·혐오 표현은 절대 쓰지 마. 이모지, 따옴표, 설명 없이 대사만 써."
-)
-# 매운맛: 친구끼리 하는 거친 반말 (욕설 허용, 비하·혐오·패드립·위협은 금지)
-SYSTEM_SPICY = (
-    "너는 온라인 {game} 게임에서 사람과 대결하는 AI 상대 '{name}'야. 친구끼리 게임하면서 막말하는 분위기야. "
-    "방금 일어난 상황에 맞춰 상대를 거칠게 도발하거나 리액션하는 채팅을 한국어 반말 한 문장(40자 이내)으로 써. "
-    "***, ***, ***, 개- 같은 욕을 자연스럽게 섞어도 돼. "
-    "단, 장애·성별·지역·인종·성적지향 비하, 부모 욕(패드립), 죽이겠다는 위협은 절대 쓰지 마. 이모지, 따옴표, 설명 없이 대사만 써."
 )
 
 
@@ -98,7 +92,7 @@ class Banter:
 
     # LLM 에게 줄 글 (시스템, 사용자)
     def _prompt(self, kind: str, example: str, chat: str, values: dict[str, Any]) -> tuple[str, str]:
-        system = (SYSTEM_SPICY if self.spicy else SYSTEM).format(game=self.game or "보드",
+        system = ((self.spicy and spicy_data.system()) or SYSTEM).format(game=self.game or "보드",
                                                                  name=self.speaker.get("name", "AI"))
         user = f"상황: {self.situations.get(kind, kind)}."
         if chat:

@@ -14,6 +14,8 @@ import re
 import time
 import urllib.request
 
+from . import spicy
+
 log = logging.getLogger("game")
 
 TIMEOUT = 4.0          # 이 안에 답이 없으면 미리 써 둔 대사
@@ -21,9 +23,9 @@ MAX_CHARS = 60         # 이보다 길면 버린다
 RETRY_AFTER = 20.0     # 실패하면 이 시간 동안은 부르지 않는다
 DEFAULT_URL = "http://127.0.0.1:18080"
 
-# 나오면 버리는 말: 비하·혐오·패드립·위협은 언제나, 욕설은 순한맛일 때
-HATE = re.compile(r"(?!)")
-PROFANITY = re.compile(r"(?!)")
+# 나오면 버리는 말 (비공개 파일 spicy.json): hate 는 언제나, profanity 는 순한맛일 때. 파일이 없으면 거르지 않는다
+HATE = spicy.pattern("hate")
+PROFANITY = spicy.pattern("profanity")
 EMOJI = re.compile("[%s-%s%s-%s%s]" % (chr(0x1F000), chr(0x1FAFF), chr(0x2600), chr(0x27BF), chr(0xFE0F)))   # 이모지
 ODD = re.compile("[^ -~%s-%s%s-%s…·]" % (chr(0xAC00), chr(0xD7A3), chr(0x3131), chr(0x318E)))   # 한글·영문·기본 기호 밖의 글자
 
@@ -74,9 +76,9 @@ def clean(text: str, allow_profanity: bool = False) -> str | None:
     text = re.sub(r"^[^:：\"']{1,12}[:：]\s*", "", text)     # "AI: ..." 같은 이름표
     text = re.sub(r"\s{2,}", " ", EMOJI.sub("", text))
     text = text.strip("\"'“”‘’ ")
-    if not text or len(text) > MAX_CHARS or HATE.search(text) or ODD.search(text):
+    if not text or len(text) > MAX_CHARS or ODD.search(text) or (HATE and HATE.search(text)):
         return None
-    if not allow_profanity and PROFANITY.search(text):
+    if not allow_profanity and PROFANITY and PROFANITY.search(text):
         return None
     return text
 

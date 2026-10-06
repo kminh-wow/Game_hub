@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from common.multiplayer import BaseRoom
+from common.multiplayer import BaseRoom, spicy
 
 from .game import Game
 
@@ -24,6 +24,10 @@ class Room(BaseRoom):
     min_players = 1
     max_players_limit = 4
     default_max_players = 4
+
+    # 방 상태 덧붙임 (매운맛을 쓸 수 있는지)
+    def extra_state(self) -> dict:
+        return {"spicy": spicy.available()}
 
     def create_game(self) -> Game:
         return Game(self)

@@ -66,7 +66,7 @@ def test_avoids_repeating_recent_lines(monkeypatch):
     assert sorted(picks) == sorted(LINES["hit"])
 
 
-@pytest.mark.parametrize("text,kind", [("이 ***아", "chat_insult"), ("ㅎㅇ", "chat_hello"), ("오늘 날씨", "chat_other")])
+@pytest.mark.parametrize("text,kind", [("넌 바보야", "chat_insult"), ("ㅎㅇ", "chat_hello"), ("오늘 날씨", "chat_other")])
 def test_chat_is_classified(monkeypatch, text, kind):
     async def scenario():
         room = RoomStub()
@@ -135,7 +135,7 @@ def test_llm_line_is_used_when_available(fake_llm):
     assert "네 포탄이 맞았다" in req["messages"][1]["content"]
 
 
-@pytest.mark.parametrize("reply", ["<think>음</think>야 이 ***아", "", "아" * 100])
+@pytest.mark.parametrize("reply", ["<think>음</think>你好", "", "아" * 100])
 def test_bad_llm_lines_fall_back_to_written_lines(fake_llm, reply):
     fake_llm["reply"] = reply
     assert _one_line(fake_llm) in LINES["hit"]
@@ -162,35 +162,63 @@ def test_default_address_and_off(monkeypatch):
     assert llm.url() == "" and not llm.enabled()
 
 
-# ---- 매운맛 ----
+# ---- 매운맛 (실제 데이터는 git 에 없는 private/spicy.json, 테스트는 가짜 단어로) ----
 
-def test_spicy_lines_replace_mild_ones():
-    spicy = {"hit": ["*** 정확하지 ***"]}
-    b = Banter(RoomStub(), {"id": "ai", "name": "AI"}, LINES, random.Random(0), spicy=spicy)
-    assert b.spicy and b.pick("hit") == "*** 정확하지 ***"
+FAKE_SPICY = {
+    "system": "매운맛 지시 {game} {name}",
+    "insult": "욕일|욕이",
+    "hate": "혐오말",
+    "profanity": "욕일|욕이",
+    "lines": {"omok": {"start": ["욕일 시작"]}, "fortress": {"start": ["욕이 시작 {name}"]}},
+}
+
+
+@pytest.fixture
+def fake_spicy(monkeypatch):
+    import re
+
+    import common.multiplayer.llm as llm
+    from common.multiplayer import spicy
+    monkeypatch.setattr(spicy, "data", lambda: FAKE_SPICY)
+    monkeypatch.setattr(llm, "HATE", re.compile(FAKE_SPICY["hate"]))
+    monkeypatch.setattr(llm, "PROFANITY", re.compile(FAKE_SPICY["profanity"]))
+    return FAKE_SPICY
+
+
+def test_spicy_lines_and_prompt(fake_spicy):
+    from common.multiplayer import spicy
+    assert spicy.available() and spicy.lines("omok") == {"start": ["욕일 시작"]}
+    b = Banter(RoomStub(), {"id": "ai", "name": "AI"}, LINES, random.Random(0), game="오목",
+               spicy={"hit": ["욕일 정확하지"]})
+    assert b.spicy and b.pick("hit") == "욕일 정확하지"
     assert b.pick("chat_other") == "그렇군요."                   # 매운맛에 없는 상황은 원래 대사
     system, _ = b._prompt("hit", "예시", "", {})
-    assert "욕을 자연스럽게" in system and "패드립" in system
+    assert system == "매운맛 지시 오목 AI"
 
 
-def test_profanity_allowed_only_when_spicy_but_hate_always_blocked():
+def test_profanity_allowed_only_when_spicy_but_hate_always_blocked(fake_spicy):
     from common.multiplayer.llm import clean
-    assert clean("*** 못 쏘네 ***") is None
-    assert clean("*** 못 쏘네 ***", allow_profanity=True) == "*** 못 쏘네 ***"
-    for hateful in ("이 장애인아", "***마 ㅋㅋ", "죽여버린다 ***"):
-        assert clean(hateful, allow_profanity=True) is None
-    assert clean("거기에 두냐 *** ㅋㅋ") is None                     # 순한맛에서는 욕
-    assert clean("거기에 두냐 *** ㅋㅋ", allow_profanity=True) == "거기에 두냐 *** ㅋㅋ"
+    assert clean("욕일 못 쏘네") is None                          # 순한맛에서는 욕을 버린다
+    assert clean("욕일 못 쏘네", allow_profanity=True) == "욕일 못 쏘네"
+    assert clean("혐오말 ㅋㅋ", allow_profanity=True) is None     # 혐오 표현은 언제나 버린다
 
 
-def test_spicy_written_lines_have_no_hate():
-    from common.multiplayer.llm import HATE
-    from fortress.app.banter import SPICY as fortress_spicy
-    from omok.app.banter import SPICY as omok_spicy
-    for table in (fortress_spicy, omok_spicy):
+def test_without_private_file_spicy_is_unavailable(monkeypatch):
+    from common.multiplayer import spicy
+    monkeypatch.setattr(spicy, "data", lambda: {})
+    assert not spicy.available() and spicy.lines("omok") is None and spicy.system() is None
+
+
+def test_private_spicy_lines_have_no_hate():
+    from common.multiplayer import spicy
+    real = spicy.data()
+    if not real:
+        pytest.skip("private/spicy.json 이 없다")
+    hate = spicy.pattern("hate")
+    for table in real["lines"].values():
         for lines in table.values():
             for line in lines:
-                assert not HATE.search(line), line
+                assert not (hate and hate.search(line)), line
 
 
 def test_odd_scripts_are_dropped():

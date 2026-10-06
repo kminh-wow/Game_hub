@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any
 
-from common.multiplayer import BaseRoom
+from common.multiplayer import BaseRoom, spicy
 
 from .ai import DEFAULT_LEVEL, LEVEL_NAMES
 from .game import Game
@@ -38,7 +38,7 @@ class Room(BaseRoom):
         return Game(self)
 
     def extra_state(self) -> dict[str, Any]:
-        return {"wins": self.wins, "draws": self.draws}
+        return {"wins": self.wins, "draws": self.draws, "spicy": spicy.available()}
 
     def record_result(self, winner: Any, loser: Any) -> None:
         if winner is None:
