@@ -94,7 +94,7 @@ class Banter:
         if chat:
             who = values.get("name") or "상대"
             user += f' {who}의 채팅: "{chat[:100]}"'
-        user += f" 참고 대사: {example}"
+        user += f" 말투 예시(그대로 쓰지 말고 새로 써): {example}"
         return system, user
 
     async def _send(self, text: str, after: float = 0.0, prompt: tuple[str, str] | None = None) -> None:

@@ -1,7 +1,8 @@
 """로컬 LLM(llama.cpp 서버 등, OpenAI 호환 /v1/chat/completions)으로 AI 대사 만들기.
 
-서버 환경변수 BANTER_LLM_URL 에 주소를 넣으면 켜진다 (예: http://100.64.0.2:8080).
-안 넣었거나, 응답이 늦거나, 이상한 말을 하면 None 을 돌려주고 미리 써 둔 대사를 쓴다.
+기본 주소는 서버 자신의 127.0.0.1:18080 이다. 내 PC에서 tools/ai-chat.bat 을 켜면
+SSH 터널로 PC의 llama-server 가 이 주소에 연결된다. 다른 주소는 환경변수 BANTER_LLM_URL, 끄려면 "off".
+연결이 없거나, 응답이 늦거나, 이상한 말을 하면 None 을 돌려주고 미리 써 둔 대사를 쓴다.
 """
 from __future__ import annotations
 
@@ -17,20 +18,31 @@ log = logging.getLogger("game")
 
 TIMEOUT = 4.0          # 이 안에 답이 없으면 미리 써 둔 대사
 MAX_CHARS = 60         # 이보다 길면 버린다
-RETRY_AFTER = 60.0     # 실패하면 이 시간 동안은 부르지 않는다
+RETRY_AFTER = 20.0     # 실패하면 이 시간 동안은 부르지 않는다
+DEFAULT_URL = "http://127.0.0.1:18080"
 
 # 나오면 버리는 말 (욕설·비하)
 BLOCKED = re.compile(r"(?!)")
+EMOJI = re.compile("[%s-%s%s-%s%s]" % (chr(0x1F000), chr(0x1FAFF), chr(0x2600), chr(0x27BF), chr(0xFE0F)))   # 이모지
 
 _down_until = 0.0
+_connected: bool | None = None   # 마지막으로 확인한 연결 상태 (바뀔 때만 로그)
 
 
 def url() -> str:
-    return os.environ.get("BANTER_LLM_URL", "").rstrip("/")
+    value = os.environ.get("BANTER_LLM_URL", "").strip() or DEFAULT_URL
+    return "" if value.lower() in ("off", "0", "none") else value.rstrip("/")
 
 
 def enabled() -> bool:
     return bool(url()) and time.monotonic() >= _down_until
+
+
+def _mark(ok: bool) -> None:
+    global _connected
+    if ok != _connected:
+        log.info("[LLM] %s", "연결됨 — AI 대사를 새로 만듭니다" if ok else "연결 안 됨 — 미리 써 둔 대사를 씁니다")
+    _connected = ok
 
 
 def _post(prompt_system: str, prompt_user: str) -> str:
@@ -58,6 +70,7 @@ def clean(text: str) -> str | None:
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
     text = text.strip().splitlines()[0].strip() if text.strip() else ""
     text = re.sub(r"^[^:：\"']{1,12}[:：]\s*", "", text)     # "AI: ..." 같은 이름표
+    text = re.sub(r"\s{2,}", " ", EMOJI.sub("", text))
     text = text.strip("\"'“”‘’ ")
     if not text or len(text) > MAX_CHARS or BLOCKED.search(text):
         return None
@@ -71,8 +84,9 @@ async def generate(prompt_system: str, prompt_user: str) -> str | None:
         return None
     try:
         raw = await asyncio.wait_for(asyncio.to_thread(_post, prompt_system, prompt_user), TIMEOUT + 0.5)
-    except Exception as exc:
+    except Exception:
         _down_until = time.monotonic() + RETRY_AFTER
-        log.warning("[LLM] 대사 생성 실패 (%s) — %d초 동안 미리 써 둔 대사를 씁니다", type(exc).__name__, RETRY_AFTER)
+        _mark(False)
         return None
+    _mark(True)
     return clean(raw)
