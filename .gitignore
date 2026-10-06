@@ -6,6 +6,9 @@ venv/
 .pytest_cache/
 node_modules/
 
+# 매운맛(욕설) AI 대사 데이터: git 에 올리지 않는다 (서버에는 scp 로)
+private/
+
 # Local previews, package cache, and Blender automatic backups
 .npm-cache/
 test-results/

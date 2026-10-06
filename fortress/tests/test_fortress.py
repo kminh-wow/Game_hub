@@ -246,15 +246,18 @@ def test_dummy_practice_has_no_talk():
 def test_spicy_talk_setting(client, monkeypatch):
     import app.game as game_module
     import common.multiplayer.banter as banter_module
-    from app.banter import SPICY
+    from common.multiplayer import spicy
+    fake = {"lines": {"fortress": {"start": ["매운 시작 {name}"]}}}
+    monkeypatch.setattr(spicy, "data", lambda: fake)
     monkeypatch.setattr(game_module, "AI_THINK", 5)
     monkeypatch.setattr(banter_module, "DELAY", (0, 0))
     me = Conn(client, "sp" + uuid.uuid4().hex[:4])
     me.send("create_room", title="매운맛")
-    assert me.until("room")["room"]["settings"]["ai_talk"] == 0
+    room = me.until("room")["room"]
+    assert room["settings"]["ai_talk"] == 0 and room["spicy"]
     me.send("update_settings", settings={"solo_opponent": 3, "ai_talk": 1})
     me.until("room", lambda m: m["room"]["settings"]["ai_talk"] == 1)
     me.send("start")
     hello = me.until("chat", lambda m: m.get("bot"))
-    assert hello["text"] in [line.format(name=me.name) for line in SPICY["start"]]
+    assert hello["text"] == f"매운 시작 {me.name}"
     me.close()

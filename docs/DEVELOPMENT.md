@@ -123,7 +123,8 @@ app = create_app(server, STATIC_DIR, "My Game")
   - **켜는 법**: 내 PC에서 `tools/ai-chat.bat`을 더블클릭합니다. PC의 llama-server(`127.0.0.1:18080`)를 띄우고, SSH 역방향 터널(`-R 127.0.0.1:18080:127.0.0.1:18080`)로 게임 서버의 `127.0.0.1:18080`에 붙입니다. 게임 서버는 기본으로 이 주소를 보므로 서버 설정은 필요 없습니다. 창을 닫으면 끊기고 미리 써 둔 대사로 돌아갑니다. 모델·키·서버 주소는 bat 파일 위쪽에서 바꿉니다.
   - 다른 주소를 쓰려면 서버 환경변수 `BANTER_LLM_URL`, 아예 끄려면 `BANTER_LLM_URL=off`.
   - 오목은 사람이 둘 때마다 `ai.judge_move`로 그 수를 AI 평가 함수에 비춰 봅니다: 지는 자리(상대 오목)를 안 막으면 `blunder`, 가장 좋은 수의 25% 미만이면 `bad`, 85% 이상이면 `good`(긴박한 판에서만). 이 평가로 `player_good`/`player_bad`/`player_blunder` 대사를 2.5초 간격으로 합니다.
-  - 방 설정 `ai_talk`(0 순한맛, 1 매운맛): 매운맛이면 미리 써 둔 대사를 각 게임의 `SPICY`로 바꾸고, LLM에게도 욕설을 허용하는 지시(`SYSTEM_SPICY`)를 줍니다. 비하·혐오·패드립·위협 표현(`llm.HATE`)과 한글·영문 밖의 이상한 글자(`llm.ODD`)는 말투와 상관없이 버립니다.
+  - 방 설정 `ai_talk`(0 순한맛, 1 매운맛): 매운맛 대사·지시문·욕설 단어 목록은 **git에 올리지 않는 `private/spicy.json`**에 있습니다(`common/multiplayer/spicy.py`가 읽음, 형식은 그 파일 맨 위 설명). 파일이 있으면 매운맛 대사로 바꾸고 LLM에게도 욕을 허용하는 지시를 줍니다. `hate` 목록은 말투와 상관없이, `profanity` 목록은 순한맛일 때 버립니다. 파일이 없으면 매운맛 칸이 대기실에서 숨겨지고 순한맛만 됩니다(단어 걸러내기도 없음). 한글·영문 밖의 이상한 글자(`llm.ODD`)는 항상 버립니다.
+  - 서버에 올리기(처음 한 번, 바꿀 때마다): `scp -i <키> private/spicy.json <user>@<서버>:~/Game_hub/private/` 후 `sudo systemctl restart game-hub`. `update.sh`는 이 파일을 건드리지 않습니다. 팀원에게는 파일을 직접 전달합니다.
 - 기록: `common/multiplayer/log.py`의 `room_event(room, "글")`로 게임 안의 일을 로그에 남깁니다(포트리스 발사, 요트 점수 기록 참고). 화면은 25초마다 `ping`을 보내 연결을 유지하고, 오류가 나면 `client_error {message, stack, ua}`를 보냅니다(`lobby.reportError(err, "어디서")`로 직접 보낼 수도 있습니다).
 
 ### 화면: `common/web/lobby.js`
