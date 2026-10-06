@@ -116,6 +116,20 @@
     .hills i.b { right: 26px; background: #2f6fd6; }
 
     footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
+
+    /* 닉네임 */
+    .nick { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: -16px 0 32px; }
+    .nick input { width: min(240px, 60vw); padding: 10px 12px; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+    .nick input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+    .nick button { padding: 10px 16px; font: inherit; font-weight: 600; color: var(--panel); background: var(--accent); border: 0; border-radius: 10px; cursor: pointer; }
+    .nick button.ghost { color: var(--muted); background: transparent; border: 1px solid var(--line); font-weight: 400; }
+    .nick .hint { flex-basis: 100%; text-align: center; color: var(--muted); font-size: 14px; margin: 0; }
+    .nick .hint.warn { color: #d56722; font-weight: 600; }
+    .nick b { color: var(--accent); }
+    .nick.shake { animation: shake .35s; }
+    @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+    .games.locked .card { opacity: .55; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
@@ -124,6 +138,17 @@
     <h1>Ddan <span>Jit</span></h1>
     <p>딴짓 반드시 가야지</p>
   </header>
+
+  <!-- 닉네임 (모든 게임에서 같이 쓴다) -->
+  <form id="nick-form" class="nick hidden">
+    <input id="nick-input" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="off" aria-label="닉네임">
+    <button type="submit">시작하기</button>
+    <p id="nick-hint" class="hint">닉네임을 한 번 정하면 모든 게임에서 그대로 쓰여요.</p>
+  </form>
+  <div id="nick-view" class="nick hidden">
+    <span>👋 <b id="nick-name"></b>님, 어떤 게임 할래요?</span>
+    <button id="nick-change" type="button" class="ghost">닉네임 바꾸기</button>
+  </div>
 
   <main class="games">
     <a class="card" href="wordchain/">
@@ -207,5 +232,55 @@
   </main>
 
   <footer>Ddan Jit</footer>
+
+  <script>
+    // 닉네임 정하기
+    (() => {
+      const KEY = "gamehub-name";
+      const $ = (s) => document.querySelector(s);
+      const read = () => { try { return localStorage.getItem(KEY) || ""; } catch { return ""; } };
+      const write = (v) => { try { localStorage.setItem(KEY, v); } catch {} };
+
+      function render(editing = false) {
+        const name = read();
+        const asking = editing || !name;
+        $("#nick-form").classList.toggle("hidden", !asking);
+        $("#nick-view").classList.toggle("hidden", asking);
+        $(".games").classList.toggle("locked", !name);
+        $("#nick-name").textContent = name;
+        if (asking) {
+          $("#nick-input").value = name;
+          $("#nick-input").focus();
+        }
+      }
+
+      $("#nick-form").onsubmit = (e) => {
+        e.preventDefault();
+        const name = $("#nick-input").value.trim();
+        if (!name) return;
+        write(name);
+        $("#nick-hint").className = "hint";
+        $("#nick-hint").textContent = "닉네임을 한 번 정하면 모든 게임에서 그대로 쓰여요.";
+        render();
+      };
+      $("#nick-change").onclick = () => render(true);
+
+      // 닉네임 없이 게임 고르면 막기
+      for (const card of document.querySelectorAll(".games .card")) {
+        card.addEventListener("click", (e) => {
+          if (read()) return;
+          e.preventDefault();
+          const form = $("#nick-form");
+          $("#nick-hint").className = "hint warn";
+          $("#nick-hint").textContent = "먼저 닉네임을 정해 주세요.";
+          form.classList.remove("shake");
+          void form.offsetWidth;
+          form.classList.add("shake");
+          $("#nick-input").focus();
+        });
+      }
+      render();
+    })();
+  </script>
 </body>
 </html>

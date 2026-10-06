@@ -131,7 +131,7 @@ const handlers = {
     $("#me-name").textContent = msg.player.name;
     $("#word-count").textContent = msg.word_count.toLocaleString();
     $("#login-error").textContent = "";
-    try { localStorage.setItem("hm-name", msg.player.name); } catch {}
+    try { localStorage.setItem("hm-name", msg.player.name); localStorage.setItem("gamehub-name", msg.player.name); } catch {}
     show("lobby");
   },
 
@@ -566,7 +566,11 @@ $("#login-form").onsubmit = (e) => {
   if (name) connect(name);
 };
 
-try { $("#login-name").value = localStorage.getItem("hm-name") || ""; } catch {}
+// 메인 화면에서 정한 닉네임 (있으면 바로 접속)
+let hubName = "";
+try { hubName = localStorage.getItem("gamehub-name") || ""; } catch {}
+try { $("#login-name").value = hubName || localStorage.getItem("hm-name") || ""; } catch {}
+if (hubName) connect(hubName);
 
 $("#btn-open-create").onclick = () => {
   $("#create-form").classList.remove("hidden");
