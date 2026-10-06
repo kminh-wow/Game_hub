@@ -14,6 +14,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import asdict
 from typing import Any, ClassVar
 
+from .log import result_text, room_event
 from .models import Player, broadcast
 
 
@@ -34,6 +35,7 @@ class BaseRoom:
     min_players: ClassVar[int] = 2
     max_players_limit: ClassVar[int] = 8
     default_max_players: ClassVar[int] = 4
+    log_label: str = "?"     # 로그에 쓰는 게임 이름 (서버가 정한다)
 
     def __init__(
         self,
@@ -111,6 +113,8 @@ class BaseRoom:
         }
 
     async def broadcast(self, msg: dict[str, Any]) -> None:
+        if msg.get("type") == "game_over":
+            room_event(self, f"게임 끝 · {result_text(msg)}")
         await broadcast(self.audience, msg)
 
     async def system(self, text: str) -> None:
@@ -125,6 +129,7 @@ class BaseRoom:
     async def add(self, player: Player) -> None:
         self.players.append(player)
         player.room = self
+        room_event(self, f"입장 {player.name} ({len(self.players)}/{self.max_players})")
         await self.system(f"{player.name}님이 들어왔어요.")
         await self.sync()
 
@@ -135,6 +140,7 @@ class BaseRoom:
         self.spectators.append(player)
         player.room = self
         player.spectating = True
+        room_event(self, f"관전 {player.name}")
         await self.system(f"{player.name}님이 관전을 시작했어요.")
         await self.sync()
         if self.game is not None and hasattr(self.game, "watch_messages"):
@@ -156,6 +162,7 @@ class BaseRoom:
             self.spectators.remove(player)
             player.room = None
             player.spectating = False
+            room_event(self, f"관전 끝 {player.name}")
             await self.system(f"{player.name}님이 관전을 마쳤어요.")
             await self.sync()
             return
@@ -164,6 +171,7 @@ class BaseRoom:
         self.players.remove(player)
         self.ready.discard(player.id)
         player.room = None
+        room_event(self, f"나감 {player.name}{' (게임 중)' if self.game else ''}")
         if self.game:
             await self.game.remove_player(player)
         if self.players and self.host is player:
@@ -218,6 +226,7 @@ class BaseRoom:
             return "모두 준비해야 시작할 수 있어요."
 
         self.game = self.create_game()
+        room_event(self, f"게임 시작 · {', '.join(p.name for p in self.players)} · 설정 {asdict(self.settings)}")
         await self.sync()
         await self.game.start()
         return None

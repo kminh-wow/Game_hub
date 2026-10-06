@@ -6,6 +6,8 @@ import logging
 import random
 from typing import TYPE_CHECKING, Any
 
+from common.multiplayer import room_event
+
 from . import ai
 from .world import (
     HEIGHT, MAX_FUEL, MAX_WIND, SEA, WEAPONS, WIDTH, Tank, explode, fly, generate_terrain, pack,
@@ -118,6 +120,7 @@ class Game:
         except asyncio.CancelledError:
             return
         self._timer = None
+        room_event(self.room, f"시간 초과 {self.tanks[self.current_id].name}")
         self.events.append({"kind": "timeout", "player_id": self.current_id})
         await self._next_turn()
 
@@ -225,6 +228,7 @@ class Game:
         for r in results:
             if r["cause"] and r["id"] not in self.deaths:
                 self.deaths.append(r["id"])
+        self._log_shot(tank, power, weapon, shot, results)
         frame_ms = 1000 / 30
         duration = (len(shot["frames"]) - 1) * frame_ms + (EXPLOSION_MS if shot["hit"] else 300)
         self.events.append({
@@ -243,6 +247,21 @@ class Game:
         self.flying = True
         await self.broadcast_state()
         self._after = asyncio.create_task(self._after_shot(duration / 1000))
+
+    # 발사 기록
+    def _log_shot(self, tank: Tank, power: float, weapon: str, shot: dict[str, Any], results: list[dict[str, Any]]) -> None:
+        head = (f"발사 {tank.name} 각도 {tank.angle:.0f} 파워 {power:.0f} {WEAPONS[weapon]['name']} 바람 {self.wind:+d}")
+        if not shot["hit"]:
+            body = "맵 밖으로 빗나감"
+        else:
+            cells = []
+            for r in results:
+                name = self.tanks[r["id"]].name
+                cause = {"sea": " 바다에 빠져 탈락", "hit": " 탈락"}.get(r["cause"], "")
+                cells.append(f"{name} -{r['damage']} (남은 {r['hp']}){cause}")
+            target = f"직격 {shot['direct'].name}" if shot["direct"] else f"착탄 x={shot['hit'][0]:.0f}"
+            body = f"{target} · " + (", ".join(cells) if cells else "피해 없음")
+        room_event(self.room, f"{head} → {body}")
 
     async def _after_shot(self, seconds: float) -> None:
         try:

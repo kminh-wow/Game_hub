@@ -13,6 +13,7 @@ from typing import Any
 
 from fastapi import WebSocket
 
+from .log import browser, log, room_event, tag
 from .models import Player, broadcast
 from .room import BaseRoom
 
@@ -20,6 +21,7 @@ MAX_NAME = 12
 MAX_TITLE = 30
 MAX_CHAT = 200
 MAX_TOKEN = 64
+MAX_CLIENT_ERRORS = 20   # 접속 하나당 기록할 브라우저 오류 수
 
 # WebSocket 종료 코드 (클라이언트가 안내 문구를 고르는 데 쓴다)
 CLOSE_INVALID_NAME = 4000
@@ -29,7 +31,7 @@ CLOSE_REPLACED = 4002
 Action = Callable[[Any, Player, dict], Awaitable[str | None]]
 
 # 관전 중에도 할 수 있는 메시지 (그 밖의 게임 조작·준비·설정·시작은 막는다)
-SPECTATOR_ALLOWED = {"chat", "leave_room", "ping"}
+SPECTATOR_ALLOWED = {"chat", "leave_room", "ping", "client_error"}
 
 
 def valid_name(name: str) -> bool:
@@ -45,6 +47,7 @@ class GameServer:
         welcome_info: Callable[[], dict[str, Any]] = dict,
     ):
         self.room_class = room_class
+        self.label = room_class.__module__.split(".")[0]   # 로그에 쓰는 게임 이름 (create_app 이 정한다)
         self.ctx = ctx
         self.welcome_info = welcome_info
         self.players: dict[str, Player] = {}
@@ -59,6 +62,7 @@ class GameServer:
             "ready": self._on_ready,
             "update_settings": self._on_update_settings,
             "start": self._on_start,
+            "client_error": self._on_client_error,
         }
         self._actions = actions or {}
 
@@ -76,6 +80,7 @@ class GameServer:
             if not token or existing.token != token:
                 await ws.close(code=CLOSE_NAME_TAKEN, reason="name taken")
                 return None
+            log.info("%s 다른 창에서 다시 접속 %s", tag(self.label), name)
             await existing.send({"type": "kicked", "message": "다른 창에서 같은 닉네임으로 접속했어요."})
             await self.disconnect(existing)
             try:
@@ -85,6 +90,7 @@ class GameServer:
 
         player = Player(id=uuid.uuid4().hex[:8], name=name, ws=ws, token=token)
         self.players[player.id] = player
+        log.info("%s 접속 %s (지금 %d명)", tag(self.label), name, len(self.players))
         await player.send({"type": "welcome", "player": player.public(), **self.welcome_info()})
         await self.broadcast_lobby()
         return player
@@ -94,6 +100,7 @@ class GameServer:
         if self.players.get(player.id) is not player:
             return
         del self.players[player.id]
+        log.info("%s 접속 끊김 %s (지금 %d명)", tag(self.label), player.name, len(self.players))
         if player.room:
             await self._leave(player)
         await self.broadcast_lobby()
@@ -136,7 +143,8 @@ class GameServer:
             await room.close_for_spectators()
             if room.game:
                 await room.game.finish()
-            self.rooms.pop(room.id, None)
+            if self.rooms.pop(room.id, None) is not None:
+                room_event(room, "방 닫힘")
             await self.broadcast_lobby()
         await player.send({"type": "room", "room": None})
 
@@ -177,7 +185,9 @@ class GameServer:
             ctx=self.ctx,
             on_lobby_change=self.broadcast_lobby,
         )
+        room.log_label = self.label
         self.rooms[room.id] = room
+        room_event(room, f"방 만듦 '{title}' 방장 {player.name}")
         await room.add(player)
 
     async def _on_join_room(self, player: Player, msg: dict) -> None:
@@ -212,6 +222,17 @@ class GameServer:
             settings = msg.get("settings")
             if isinstance(settings, dict):
                 await self._error(player, await player.room.update_settings(player, settings))
+
+    # 브라우저 오류 기록
+    async def _on_client_error(self, player: Player, msg: dict) -> None:
+        player.client_errors += 1
+        if player.client_errors > MAX_CLIENT_ERRORS:
+            return
+        text = " ".join(str(msg.get("message", "")).split())[:300]
+        stack = " / ".join(line.strip() for line in str(msg.get("stack", "")).splitlines()[:3])[:400]
+        where = tag(self.label, player.room) if player.room else tag(self.label)
+        log.warning("%s 브라우저 오류 %s (%s): %s%s", where, player.name, browser(str(msg.get("ua", ""))[:300]),
+                    text, f" | {stack}" if stack else "")
 
     async def _on_start(self, player: Player, msg: dict) -> None:
         if player.room:

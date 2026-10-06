@@ -60,6 +60,19 @@ const GameLobby = (() => {
     }
   }
 
+  // 브라우저 오류 보고 (서버 로그에 남는다. 접속 전 오류는 모아 뒀다가 접속하면 보낸다)
+  let reportedErrors = 0;
+  const pendingErrors = [];
+  function reportError(err, where = "") {
+    if (++reportedErrors > 10) return;
+    const message = (err && (err.message || String(err))) || "알 수 없는 오류";
+    const data = { message: where ? `${where}: ${message}` : message, stack: String(err?.stack || ""), ua: navigator.userAgent };
+    if (state.ws && state.ws.readyState === WebSocket.OPEN && state.me) send("client_error", data);
+    else if (pendingErrors.length < 5) pendingErrors.push(data);
+  }
+  window.addEventListener("error", (e) => reportError(e.error || e.message));
+  window.addEventListener("unhandledrejection", (e) => reportError(e.reason, "promise"));
+
   const isMe = (id) => !!state.me && id === state.me.id;
 
   function playerName(id) {
@@ -121,6 +134,7 @@ const GameLobby = (() => {
         handle(JSON.parse(e.data));
       } catch (err) {
         console.error(err);
+        reportError(err, "메시지 처리");
       }
     };
     ws.onclose = (e) => {
@@ -139,6 +153,7 @@ const GameLobby = (() => {
       $("#login-error").textContent = "";
       storage("name", msg.player.name);
       show("lobby");
+      while (pendingErrors.length) send("client_error", pendingErrors.shift());
     },
     lobby(msg) {
       state.rooms = msg.rooms;
@@ -366,6 +381,7 @@ const GameLobby = (() => {
     return {
       state,
       send,
+      reportError,
       toast,
       el,
       isMe,

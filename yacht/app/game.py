@@ -6,7 +6,9 @@ import logging
 import random
 from typing import TYPE_CHECKING, Any
 
-from .rules import CATEGORY_IDS, DICE, MAX_ROLLS, ROUNDS, all_notes, all_scores, best_category, explain, score, totals
+from common.multiplayer import room_event
+
+from .rules import CATEGORIES, CATEGORY_IDS, DICE, MAX_ROLLS, ROUNDS, all_notes, all_scores, best_category, explain, score, totals
 from .physics import initial_poses, throw_dice
 
 YACHT_ASSIST = 0.25  # 같은 눈을 모으는 중일 때 두 번 던지는 비율 (요트 확률 약 +1.5%p)
@@ -235,6 +237,7 @@ class Game:
         self.sheets[self.current.id][category] = points
         self.notes[self.current.id][category] = explain(category, self.dice)
         self.events.append({"kind": "write", "player_id": self.current.id, "category": category, "points": points})
+        room_event(self.room, f"기록 {self.current.name} {dict(CATEGORIES)[category]} {points}점 (주사위 {self.dice})")
         await self._next_turn()
 
     async def _next_turn(self) -> None:

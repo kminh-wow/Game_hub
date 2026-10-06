@@ -11,6 +11,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .log import LABELS, log, tag
 from .server import CLOSE_INVALID_NAME, GameServer, valid_name
 
 # 연결이 끊겼다는 예외. 새 Starlette(1.x)는 이미 끊긴 연결에서 다시 받으려 하면
@@ -30,6 +31,7 @@ def create_app(
 ) -> FastAPI:
     # 게임 화면 외의 자동 문서 페이지(/docs, /redoc, /openapi.json)는 노출하지 않는다.
     app = FastAPI(title=title, docs_url=None, redoc_url=None, openapi_url=None)
+    server.label = LABELS.get(title, title)
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     @app.get("/")
@@ -58,7 +60,14 @@ def create_app(
                     msg = json.loads(raw)
                 except json.JSONDecodeError:
                     continue
-                await server.handle(player, msg)
+                # 처리 중 오류가 나도 연결은 유지
+                try:
+                    await server.handle(player, msg)
+                except Exception:
+                    kind = msg.get("type") if isinstance(msg, dict) else None
+                    where = tag(server.label, player.room) if player.room else tag(server.label)
+                    log.exception("%s 서버 오류 %s 메시지 %s", where, player.name, kind)
+                    await player.send({"type": "error", "message": "서버에서 오류가 났어요. 다시 해 주세요."})
         except DISCONNECTED:
             pass
         finally:
