@@ -152,6 +152,7 @@ const GameLobby = (() => {
       $("#me-name").textContent = msg.player.name;
       $("#login-error").textContent = "";
       storage("name", msg.player.name);
+      hubName(msg.player.name);
       show("lobby");
       while (pendingErrors.length) send("client_error", pendingErrors.shift());
     },
@@ -325,13 +326,23 @@ const GameLobby = (() => {
 
   // ---------- 이벤트 ----------
 
+  // 메인 화면에서 정한 닉네임 (모든 게임 공용)
+  function hubName(value) {
+    try {
+      if (value === undefined) return localStorage.getItem("gamehub-name") || "";
+      localStorage.setItem("gamehub-name", value);
+    } catch {
+      return "";
+    }
+  }
+
   function bindEvents() {
     $("#login-form").onsubmit = (e) => {
       e.preventDefault();
       const name = $("#login-name").value.trim();
       if (name) connect(name);
     };
-    $("#login-name").value = storage("name") || "";
+    $("#login-name").value = hubName() || storage("name") || "";
 
     $("#btn-open-create").onclick = () => {
       $("#create-form").classList.remove("hidden");
@@ -378,6 +389,8 @@ const GameLobby = (() => {
   function init(config) {
     cfg = config;
     bindEvents();
+    // 메인 화면에서 닉네임을 정했으면 바로 접속
+    if (hubName()) connect(hubName());
     return {
       state,
       send,
