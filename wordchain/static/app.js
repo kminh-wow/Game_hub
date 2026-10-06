@@ -41,6 +41,16 @@ function send(type, data = {}) {
   }
 }
 
+// 브라우저 오류 보고 (서버 로그에 남는다)
+let reportedErrors = 0;
+function reportError(err, where = "") {
+  if (++reportedErrors > 10) return;
+  const message = (err && (err.message || String(err))) || "알 수 없는 오류";
+  send("client_error", { message: where ? `${where}: ${message}` : message, stack: String(err?.stack || ""), ua: navigator.userAgent });
+}
+window.addEventListener("error", (e) => reportError(e.error || e.message));
+window.addEventListener("unhandledrejection", (e) => reportError(e.reason, "promise"));
+
 function playerName(id) {
   const p = state.room?.players.find((p) => p.id === id);
   return p ? p.name : "?";

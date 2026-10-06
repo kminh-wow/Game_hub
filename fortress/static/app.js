@@ -678,6 +678,7 @@ requestAnimationFrame(tick);
 let reported = false;
 function reportError(err) {
   console.error(err);
+  lobby.reportError(err, "화면");
   if (reported) return;
   reported = true;
   lobby.toast(`화면 오류: ${err?.message || err}`);

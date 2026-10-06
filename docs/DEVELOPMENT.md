@@ -115,9 +115,11 @@ app = create_app(server, STATIC_DIR, "My Game")
 - 클라이언트가 `spectate_room {room_id}`를 보내면 `room.spectators`에 들어갑니다. 관전자는 `max_players`에 들어가지 않고, 방마다 `MAX_SPECTATORS`(20)명까지입니다.
 - `room.broadcast()`는 참가자와 관전자 모두(`room.audience`)에게 보냅니다. 게임이 참가자에게 직접 보내는 곳이 있으면 `room.players` 대신 `room.audience`를 쓰세요(행맨의 `broadcast_state` 참고).
 - 방 상태(`room` 메시지)에 `spectators` 목록이 들어가고, 로비의 방 카드(`rooms[].spectators`)와 접속자(`users[].spectating`)에도 표시됩니다.
-- 관전 중인 사람(`player.spectating`)은 `chat`과 `leave_room`만 보낼 수 있습니다. 게임 조작·준비·시작·설정은 `관전 중에는 할 수 없어요.` 오류로 막힙니다. 채팅에는 `spectator: true`가 붙습니다.
+- 관전 중인 사람(`player.spectating`)은 `chat`, `leave_room`, `ping`, `client_error`만 보낼 수 있습니다. 게임 조작·준비·시작·설정은 `관전 중에는 할 수 없어요.` 오류로 막힙니다. 채팅에는 `spectator: true`가 붙습니다.
 - **늦게 들어온 관전자에게 지금 상태를 보내려면** 게임에 `watch_messages(player) -> list[dict]`를 만듭니다. 입장 직후 이 메시지들을 관전자에게만 보냅니다. 숨겨야 할 정보(행맨의 정답 등)는 여기서 가립니다.
 - 참가자가 모두 나가면 방이 닫히고, 관전자는 `room: null`과 안내 오류를 받고 로비로 돌아갑니다.
+
+- 기록: `common/multiplayer/log.py`의 `room_event(room, "글")`로 게임 안의 일을 로그에 남깁니다(포트리스 발사, 요트 점수 기록 참고). 화면은 25초마다 `ping`을 보내 연결을 유지하고, 오류가 나면 `client_error {message, stack, ua}`를 보냅니다(`lobby.reportError(err, "어디서")`로 직접 보낼 수도 있습니다).
 
 ### 화면: `common/web/lobby.js`
 
@@ -164,6 +166,10 @@ bash deploy/setup.sh              # 게임 서버는 127.0.0.1:8000, nginx가 80
 - **왜 파이썬 3.11인가**: pybullet 3.2.7은 3.11까지만 미리 빌드된 설치 파일이 있습니다. 더 새로운 파이썬(Ubuntu 26.04의 3.14 등)에서는 소스를 컴파일해야 하는데, 서버에 컴파일러가 없고 `/tmp`가 작은 메모리 디스크(약 450MB)라서 `Disk quota exceeded`로 실패합니다. 3.11은 [uv](https://docs.astral.sh/uv/)로 내려받으며 시스템 파이썬은 건드리지 않습니다. 새 가상환경이 완성되기 전에는 예전 것을 지우지 않고, 실패하면 되돌립니다.
 - **배포가 `Disk quota exceeded`로 실패하면**: `df -h /`로 디스크를, `findmnt /tmp`로 임시 공간을 확인하세요. 스크립트는 `TMPDIR`을 `~/.tmp`(디스크)로 돌려 두었습니다.
 - 로그 보기: `sudo journalctl -u game-hub -f`
+- **게임 기록만 실시간으로 보기**: `sudo journalctl -u game-hub -f | grep 게임` (지난 기록은 `--since "1 hour ago"`처럼 시간을 붙여서)
+  - 멀티 게임(끝말잇기·행맨·오목·요트·포트리스)은 `게임 [포트리스 #3] ...` 형식으로 한 줄씩 남깁니다: 접속·접속 끊김, 방 만듦·입장·나감·관전·방 닫힘, 게임 시작(참가자·설정), 게임 끝(승자·순위). 요트는 점수 기록, 포트리스는 발사(각도·파워·바람·피해·탈락)와 시간 초과도 남깁니다.
+  - **브라우저 오류**: 화면에서 오류가 나면 브라우저가 서버로 보내서 `브라우저 오류 닉네임 (크롬 141): 문구 | 스택` 으로 남습니다(접속 하나당 20개까지). 오류만 보려면 `| grep "브라우저 오류"`.
+  - 게임 메시지를 처리하다 서버에서 오류가 나면 `서버 오류 닉네임 메시지 종류`와 함께 전체 스택을 남기고, 연결은 끊지 않습니다(그 사람에게는 "서버에서 오류가 났어요"가 갑니다).
 - 끝말잇기 전체 사전은 git에 없으므로 서버에 따로 올립니다.
   - `scp -i <키> wordchain/data/words.txt <user>@<서버IP>:~/Game_hub/wordchain/data/`
   - 올린 뒤 `sudo systemctl restart game-hub`

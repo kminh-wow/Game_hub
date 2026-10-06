@@ -6,6 +6,7 @@
 """
 from .app import create_app
 from .models import Player, broadcast
+from .log import room_event
 from .room import BaseRoom, clamp_int
 from .server import (
     CLOSE_INVALID_NAME,
@@ -25,5 +26,6 @@ __all__ = [
     "broadcast",
     "clamp_int",
     "create_app",
+    "room_event",
     "valid_name",
 ]
