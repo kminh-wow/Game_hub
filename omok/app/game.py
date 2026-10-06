@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from common.multiplayer.banter import Banter
 
-from .ai import LEVEL_NAMES, ai_move
+from .ai import LEVEL_NAMES, ai_move, judge_move
 from .banter import LINES, SITUATIONS, SPICY
 from .rules import BLACK, LINES as DIRECTIONS, WHITE, in_bounds, is_full, new_board, other, winning_line
 
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .room import Room
 
 AI_DELAY = 0.6   # AI 가 두기 전 기다리는 시간(초)
+MOVE_COOLDOWN = 2.5   # 사람 수에 대한 AI 반응 사이 최소 간격(초)
 
 
 class AIPlayer:
@@ -58,6 +59,7 @@ class Game:
             self.banter = Banter(room, ai.public(), LINES, game="오목", situations=SITUATIONS,
                                  spicy=SPICY if self.settings.ai_talk else None)
         self.human = next((p for p in (self.black, self.white) if not isinstance(p, AIPlayer)), None)
+        self._judged: str | None = None          # 사람이 방금 둔 수 평가
 
     # ---- 조회 ----
 
@@ -165,6 +167,7 @@ class Game:
             return "판 밖이에요."
         if self.board[y][x]:
             return "이미 돌이 있는 자리예요."
+        self._judged = judge_move(self.board, self.turn, x, y) if self.banter else None
         await self._place(x, y)
         return None
 
@@ -190,6 +193,9 @@ class Game:
             self.banter.say("ai_threat" if by_ai else "player_threat", chance=.8)
         elif by_ai:
             self.banter.say("ai_move", chance=.12)
+        elif self._judged:                       # 사람 수마다 잘 뒀나 못 뒀나
+            chance = {"blunder": 1.0, "bad": .75, "good": .65}[self._judged]
+            self.banter.say(f"player_{self._judged}", chance=chance, cooldown=MOVE_COOLDOWN)
 
     async def resign(self, player: Player) -> str | None:
         if self.finished or player not in (self.black, self.white):

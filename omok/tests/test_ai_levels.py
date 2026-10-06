@@ -83,3 +83,37 @@ def test_expert_does_not_change_the_board():
     before = [row[:] for row in b]
     ai_move(b, WHITE, random.Random(0), 4, 0.3)
     assert b == before
+
+
+# ---- 사람 수 평가 (AI 대사용) ----
+
+from app.ai import judge_move  # noqa: E402
+
+
+def test_judge_not_blocking_a_four_is_a_blunder():
+    b = board_with(white=[(3, 5), (4, 5), (5, 5), (6, 5)], black=[(2, 5), (9, 9)])
+    assert judge_move(b, BLACK, 7, 5) in ("good", None)        # 막으면 괜찮은 수
+    assert judge_move(b, BLACK, 12, 12) == "blunder"           # 안 막으면 큰 실수
+
+
+def test_judge_ignoring_an_open_three_is_bad_and_blocking_is_good():
+    b = board_with(white=[(5, 7), (6, 7), (7, 7)], black=[(6, 8), (9, 3)])
+    assert judge_move(b, BLACK, 4, 7) == "good" or judge_move(b, BLACK, 8, 7) == "good"
+    assert judge_move(b, BLACK, 1, 13) == "bad"
+
+
+def test_judge_mostly_quiet_in_ordinary_moves():
+    rng = random.Random(3)
+    counts = {"good": 0, "bad": 0, "blunder": 0, None: 0}
+    for game in range(6):
+        b = new_board()
+        turn = BLACK
+        for _ in range(30):
+            x, y = ai_move(b, turn, rng, 0 if turn == BLACK else 3)
+            if turn == BLACK:
+                counts[judge_move(b, turn, x, y)] += 1
+            b[y][x] = turn
+            turn = WHITE if turn == BLACK else BLACK
+    total = sum(counts.values())
+    assert counts["good"] and counts["bad"]                       # 둘 다 나온다
+    assert counts[None] > total * .2                              # 매 수마다 뭔가 판정하진 않는다
