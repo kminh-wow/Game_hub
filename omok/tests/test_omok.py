@@ -192,3 +192,31 @@ def test_ai_level_setting_applies_to_ai_name(client):
     ai = g["black"] if g["black"]["id"] == "ai" else g["white"]
     assert ai["name"] == "AI · 최상"
     me.close()
+
+
+def test_ai_talks_at_start_and_answers_chat(client, monkeypatch):
+    import common.multiplayer.banter as banter_module
+    monkeypatch.setattr(banter_module, "DELAY", (0, 0))
+    monkeypatch.setattr(banter_module, "COOLDOWN", 0)
+    monkeypatch.setattr(banter_module, "CHAT_COOLDOWN", 0)
+    me = Conn(client, "talk" + uuid.uuid4().hex[:4])
+    me.send("create_room", title="수다")
+    me.until("room")
+    me.send("start")
+    hello = me.until("chat", lambda m: m.get("bot"))
+    assert hello["from"]["id"] == "ai" and hello["text"]
+    for _ in range(5):                                  # 확률이라 몇 번 말 걸면 대꾸한다
+        me.send("chat", text="안녕?")
+    reply = me.until("chat", lambda m: m.get("bot"))
+    assert reply["from"]["name"].startswith("AI")
+    me.close()
+
+
+def test_two_humans_have_no_ai_talk():
+    from types import SimpleNamespace
+
+    from app.game import Game
+    from app.room import RoomSettings
+    players = [SimpleNamespace(id="a", name="a"), SimpleNamespace(id="b", name="b")]
+    room = SimpleNamespace(settings=RoomSettings(), players=players, last_loser_id=None)
+    assert Game(room).banter is None

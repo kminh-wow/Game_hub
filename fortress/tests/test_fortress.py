@@ -210,3 +210,34 @@ def test_solo_opponent_setting_is_limited(client):
     me.send("update_settings", settings={"solo_opponent": 9})
     assert me.until("room")["room"]["settings"]["solo_opponent"] == 3
     me.close()
+
+
+def test_ai_opponent_talks(client, monkeypatch):
+    import app.game as game_module
+    import common.multiplayer.banter as banter_module
+    monkeypatch.setattr(game_module, "AI_THINK", 0.05)
+    monkeypatch.setattr(game_module, "AI_AIM", 0.05)
+    monkeypatch.setattr(banter_module, "DELAY", (0, 0))
+    monkeypatch.setattr(banter_module, "COOLDOWN", 0)
+    monkeypatch.setattr(banter_module, "CHAT_COOLDOWN", 0)
+    me = Conn(client, "tk" + uuid.uuid4().hex[:4])
+    me.send("create_room", title="수다")
+    me.until("room")
+    me.send("update_settings", settings={"solo_opponent": 2})
+    me.until("room", lambda m: m["room"]["settings"]["solo_opponent"] == 2)
+    me.send("start")
+    hello = me.until("chat", lambda m: m.get("bot"))
+    assert hello["from"] == {"id": "ai", "name": "AI · 중"}
+    for _ in range(5):
+        me.send("chat", text="ㅋㅋㅋ")
+    assert me.until("chat", lambda m: m.get("bot"))["text"]
+    me.close()
+
+
+def test_dummy_practice_has_no_talk():
+    from types import SimpleNamespace
+
+    from app.game import Game
+    from app.room import RoomSettings
+    room = SimpleNamespace(settings=RoomSettings(), players=[SimpleNamespace(id="a", name="a")])
+    assert Game(room).banter is None

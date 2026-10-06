@@ -162,6 +162,9 @@ class GameServer:
         out = {"type": "chat", "from": player.public(), "text": text, "spectator": player.spectating}
         if player.room:
             await player.room.broadcast({**out, "scope": "room"})
+            game = player.room.game
+            if game is not None and hasattr(game, "hear_chat"):     # AI 대꾸
+                await game.hear_chat(player, text)
         else:
             in_lobby = [p for p in self.players.values() if p.room is None]
             await broadcast(in_lobby, {**out, "scope": "lobby"})
