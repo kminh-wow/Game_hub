@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from .room import Room
 
 SHOT_MS = 900            # 총을 쏜 뒤 다음 차례까지
+RIFLE_GAP_MS = 350       # 소총 한 발 뒤 다음 발까지 (차례 안에서)
+AI_BURST = 0.45          # AI 가 소총을 연달아 쏠 때 쉬는 시간(초)
 BLAST_MS = 1100          # 수류탄이 터진 뒤 다음 차례까지
 DUMMY_ID = "dummy"
 AI_ID = "ai"
@@ -63,6 +65,9 @@ class Game:
         self.turn = 0
         self.move_left = MOVE_MAX
         self.acting = False                      # 총알·수류탄 재생 중
+        self.ending = False                      # 이번 사격이 끝나면 차례가 넘어감
+        self.shots = 0                           # 이번 차례에 쏜 수
+        self.turn_weapon: str | None = None      # 이번 차례에 쓴 무기 (한 차례에 한 종류)
         self.finished = False
         self.deaths: list[str] = []
         self.events: list[dict[str, Any]] = []
@@ -82,14 +87,16 @@ class Game:
             "size": SIZE,
             "boxes": [b.public() for b in self.boxes],
             "soldiers": [s.public() for s in self.soldiers.values()],
-            "weapons": {k: {key: w[key] for key in ("name", "stock", "spread", "speed", "radius", "fuse") if key in w}
-                        for k, w in WEAPONS.items()},
+            "weapons": {k: {key: w[key] for key in ("name", "stock", "per_turn", "spread", "speed", "radius", "fuse")
+                            if key in w} for k, w in WEAPONS.items()},
+            "shots": self.shots,
+            "turn_weapon": self.turn_weapon,
             "current_id": None if self.finished else self.current_id,
             "turn": self.turn,
             "move_left": round(self.move_left, 2),
             "move_max": MOVE_MAX,
             "acting": self.acting,
-            "time_left_ms": 0 if self.finished or self.acting else max(int((self.deadline - loop.time()) * 1000), 0),
+            "time_left_ms": 0 if self.finished or self.ending else max(int((self.deadline - loop.time()) * 1000), 0),
             "time_total_ms": self.settings.turn_time * 1000,
         }
 
@@ -120,6 +127,12 @@ class Game:
         self._cancel_timer()
         self.turn += 1
         self.move_left = MOVE_MAX
+        self.shots = 0
+        self.turn_weapon = None
+        self.acting = self.ending = False
+        if self._after:                          # 시간이 다 돼서 넘어온 경우 남은 재생 예약 정리
+            self._after.cancel()
+            self._after = None
         self.deadline = asyncio.get_running_loop().time() + self.settings.turn_time
         turn = self._ai_turn() if self.current_id == AI_ID else self._turn_timer()
         self._timer = asyncio.create_task(turn)
@@ -169,8 +182,19 @@ class Game:
         except asyncio.CancelledError:
             return
         self._timer = None
-        weapon = plan["weapon"] if me.stock.get(plan["weapon"], 1) > 0 else "rifle"
+        weapon = plan["weapon"] if me.stock.get(plan["weapon"], 0) > 0 else "rifle"
+        if me.stock.get(weapon, 0) <= 0:
+            await self._end_turn()
+            return
         await self._fire(me, weapon)
+        while weapon == "rifle" and not self.ending and not self.finished:   # 소총은 연달아
+            await asyncio.sleep(AI_BURST)
+            aim = ai.reaim(self.boxes, list(self.soldiers.values()), me, self.ai_level, self.rng)
+            if aim is None or me.stock.get("rifle", 0) <= 0 or self.finished:
+                await self._end_turn()
+                return
+            me.yaw, me.pitch = aim
+            await self._fire(me, "rifle")
 
     def _cancel_timer(self) -> None:
         if self._timer:
@@ -244,6 +268,20 @@ class Game:
     async def _send_soldier(self, s: Soldier) -> None:
         await self.room.broadcast({"type": "soldier", "soldier": s.public(), "move_left": round(self.move_left, 2)})
 
+    # 차례 끝내기 (쏘지 않거나 소총을 덜 쏘고 넘길 때)
+    async def end_turn(self, player: Player) -> str | None:
+        if err := self._check_turn(player):
+            return err
+        await self._end_turn()
+        return None
+
+    async def _end_turn(self) -> None:
+        if self.finished:
+            return
+        self._cancel_timer()
+        self.events.append({"kind": "pass", "player_id": self.current_id})
+        await self._next_turn()
+
     # 발사
     async def fire(self, player: Player, weapon: Any, yaw: Any, pitch: Any) -> str | None:
         if err := self._check_turn(player):
@@ -251,8 +289,10 @@ class Game:
         if weapon not in WEAPONS:
             return "그런 무기는 없어요."
         s = self.soldiers[player.id]
-        if s.stock.get(weapon, 1) <= 0:
-            return f"{WEAPONS[weapon]['name']}을 다 썼어요."
+        if s.stock.get(weapon, 0) <= 0:
+            return f"{WEAPONS[weapon]['name']} 탄약이 없어요."
+        if self.turn_weapon and self.turn_weapon != weapon:
+            return f"이번 차례에는 {WEAPONS[self.turn_weapon]['name']}만 쓸 수 있어요."
         angles = self._angles(yaw, pitch)
         if angles is None:
             return "잘못된 조준이에요."
@@ -262,9 +302,9 @@ class Game:
 
     # 사격 계산과 재생 예약
     async def _fire(self, s: Soldier, weapon: str) -> None:
-        if weapon in s.stock:
-            s.stock[weapon] -= 1
-        self._cancel_timer()
+        s.stock[weapon] = max(0, s.stock.get(weapon, 0) - 1)
+        self.shots += 1
+        self.turn_weapon = weapon
         everyone = list(self.soldiers.values())
         if weapon == "grenade":
             result = throw(self.boxes, everyone, s)
@@ -287,9 +327,16 @@ class Game:
         if self.banter:
             self._react(s, weapon, result, event["landed_ms"] / 1000)
         self.events.append(event)
+        # 한 차례에 쏠 수 있는 만큼 다 쐈거나, 탄이 떨어졌거나, 승부가 났으면 차례 끝
+        self.ending = (self.shots >= WEAPONS[weapon]["per_turn"] or s.stock.get(weapon, 0) <= 0
+                       or self._game_over())
         self.acting = True
+        if self.ending:
+            self._cancel_timer()
+        else:
+            duration = RIFLE_GAP_MS
         await self.broadcast_state()
-        self._after = asyncio.create_task(self._after_shot(duration / 1000))
+        self._after = asyncio.create_task(self._after_shot(duration / 1000, self.ending))
 
     def _log_shot(self, s: Soldier, weapon: str, result: dict[str, Any]) -> None:
         cells = [f"{self.soldiers[r['id']].name} -{r['damage']}({r['part']}) 남은 {r['hp']}{' 탈락' if r['dead'] else ''}"
@@ -325,15 +372,20 @@ class Game:
         else:
             say("player_miss", .35)
 
-    async def _after_shot(self, seconds: float) -> None:
+    async def _after_shot(self, seconds: float, ending: bool) -> None:
         try:
             await asyncio.sleep(seconds)
         except asyncio.CancelledError:
             return
         self._after = None
         self.acting = False
-        if not self.finished:
+        if self.finished:
+            return
+        if ending:
+            self.ending = False
             await self._next_turn()
+        else:
+            await self.broadcast_state()                 # 같은 차례에 다음 발
 
     # ---- 종료 / 퇴장 ----
 

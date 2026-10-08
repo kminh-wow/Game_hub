@@ -43,6 +43,8 @@ def fast(monkeypatch):
     import app.game as game_module
     monkeypatch.setattr(game_module, "SHOT_MS", 50)
     monkeypatch.setattr(game_module, "BLAST_MS", 50)
+    monkeypatch.setattr(game_module, "RIFLE_GAP_MS", 30)
+    monkeypatch.setattr(game_module, "AI_BURST", 0.05)
     monkeypatch.setattr(game_module, "AI_THINK", 0.02)
     monkeypatch.setattr(game_module, "AI_AIM", 0.02)
     monkeypatch.setattr(game_module, "AI_STEP", 0.0)
@@ -88,13 +90,46 @@ def test_turns_move_look_and_fire(client):
     m = other.until("look")
     assert m["pitch"] == pytest.approx(1.45)                       # 위아래 한계
 
-    cur.send("fire", weapon="rifle", yaw=0.3, pitch=-0.2)
+    cur.send("fire", weapon="rifle", yaw=0.3, pitch=-0.6)
     m = other.game(lambda g: g["acting"])
     shot = next(e for e in m["events"] if e["kind"] == "shot")
     assert shot["weapon"] == "rifle" and len(shot["from"]) == 3 and len(shot["to"]) == 3
-    cur.send("fire", weapon="rifle", yaw=0, pitch=0)
-    assert "기다려" in cur.until("error")["message"]
-    other.game(lambda g: not g["acting"] and g["current_id"] == other.id)
+    assert m["game"]["shots"] == 1 and m["game"]["time_left_ms"] > 0       # 소총 한 발로는 차례가 안 끝남
+    cur.send("fire", weapon="rifle", yaw=0, pitch=-0.6)
+    assert "기다려" in cur.until("error")["message"]                       # 발사 사이 잠깐은 못 쏨
+    m = cur.game(lambda g: not g["acting"] and g["current_id"] == cur.id)
+    cur.send("fire", weapon="sniper", yaw=0, pitch=-0.6)
+    assert "소총만" in cur.until("error")["message"]                       # 한 차례에 한 종류
+    for n in (2, 3):
+        cur.send("fire", weapon="rifle", yaw=0, pitch=-0.6)
+        cur.game(lambda g, n=n: g["shots"] == n)
+        if n == 2:
+            cur.game(lambda g: not g["acting"])
+    other.game(lambda g: not g["acting"] and g["current_id"] == other.id)  # 세 발째에 차례 끝
+    assert me_of(m["game"], cur.id)["stock"]["rifle"] == 44            # 45발에서 한 발 쓴 시점
+    for c in (a, b):
+        c.close()
+
+
+def test_sniper_ends_turn_and_end_turn_passes(client):
+    a, b, cur, other, _, g = pair(client)
+    cur.send("fire", weapon="sniper", yaw=0, pitch=-0.6)
+    m = other.game(lambda g: g["current_id"] == other.id and not g["acting"])
+    assert me_of(m["game"], cur.id)["stock"]["sniper"] == 2
+    other.send("end_turn")                                         # 쏘지 않고 넘기기
+    m = cur.until("game", lambda m: any(e["kind"] == "pass" for e in m["events"]))
+    assert m["game"]["current_id"] == cur.id
+    for c in (a, b):
+        c.close()
+
+
+def test_running_out_of_ammo(client):
+    from app.main import server
+    a, b, cur, other, room_id, g = pair(client)
+    game = server.rooms[room_id].game
+    game.soldiers[cur.id].stock["sniper"] = 0
+    cur.send("fire", weapon="sniper", yaw=0, pitch=0)
+    assert "탄약이 없어요" in cur.until("error")["message"]
     for c in (a, b):
         c.close()
 

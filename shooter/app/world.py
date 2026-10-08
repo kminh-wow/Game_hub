@@ -23,11 +23,11 @@ MAX_HP = 100
 GRAVITY = 9.8
 MAX_RANGE = 90.0
 
-# 무기: 퍼짐(도), 몸·머리 피해, 판마다 개수 (None 무제한)
+# 무기: 퍼짐(도), 몸·머리 피해, 판마다 탄약(stock), 한 차례에 쏠 수 있는 수(per_turn)
 WEAPONS: dict[str, dict[str, Any]] = {
-    "rifle": {"name": "소총", "spread": 1.6, "body": 25, "head": 50, "stock": None},
-    "sniper": {"name": "저격총", "spread": 0.12, "body": 70, "head": 100, "stock": 2},
-    "grenade": {"name": "수류탄", "speed": 15.0, "radius": 4.5, "damage": 70, "fuse": 4.0, "stock": 2},
+    "rifle": {"name": "소총", "spread": 1.6, "body": 25, "head": 50, "stock": 45, "per_turn": 3},
+    "sniper": {"name": "저격총", "spread": 0.12, "body": 70, "head": 100, "stock": 3, "per_turn": 1},
+    "grenade": {"name": "수류탄", "speed": 15.0, "radius": 4.5, "damage": 70, "fuse": 4.0, "stock": 2, "per_turn": 1},
 }
 RIFLE_FALLOFF = (15.0, 35.0, 0.5)   # 이 거리부터 줄어서, 이 거리에서 이 배율
 

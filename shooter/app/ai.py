@@ -71,6 +71,20 @@ def _grenade_aim(boxes: list[Box], soldiers: list[Soldier], me: Soldier, target:
     return best
 
 
+# 연발용 다시 조준 (지금 자리에서 상대가 보이면 흔들림 섞은 시선, 안 보이면 None)
+def reaim(boxes: list[Box], soldiers: list[Soldier], me: Soldier, level: int,
+          rng: random.Random) -> tuple[float, float] | None:
+    target = _target(me, soldiers)
+    if target is None:
+        return None
+    visible = [y for y in (1.15, 0.85, 1.62) if sees(boxes, soldiers, me, target, y=y)]
+    if not visible:
+        return None
+    err = math.radians(_AIM_ERROR[level])
+    yaw, pitch = _aim_at(me, target.x, visible[0], target.z)
+    return yaw + rng.gauss(0, err), max(-1.4, min(1.4, pitch + rng.gauss(0, err * .6)))
+
+
 # 이번 차례 계획: 갈 자리, 무기, 조준 (yaw, pitch)
 def plan(boxes: list[Box], soldiers: list[Soldier], me: Soldier, level: int,
          rng: random.Random) -> dict[str, Any]:
