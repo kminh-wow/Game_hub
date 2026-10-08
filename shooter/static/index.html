@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>턴제 FPS</title>
+  <link rel="stylesheet" href="static/style.css?v=1">
+  <script type="importmap">{"imports":{"three":"./static/vendor/three/build/three.module.js"}}</script>
+</head>
+<body>
+  <!-- 로그인 -->
+  <section id="screen-login" class="screen">
+    <div class="login-card">
+      <h1>턴제 FPS <span>Turn Shooter</span></h1>
+      <p class="muted">내 차례에 움직이고, 조준하고, 한 발. 끝까지 살아남아라</p>
+      <form id="login-form">
+        <input id="login-name" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="off" required>
+        <button type="submit">입장</button>
+      </form>
+      <p id="login-error" class="error"></p>
+      <a class="hub-link" href="../">← 다른 게임 고르기</a>
+    </div>
+  </section>
+
+  <!-- 로비 -->
+  <section id="screen-lobby" class="screen hidden">
+    <header class="topbar">
+      <a class="hub-link" href="../" title="게임 목록">← Ddan Jit</a>
+      <h2>로비</h2>
+      <span class="muted">접속: <b id="me-name"></b></span>
+    </header>
+    <div class="layout">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h3>방 목록</h3>
+          <button id="btn-open-create">방 만들기</button>
+        </div>
+        <form id="create-form" class="create-form hidden">
+          <input id="create-title" maxlength="30" placeholder="방 제목" autocomplete="off">
+          <button type="submit">만들기</button>
+          <button type="button" id="btn-cancel-create" class="ghost">취소</button>
+        </form>
+        <ul id="room-list" class="room-list"></ul>
+      </div>
+      <div class="panel side">
+        <h3>접속자 <span id="user-count" class="muted"></span></h3>
+        <ul id="user-list" class="user-list"></ul>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="lobby-chat-log" class="chat-log"></ul>
+      <form id="lobby-chat-form" class="chat-form">
+        <input id="lobby-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 방 -->
+  <section id="screen-room" class="screen hidden">
+    <header class="topbar">
+      <h2 id="room-title"></h2>
+      <span id="room-info" class="muted"></span>
+      <button id="btn-leave" class="ghost">나가기</button>
+    </header>
+    <!-- 게임과 채팅 배치 -->
+    <div class="room-layout">
+      <div class="panel room-game">
+        <!-- 대기 화면 -->
+        <div id="waiting-view">
+          <h3>게임 설정</h3>
+          <form id="settings-form" class="settings">
+            <label>한 차례 제한 시간(초) <input type="number" name="turn_time" min="10" max="60" step="5"></label>
+            <label id="solo-row">혼자일 때 상대
+              <select name="solo_opponent">
+                <option value="0">허수아비 (연습)</option>
+                <option value="1">AI · 하</option>
+                <option value="2">AI · 중</option>
+                <option value="3">AI · 상</option>
+              </select>
+            </label>
+            <label id="ai-talk-row">AI 말투
+              <select name="ai_talk">
+                <option value="0">순한맛</option>
+                <option value="1">매운맛 (욕설)</option>
+              </select>
+            </label>
+          </form>
+          <p class="muted">2~4명이 돌아가며 한 명씩: 움직이고(WASD), 둘러보고(마우스), 한 발 쏘면(클릭) 차례가 끝나요. 마지막까지 살아남으면 승리!</p>
+          <p id="settings-note" class="muted"></p>
+          <button id="btn-ready" class="big"></button>
+        </div>
+
+        <!-- 게임 화면 (끝난 뒤에는 마지막 판을 보여 줌) -->
+        <div id="game-view" class="hidden">
+          <div class="game-top">
+            <div id="chips" class="chips"></div>
+            <span id="turn-info" class="muted"></span>
+          </div>
+          <div class="bar-row"><span>시간</span><div class="bar"><div id="time-bar"></div></div><span id="time-sec"></span></div>
+          <!-- 3D 화면과 HUD -->
+          <div id="stage" class="stage" tabindex="0">
+            <div id="crosshair" class="crosshair"></div>
+            <div id="scope" class="scope hidden"></div>
+            <div id="hit-flash" class="hit-flash"></div>
+            <div id="center-msg" class="center-msg"></div>
+            <div class="hud">
+              <div class="hud-left">
+                <div class="hp">HP <b id="hp-val">100</b></div>
+                <div class="move">이동 <div class="gauge"><div id="move-bar"></div></div></div>
+              </div>
+              <div id="weapons" class="weapons"></div>
+            </div>
+          </div>
+          <p id="help" class="help">화면 클릭 → 마우스로 둘러보기 · WASD 이동 · 1/2/3 무기 · 좌클릭 발사 · 우클릭 조준(확대) · Esc 마우스 풀기</p>
+        </div>
+      </div>
+      <div class="panel chat room-chat">
+        <h3>채팅</h3>
+        <ul id="room-chat-log" class="chat-log"></ul>
+        <form id="room-chat-form" class="chat-form">
+          <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+          <button type="submit">전송</button>
+        </form>
+      </div>
+      <!-- 하단 참가자 목록 -->
+      <div class="panel room-players">
+        <h3>참가자</h3>
+        <ul id="player-list" class="player-list"></ul>
+        <div id="spectator-box" class="hidden">
+          <h3>관전 <span id="spectator-count" class="muted"></span></h3>
+          <ul id="spectator-list" class="player-list"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 결과 -->
+  <div id="result-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="result-title">게임 결과</h3>
+      <ol id="result-list" class="result-list"></ol>
+      <button id="btn-close-result">확인</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="../common/lobby.js?v=banter"></script>
+  <script type="module" src="static/app.js?v=1"></script>
+</body>
+</html>

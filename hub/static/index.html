@@ -114,6 +114,11 @@
     .hills i { position: absolute; bottom: 30px; width: 16px; height: 8px; border-radius: 4px 4px 2px 2px; }
     .hills i.a { left: 26px; background: #d64545; }
     .hills i.b { right: 26px; background: #2f6fd6; }
+    /* 턴제 FPS 카드 그림 */
+    .scope-art { position: relative; width: 78px; height: 78px; border-radius: 50%; border: 3px solid currentColor; opacity: .75; }
+    .scope-art::before, .scope-art::after { content: ""; position: absolute; background: currentColor; }
+    .scope-art::before { left: 50%; top: 6px; bottom: 6px; width: 2px; margin-left: -1px; }
+    .scope-art::after { top: 50%; left: 6px; right: 6px; height: 2px; margin-top: -1px; }
 
     footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
 
@@ -227,6 +232,16 @@
       <h2>포트리스</h2>
       <p>산 너머 탱크를 향해 각도와 파워를 맞춰 쏴요. 바람을 읽고 지형을 부수며 끝까지 살아남아라!</p>
       <div class="tags"><span>1~4명</span><span>멀티플레이</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
+    <a class="card" href="shooter/">
+      <div class="art" aria-hidden="true">
+        <div class="scope-art"></div>
+      </div>
+      <h2>턴제 FPS</h2>
+      <p>1인칭 3D 전장에서 돌아가며 한 명씩! 움직이고, 둘러보고, 소총·저격총·수류탄 중 한 발. 끝까지 살아남아라.</p>
+      <div class="tags"><span>1~4명</span><span>멀티플레이</span><span>3D</span><span>PC</span></div>
       <span class="play">플레이 →</span>
     </a>
   </main>

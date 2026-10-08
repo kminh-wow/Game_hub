@@ -31,6 +31,8 @@ def client():
         ("/yacht/static/app.js", "GameLobby.init"),
         ("/fortress/", "포트리스"),
         ("/fortress/static/app.js", "GameLobby.init"),
+        ("/shooter/", "턴제 FPS"),
+        ("/shooter/static/app.js", "GameLobby.init"),
     ],
 )
 def test_pages(client, path, needle):
@@ -39,14 +41,14 @@ def test_pages(client, path, needle):
     assert needle in r.text
 
 
-@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman", "omok", "yacht", "fortress"])
+@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman", "omok", "yacht", "fortress", "shooter"])
 def test_redirect_to_trailing_slash(client, name):
     r = client.get(f"/{name}", follow_redirects=False)
     assert r.status_code in (307, 308)
     assert r.headers["location"] == f"/{name}/"
 
 
-@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/wordchain/docs", "/quoridor/docs", "/pacman/docs", "/hangman/docs", "/omok/docs", "/yacht/docs", "/fortress/docs", "/nothing"])
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/wordchain/docs", "/quoridor/docs", "/pacman/docs", "/hangman/docs", "/omok/docs", "/yacht/docs", "/fortress/docs", "/shooter/docs", "/nothing"])
 def test_hidden_pages(client, path):
     assert client.get(path).status_code == 404
 
@@ -95,6 +97,11 @@ def test_yacht_websocket(client):
 
 def test_fortress_websocket(client):
     with client.websocket_connect("/fortress/ws?name=hubfort&token=t") as ws:
+        assert ws.receive_json()["type"] == "welcome"
+
+
+def test_shooter_websocket(client):
+    with client.websocket_connect("/shooter/ws?name=hubshoot&token=t") as ws:
         assert ws.receive_json()["type"] == "welcome"
 
 
