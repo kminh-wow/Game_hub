@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>턴제 FPS</title>
-  <link rel="stylesheet" href="static/style.css?v=2">
+  <link rel="stylesheet" href="static/style.css?v=3">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/build/three.module.js"}}</script>
 </head>
 <body>
@@ -102,7 +102,7 @@
           <div id="stage" class="stage" tabindex="0">
             <div id="crosshair" class="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><b></b></div>
             <div id="aim-info" class="aim-info"></div>
-            <div id="scope" class="scope hidden"></div>
+            <div id="scope" class="scope hidden"><i class="h"></i><i class="v"></i><b></b></div>
             <div id="hit-flash" class="hit-flash"></div>
             <div id="center-msg" class="center-msg"></div>
             <div class="hud">
@@ -110,10 +110,14 @@
                 <div class="hp">HP <b id="hp-val">100</b></div>
                 <div class="move">이동 <div class="gauge"><div id="move-bar"></div></div></div>
               </div>
-              <div id="weapons" class="weapons"></div>
+              <div class="hud-right">
+                <div id="shots-info" class="shots-info"></div>
+                <div id="weapons" class="weapons"></div>
+                <button id="btn-end-turn" class="end-turn" type="button">E 차례 끝내기</button>
+              </div>
             </div>
           </div>
-          <p id="help" class="help">화면 클릭 → 마우스로 둘러보기 · WASD 이동 · 1/2/3 무기 · 좌클릭 발사 · 우클릭 조준(확대) · Esc 마우스 풀기</p>
+          <p id="help" class="help">화면 클릭 → 마우스로 둘러보기 · WASD 이동 · 1/2/3 무기 · 좌클릭 발사(소총은 한 차례 3발) · 우클릭 조준(확대) · E 차례 끝내기 · Esc 마우스 풀기</p>
         </div>
       </div>
       <div class="panel chat room-chat">
@@ -148,6 +152,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="../common/lobby.js?v=banter"></script>
-  <script type="module" src="static/app.js?v=3"></script>
+  <script type="module" src="static/app.js?v=4"></script>
 </body>
 </html>

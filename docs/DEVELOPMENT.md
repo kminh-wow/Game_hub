@@ -491,7 +491,7 @@ shooter/
 ```
 
 - 좌표는 미터, 바닥 y=0, 아레나 0~40. 시선 `yaw`는 three.js 카메라와 같아서 0이면 -z를 봅니다(`world.direction`). 사람은 반지름 0.4 원기둥 몸(높이 1.4까지)과 머리 공(높이 1.62, 반지름 0.24), 눈 높이 1.6.
-- 화면은 `look {yaw, pitch}`(시선, 0.12초마다), `move {dx, dz}`(한 번에 0.6m까지, 차례마다 7m), `fire {weapon, yaw, pitch}`를 보냅니다. 맞았는지는 서버가 퍼짐을 섞은 광선으로 판정해 `shot` 이벤트(`from`/`to` 또는 수류탄 `frames`/`at`, `results`)로 보냅니다.
+- 화면은 `look {yaw, pitch}`(시선, 0.12초마다), `move {dx, dz}`(한 번에 0.6m까지, 차례마다 7m), `fire {weapon, yaw, pitch}`를 보냅니다. 무기마다 판 전체 탄약(`stock`)과 한 차례에 쏠 수 있는 수(`per_turn`, 소총 3·저격총 1·수류탄 1)가 있고, 한 차례에는 한 종류만 씁니다(`turn_weapon`). 정해진 수를 다 쏘면 재생 뒤 차례가 넘어가고(`ending`), 덜 쏘고 넘기려면 `end_turn`. 맞았는지는 서버가 퍼짐을 섞은 광선으로 판정해 `shot` 이벤트(`from`/`to` 또는 수류탄 `frames`/`at`, `results`)로 보냅니다.
 - 화면은 내가 살아 있으면 내 눈, 탈락했거나 관전 중이면 지금 차례인 사람의 눈으로 봅니다. 그래픽은 three.js 기본 도형이라 디자인 작업 때 `soldierMesh`, `buildArena`, 효과 함수들을 바꾸면 됩니다.
 - 검증: `cd shooter && python -m pytest tests`
 

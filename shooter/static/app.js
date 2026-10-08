@@ -351,6 +351,7 @@ function onEvent(e, g) {
     }
   }
   if (e.kind === "timeout") lobby.logSystem(`${name(e.player_id)}님 시간 초과`);
+  if (e.kind === "pass") lobby.logSystem(`${name(e.player_id)}님 차례 끝`);
   if (e.kind === "left") lobby.logSystem(`${name(e.player_id)}님이 나가서 탈락했어요.`);
   if (e.kind !== "shot") return;
   const shooter = soldierOf(g, e.player_id);
@@ -398,15 +399,24 @@ function renderHud(g) {
   $("#help").classList.toggle("hidden", !playing);
   $("#hp-val").textContent = mine ? mine.hp : "-";
   $("#move-bar").style.width = `${myTurn(g) ? (g.move_left / g.move_max) * 100 : 0}%`;
-  if (mine && mine.stock?.[weapon] === 0) weapon = "rifle";
+  const mineTurn = myTurn(g) || (!!g.acting && isMe(g.current_id));
+  if (g.turn_weapon && isMe(g.current_id)) weapon = g.turn_weapon;     // 한 차례에 한 종류
+  else if (mine && mine.stock?.[weapon] === 0) weapon = Object.keys(g.weapons).find((id) => mine.stock[id] > 0) || weapon;
+  // 이번 차례 남은 발
+  const spec = g.weapons[weapon] || {};
+  const used = isMe(g.current_id) && g.turn_weapon === weapon ? g.shots : 0;
+  $("#shots-info").textContent = mineTurn ? `이번 차례 ${spec.name} ${spec.per_turn - used}/${spec.per_turn}발` : "";
+  $("#btn-end-turn").classList.toggle("hidden", !myTurn(g));
   $("#weapons").replaceChildren(
     ...Object.entries(g.weapons).map(([id, w], i) => {
       const left = mine?.stock?.[id];
+      const locked = isMe(g.current_id) && g.turn_weapon && g.turn_weapon !== id;
       const b = lobby.el("button", {
         type: "button",
         className: weapon === id ? "on" : "",
-        textContent: `${i + 1} ${w.name}${left === undefined ? "" : ` ${left}`}`,
-        disabled: !playing || left === 0,
+        textContent: `${i + 1} ${w.name} ${left ?? "∞"}`,
+        title: `${w.name}: 남은 탄 ${left ?? "∞"} · 한 차례에 ${w.per_turn}발`,
+        disabled: !playing || left === 0 || !!locked,
       });
       b.onclick = () => selectWeapon(id);
       return b;
@@ -417,6 +427,7 @@ function renderHud(g) {
 function selectWeapon(id) {
   const g = lobby.state.game;
   if (me(g)?.stock?.[id] === 0) return;
+  if (g?.turn_weapon && isMe(g.current_id) && g.turn_weapon !== id) return;
   weapon = id;
   if (g) renderHud(g);
 }
@@ -460,6 +471,7 @@ document.addEventListener("pointerlockchange", () => {
 document.addEventListener("keydown", (e) => {
   if (typing(e) || $("#game-view").classList.contains("hidden")) return;
   if (WEAPON_KEYS[e.code]) return selectWeapon(WEAPON_KEYS[e.code]);
+  if (e.code === "KeyE" && myTurn(lobby.state.game)) return endTurn();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code) && lobby.state.room?.playing) {
     keys.add(e.code);
     e.preventDefault();
@@ -470,8 +482,15 @@ window.addEventListener("blur", () => keys.clear());
 
 function fire(g) {
   lobby.send("fire", { weapon, yaw: view.yaw, pitch: view.pitch });
+  if (weapon !== "rifle") zoom = false;
+}
+
+// 차례 끝내기
+function endTurn() {
+  lobby.send("end_turn");
   zoom = false;
 }
+$("#btn-end-turn").onclick = endTurn;
 
 // 이동과 시선 보내기
 function sendInput(g, now) {
@@ -619,9 +638,9 @@ function tick(now) {
   requestAnimationFrame(tick);
 
 // 점검용 손잡이 (자동 테스트·디버깅)
-window.__shooter = { lobby, fire: () => fire(lobby.state.game), setView: (yaw, pitch) => (view = { yaw, pitch }) };
+window.__shooter = { lobby, fire: () => fire(lobby.state.game), setView: (yaw, pitch) => (view = { yaw, pitch }), setZoom: (on) => (zoom = on) };
 }
 requestAnimationFrame(tick);
 
 // 점검용 손잡이 (자동 테스트·디버깅)
-window.__shooter = { lobby, fire: () => fire(lobby.state.game), setView: (yaw, pitch) => (view = { yaw, pitch }) };
+window.__shooter = { lobby, fire: () => fire(lobby.state.game), setView: (yaw, pitch) => (view = { yaw, pitch }), setZoom: (on) => (zoom = on) };
