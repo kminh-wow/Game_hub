@@ -1,4 +1,5 @@
-"""턴제 FPS 한 판: 돌아가며 움직이고, 둘러보고, 한 발 쏜다. 마지막까지 살아남은 사람이 이긴다."""
+"""턴제 FPS 한 판: 돌아가며 움직이고, 둘러보고, 쏜다. 마지막까지 살아남은 사람이 이긴다.
+한 바퀴가 한 라운드. 라운드마다 보급 상자가 하나씩 늘고, ZONE_ROUND 부터는 안전 구역이 줄어 밖에 있으면 다친다."""
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +14,8 @@ from common.multiplayer.banter import Banter
 from . import ai
 from .banter import LINES
 from .world import (
-    MOVE_MAX, SIZE, STEP_MAX, WEAPONS, Soldier, corners, generate_map, shoot, step, throw,
+    CROUCH_COST, ITEMS, MOVE_MAX, PICK_R, SIZE, STEP_MAX, WEAPONS, ZONE_ROUND, Item, Soldier, corners, free_spot,
+    generate_map, hurt, pick, shoot, step, throw, zone_damage, zone_radius,
 )
 
 if TYPE_CHECKING:
@@ -29,6 +31,8 @@ AI_ID = "ai"
 AI_THINK = 0.8           # AI 가 움직이기 전 기다리는 시간(초)
 AI_AIM = 0.7             # AI 가 조준한 뒤 쏘기까지(초)
 AI_STEP = 0.08           # AI 가 한 걸음 옮길 때마다 쉬는 시간(초)
+ITEM_START = 4           # 처음 깔리는 보급 상자 수
+ITEM_MAX = 6             # 맵에 동시에 있을 수 있는 보급 상자 수
 
 
 class Game:
@@ -54,6 +58,16 @@ class Game:
             s = Soldier(id=pid, name=name, color=i, x=x, z=z, dummy=pid == DUMMY_ID)
             s.yaw = math.atan2(-(SIZE / 2 - x), -(SIZE / 2 - z))   # 가운데를 보고 시작
             self.soldiers[pid] = s
+
+        # 안전 구역 (가운데는 무작위, 처음엔 맵 전체를 덮음)
+        self.zone_x, self.zone_z = self.rng.uniform(14, SIZE - 14), self.rng.uniform(14, SIZE - 14)
+        self.zone_r0 = max(math.hypot(cx - self.zone_x, cz - self.zone_z) for cx in (0, SIZE) for cz in (0, SIZE)) + 1
+        self.round = 1
+        # 보급 상자
+        self.items: list[Item] = []
+        self._item_seq = 0
+        for kind in ("ammo", "heal", "ammo", "heal")[:ITEM_START]:
+            self._spawn_item(kind, spots)
 
         self.order: list[str] = [pid for pid, _ in names if pid != DUMMY_ID]   # 차례 순서
         self.banter = None                       # AI 대사 (AI 와 대결할 때만)
@@ -81,11 +95,20 @@ class Game:
     def current_id(self) -> str:
         return self.order[self.turn_idx]
 
+    def _zone(self, rnd: int | None = None) -> tuple[float, float, float]:
+        return self.zone_x, self.zone_z, zone_radius(self.zone_r0, self.round if rnd is None else rnd)
+
     def state(self) -> dict[str, Any]:
         loop = asyncio.get_running_loop()
         return {
             "size": SIZE,
             "boxes": [b.public() for b in self.boxes],
+            "items": [it.public() for it in self.items],
+            "item_kinds": {k: v["name"] for k, v in ITEMS.items()},
+            "round": self.round,
+            "zone": {"x": round(self.zone_x, 2), "z": round(self.zone_z, 2), "r": round(self._zone()[2], 2),
+                     "next_r": round(self._zone(self.round + 1)[2], 2), "start": ZONE_ROUND,
+                     "next_damage": zone_damage(self.round + 1)},
             "soldiers": [s.public() for s in self.soldiers.values()],
             "weapons": {k: {key: w[key] for key in ("name", "stock", "per_turn", "spread", "speed", "radius", "fuse")
                             if key in w} for k, w in WEAPONS.items()},
@@ -158,7 +181,8 @@ class Game:
             await asyncio.sleep(AI_THINK)
             try:
                 plan = await asyncio.to_thread(ai.plan, self.boxes, list(self.soldiers.values()), me,
-                                               self.ai_level, self.rng)
+                                               self.ai_level, self.rng, self._zone(self.round + 1),
+                                               self._useful_items(me))
             except Exception:
                 logging.getLogger(__name__).exception("AI 계획 실패")
                 plan = {"to": (me.x, me.z), "weapon": "rifle", "yaw": me.yaw, "pitch": me.pitch}
@@ -170,11 +194,12 @@ class Game:
                     break
                 k = min(STEP_MAX * .8, dist, self.move_left) / dist
                 me.yaw = math.atan2(-dx, -dz)
-                moved = step(self.boxes, list(self.soldiers.values()), me, dx * k, dz * k)
+                moved, picked = self._walk(me, dx * k, dz * k)
                 if not moved:
                     break
-                self.move_left = max(0.0, self.move_left - moved)
                 await self._send_soldier(me)
+                if picked:
+                    await self.broadcast_state()
                 await asyncio.sleep(AI_STEP)
             me.yaw, me.pitch = plan["yaw"], plan["pitch"]
             await self.room.broadcast({"type": "look", "id": me.id, "yaw": me.yaw, "pitch": me.pitch})
@@ -205,11 +230,54 @@ class Game:
         if self._game_over():
             await self.finish()
             return
+        prev = self.turn_idx
+        self._advance()
+        if self.turn_idx <= prev:                     # 한 바퀴 돌았으면 새 라운드
+            self._new_round()
+            if self._game_over():
+                await self.finish()
+                return
+            if not self.soldiers[self.current_id].alive:
+                self._advance()
+        await self._start_turn()
+
+    def _advance(self) -> None:
         for _ in range(len(self.order)):
             self.turn_idx = (self.turn_idx + 1) % len(self.order)
             if self.soldiers[self.current_id].alive:
                 break
-        await self._start_turn()
+
+    # 새 라운드: 구역 줄이고 밖에 있는 사람 피해, 보급 상자 하나 추가
+    def _new_round(self) -> None:
+        self.round += 1
+        zx, zz, r = self._zone()
+        results = []
+        if self.round >= ZONE_ROUND:
+            damage = zone_damage(self.round)
+            for s in self._alive():
+                if math.hypot(s.x - zx, s.z - zz) > r:
+                    results.append(hurt(s, damage, "zone"))
+                    if not s.alive:
+                        self.deaths.append(s.id)
+        if len(self.items) < ITEM_MAX:
+            self._spawn_item(self.rng.choice(list(ITEMS)), [(s.x, s.z) for s in self._alive()], (zx, zz, r))
+        self.events.append({"kind": "round", "round": self.round, "r": round(r, 2), "results": results})
+        if results:
+            room_event(self.room, f"{self.round}라운드 구역 밖 피해: " + ", ".join(
+                f"{self.soldiers[x['id']].name} -{x['damage']} 남은 {x['hp']}" for x in results))
+
+    def _spawn_item(self, kind: str, avoid: list[tuple[float, float]],
+                    zone: tuple[float, float, float] | None = None) -> None:
+        avoid = avoid + [(it.x, it.z) for it in self.items]
+        spot = free_spot(self.rng, self.boxes, avoid, zone if zone and zone[2] > 3 else None)
+        if spot:
+            self._item_seq += 1
+            self.items.append(Item(self._item_seq, kind, *spot))
+
+    # AI 가 챙길 만한 상자 (체력이 깎였으면 구급, 탄이 줄었으면 탄약)
+    def _useful_items(self, s: Soldier) -> list[Item]:
+        low_ammo = any(s.stock.get(w, 0) < WEAPONS[w]["stock"] for w in ITEMS["ammo"]["gain"])
+        return [it for it in self.items if (it.kind == "heal" and s.hp < 80) or (it.kind == "ammo" and low_ammo)]
 
     def _game_over(self) -> bool:
         return len(self._alive()) <= 1 or not any(self.soldiers[pid].alive for pid in self.players)
@@ -256,12 +324,39 @@ class Game:
         length = math.hypot(dx, dz)
         if not math.isfinite(length) or length == 0:
             return None
-        k = min(STEP_MAX, length, self.move_left) / length
+        s = self.soldiers[player.id]
+        k = min(STEP_MAX, length, self.move_left / (CROUCH_COST if s.crouch else 1)) / length
         if k <= 0:
             return None
+        _, picked = self._walk(s, dx * k, dz * k)
+        await self._send_soldier(s)
+        if picked:
+            await self.broadcast_state()
+        return None
+
+    # 한 걸음 (이동 거리 차감, 지나간 자리 보급 상자 줍기). (움직인 거리, 주웠는지)
+    def _walk(self, s: Soldier, dx: float, dz: float) -> tuple[float, bool]:
+        moved = step(self.boxes, list(self.soldiers.values()), s, dx, dz)
+        self.move_left = max(0.0, self.move_left - moved * (CROUCH_COST if s.crouch else 1))
+        picked = False
+        for it in list(self.items):
+            if math.hypot(it.x - s.x, it.z - s.z) > PICK_R:
+                continue
+            gains = pick(s, it)
+            if not gains:
+                continue                                  # 꽉 차 있으면 그대로 둠
+            self.items.remove(it)
+            self.events.append({"kind": "pickup", "player_id": s.id, "item": it.kind, "gains": gains})
+            room_event(self.room, f"{s.name} {ITEMS[it.kind]['name']} 획득 {gains}")
+            picked = True
+        return moved, picked
+
+    # 앉기 / 일어서기
+    async def crouch(self, player: Player, on: Any) -> str | None:
+        if err := self._check_turn(player):
+            return err
         s = self.soldiers[player.id]
-        moved = step(self.boxes, list(self.soldiers.values()), s, dx * k, dz * k)
-        self.move_left = max(0.0, self.move_left - moved)
+        s.crouch = bool(on)
         await self._send_soldier(s)
         return None
 

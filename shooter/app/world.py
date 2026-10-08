@@ -1,7 +1,8 @@
 """턴제 FPS 월드: 아레나와 엄폐물, 이동 충돌, 총알(직선)과 수류탄(포물선) 판정.
 
 좌표는 미터 단위, 바닥이 y=0 이고 위가 +y. 아레나는 x·z 모두 0~SIZE.
-엄폐물은 바닥에서 솟은 상자(x0, z0, x1, z1, 높이)다. 사람은 원기둥 몸 + 공 머리.
+엄폐물은 바닥에서 솟은 상자(x0, z0, x1, z1, 높이)다. 사람은 원기둥 몸 + 공 머리 (앉으면 낮아짐).
+바닥에는 보급 상자(탄약·구급)가 놓이고, 판이 길어지면 안전 구역이 줄어든다.
 """
 from __future__ import annotations
 
@@ -22,6 +23,15 @@ STEP_MAX = 0.6           # 이동 메시지 한 번의 최대 거리
 MAX_HP = 100
 GRAVITY = 9.8
 MAX_RANGE = 90.0
+CROUCH_EYE = 1.0         # 앉았을 때 눈 높이
+CROUCH_TOP = 0.8         # 앉았을 때 몸통 꼭대기
+CROUCH_HEAD = 1.02       # 앉았을 때 머리 중심
+CROUCH_SPREAD = 0.6      # 앉아서 쏘면 퍼짐 배율
+CROUCH_COST = 1.5        # 앉아서 걸으면 이동 거리 소모 배율
+PICK_R = 0.9             # 보급 상자를 줍는 거리
+ZONE_ROUND = 6           # 이 라운드부터 안전 구역이 줄어든다
+ZONE_ROUNDS = 8          # 줄기 시작해서 다 사라지기까지 라운드 수
+ZONE_DAMAGE = 10         # 구역 밖 피해 (줄어든 라운드마다 이만큼 더 커짐)
 
 # 무기: 퍼짐(도), 몸·머리 피해, 판마다 탄약(stock), 한 차례에 쏠 수 있는 수(per_turn)
 WEAPONS: dict[str, dict[str, Any]] = {
@@ -30,6 +40,11 @@ WEAPONS: dict[str, dict[str, Any]] = {
     "grenade": {"name": "수류탄", "speed": 15.0, "radius": 4.5, "damage": 70, "fuse": 4.0, "stock": 2, "per_turn": 1},
 }
 RIFLE_FALLOFF = (15.0, 35.0, 0.5)   # 이 거리부터 줄어서, 이 거리에서 이 배율
+# 보급 상자: 탄약(무기별 보충, 처음 탄약까지) / 구급(체력)
+ITEMS: dict[str, dict[str, Any]] = {
+    "ammo": {"name": "탄약 상자", "gain": {"rifle": 15, "sniper": 1, "grenade": 1}},
+    "heal": {"name": "구급상자", "hp": 35},
+}
 
 
 @dataclass
@@ -56,18 +71,42 @@ class Soldier:
     hp: int = MAX_HP
     alive: bool = True
     dummy: bool = False
+    crouch: bool = False
     stock: dict[str, int] = field(default_factory=lambda: {k: w["stock"] for k, w in WEAPONS.items() if w["stock"]})
 
     @property
     def eye(self) -> tuple[float, float, float]:
-        return (self.x, EYE, self.z)
+        return (self.x, CROUCH_EYE if self.crouch else EYE, self.z)
+
+    @property
+    def body_top(self) -> float:
+        return CROUCH_TOP if self.crouch else BODY_TOP
+
+    @property
+    def head_y(self) -> float:
+        return CROUCH_HEAD if self.crouch else HEAD_Y
+
+    # 겨눌 만한 높이 (가슴, 배, 머리)
+    def aim_points(self) -> tuple[float, float, float]:
+        return (self.body_top * 0.82, self.body_top * 0.6, self.head_y)
 
     def public(self) -> dict[str, Any]:
         return {
             "id": self.id, "name": self.name, "color": self.color,
             "x": round(self.x, 3), "z": round(self.z, 3), "yaw": round(self.yaw, 4), "pitch": round(self.pitch, 4),
-            "hp": self.hp, "alive": self.alive, "dummy": self.dummy, "stock": self.stock,
+            "hp": self.hp, "alive": self.alive, "dummy": self.dummy, "crouch": self.crouch, "stock": self.stock,
         }
+
+
+@dataclass
+class Item:
+    id: int
+    kind: str
+    x: float
+    z: float
+
+    def public(self) -> dict[str, Any]:
+        return {"id": self.id, "kind": self.kind, "x": round(self.x, 2), "z": round(self.z, 2)}
 
 
 # ---- 맵 ----
@@ -112,6 +151,49 @@ def _dist_to_box(x: float, z: float, b: Box) -> float:
     dx = max(b.x0 - x, 0.0, x - b.x1)
     dz = max(b.z0 - z, 0.0, z - b.z1)
     return math.hypot(dx, dz)
+
+
+# 보급 상자 놓을 자리 (벽·사람·다른 상자에서 떨어진 곳, zone 이 있으면 그 원 안)
+def free_spot(rng: random.Random, boxes: list[Box], avoid: list[tuple[float, float]],
+              zone: tuple[float, float, float] | None = None) -> tuple[float, float] | None:
+    for _ in range(200):
+        x, z = rng.uniform(2, SIZE - 2), rng.uniform(2, SIZE - 2)
+        if zone and math.hypot(x - zone[0], z - zone[1]) > zone[2]:
+            continue
+        if any(_dist_to_box(x, z, b) < 1.0 for b in boxes):
+            continue
+        if any(math.hypot(x - ax, z - az) < 4.0 for ax, az in avoid):
+            continue
+        return x, z
+    return None
+
+
+# 보급 상자 줍기 (얻은 것: {"hp": n} 또는 {무기: n}, 얻은 게 없으면 빈 dict)
+def pick(s: Soldier, item: Item) -> dict[str, int]:
+    spec = ITEMS[item.kind]
+    gains: dict[str, int] = {}
+    if "hp" in spec:
+        gain = min(spec["hp"], MAX_HP - s.hp)
+        if gain > 0:
+            s.hp += gain
+            gains["hp"] = gain
+    for weapon, n in spec.get("gain", {}).items():
+        gain = min(n, WEAPONS[weapon]["stock"] - s.stock.get(weapon, 0))
+        if gain > 0:
+            s.stock[weapon] = s.stock.get(weapon, 0) + gain
+            gains[weapon] = gain
+    return gains
+
+
+# 안전 구역 반지름 (라운드별)
+def zone_radius(r0: float, rnd: int) -> float:
+    if rnd < ZONE_ROUND:
+        return r0
+    return max(0.0, r0 * (1 - (rnd - ZONE_ROUND + 1) / ZONE_ROUNDS))
+
+
+def zone_damage(rnd: int) -> int:
+    return ZONE_DAMAGE * max(0, rnd - ZONE_ROUND + 1)
 
 
 # ---- 이동 ----
@@ -183,7 +265,7 @@ def _ray_body(o, d, s: Soldier) -> float | None:
         return None
     for t in sorted(((-b - math.sqrt(disc)) / a, (-b + math.sqrt(disc)) / a)):
         y = o[1] + d[1] * t
-        if t >= 0 and 0 <= y <= BODY_TOP:
+        if t >= 0 and 0 <= y <= s.body_top:
             return t
     return None
 
@@ -203,7 +285,7 @@ def cast(boxes: list[Box], soldiers: list[Soldier], o, d, skip: Soldier | None =
     for s in soldiers:
         if not s.alive or s is skip:
             continue
-        th = _ray_sphere(o, d, (s.x, HEAD_Y, s.z), HEAD_R)
+        th = _ray_sphere(o, d, (s.x, s.head_y, s.z), HEAD_R)
         if th is not None and th < best[0]:
             best = (th, s, "head")
         tb = _ray_body(o, d, s)
@@ -229,7 +311,7 @@ def _rifle_scale(dist: float) -> float:
 def shoot(boxes: list[Box], soldiers: list[Soldier], shooter: Soldier, weapon: str,
           rng: random.Random) -> dict[str, Any]:
     w = WEAPONS[weapon]
-    spread = math.radians(w["spread"])
+    spread = math.radians(w["spread"]) * (CROUCH_SPREAD if shooter.crouch else 1)
     yaw = shooter.yaw + rng.gauss(0, spread / 2)
     pitch = shooter.pitch + rng.gauss(0, spread / 2)
     o, d = shooter.eye, direction(yaw, pitch)
@@ -239,12 +321,12 @@ def shoot(boxes: list[Box], soldiers: list[Soldier], shooter: Soldier, weapon: s
         damage = w[part]
         if weapon == "rifle":
             damage = round(damage * _rifle_scale(t))
-        hits.append(_hurt(target, damage, part))
+        hits.append(hurt(target, damage, part))
     return {"from": point(o, d, 0.4), "to": point(o, d, t), "surface": part if target is None else "player",
             "target": target.id if target else None, "part": part if target else None, "results": hits}
 
 
-def _hurt(s: Soldier, damage: int, part: str) -> dict[str, Any]:
+def hurt(s: Soldier, damage: int, part: str) -> dict[str, Any]:
     s.hp = max(0, s.hp - damage)
     if s.hp == 0:
         s.alive = False
@@ -255,7 +337,7 @@ def _hurt(s: Soldier, damage: int, part: str) -> dict[str, Any]:
 def throw(boxes: list[Box], soldiers: list[Soldier], thrower: Soldier, dt: float = 1 / 60) -> dict[str, Any]:
     w = WEAPONS["grenade"]
     d = direction(thrower.yaw, thrower.pitch)
-    pos = [thrower.x + d[0] * 0.6, EYE - 0.1 + d[1] * 0.6, thrower.z + d[2] * 0.6]
+    pos = [thrower.x + d[0] * 0.6, thrower.eye[1] - 0.1 + d[1] * 0.6, thrower.z + d[2] * 0.6]
     vel = [d[0] * w["speed"], d[1] * w["speed"], d[2] * w["speed"]]
     frames = [[round(v, 3) for v in pos]]
     t, n = 0.0, 0
@@ -284,7 +366,7 @@ def blast(boxes: list[Box], soldiers: list[Soldier], at) -> list[dict[str, Any]]
     for s in soldiers:
         if not s.alive:
             continue
-        center = (s.x, 0.9, s.z)
+        center = (s.x, s.body_top * 0.65, s.z)
         dist = math.dist(at, center)
         if dist >= w["radius"]:
             continue
@@ -295,7 +377,7 @@ def blast(boxes: list[Box], soldiers: list[Soldier], at) -> list[dict[str, Any]]
             if t < dist - 0.05:
                 damage *= 0.4
         if round(damage) > 0:
-            out.append(_hurt(s, round(damage), "blast"))
+            out.append(hurt(s, round(damage), "blast"))
     return out
 
 

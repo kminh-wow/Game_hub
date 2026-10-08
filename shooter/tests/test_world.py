@@ -1,11 +1,11 @@
-"""턴제 FPS 월드: 맵, 이동 충돌, 사격, 수류탄, AI."""
+"""턴제 FPS 월드: 맵, 이동 충돌, 사격, 수류탄, 앉기, 보급 상자, 안전 구역, AI."""
 import math
 import random
 
 from app import ai
 from app.world import (
-    EYE, MOVE_MAX, RADIUS, SIZE, WEAPONS, Box, Soldier, blast, blocked, cast, corners, direction, generate_map,
-    sees, shoot, step, throw,
+    EYE, MOVE_MAX, RADIUS, SIZE, WEAPONS, ZONE_ROUND, Box, Item, Soldier, blast, blocked, cast, corners, direction,
+    free_spot, generate_map, pick, sees, shoot, step, throw, zone_damage, zone_radius,
 )
 
 
@@ -117,3 +117,46 @@ def test_ai_is_accurate_up_close_at_high_level():
         r = shoot([], [me, foe], me, plan["weapon"], rng)
         hits += bool(r["results"])
     assert hits >= 24
+
+
+def test_crouch_lowers_hitbox_and_eye():
+    a, b = Soldier("a", "A", 0, 5, 20), Soldier("b", "B", 1, 15, 20)
+    face(a, b.x, 1.62, b.z)
+    b.crouch = True
+    r = shoot([], [a, b], a, "sniper", Steady())
+    assert r["target"] is None                                   # 서 있을 때 머리 높이는 앉으면 빗나감
+    face(a, b.x, b.head_y, b.z)
+    assert shoot([], [a, b], a, "sniper", Steady())["part"] == "head"
+    low = Box(9, 15, 10, 25, 1.2)
+    assert not sees([low], [a, b], a, b, y=b.head_y)              # 낮은 엄폐물 뒤에 숨음
+    a.crouch = True
+    assert a.eye[1] < EYE
+
+
+def test_items_fill_up_to_limits():
+    s = Soldier("a", "A", 0, 5, 5, hp=90)
+    assert pick(s, Item(1, "heal", 5, 5)) == {"hp": 10} and s.hp == 100
+    assert pick(s, Item(2, "heal", 5, 5)) == {}                   # 꽉 차면 못 주움
+    s.stock = {"rifle": 40, "sniper": 0, "grenade": 2}
+    assert pick(s, Item(3, "ammo", 5, 5)) == {"rifle": 5, "sniper": 1}
+    rng = random.Random(1)
+    for _ in range(20):
+        x, z = free_spot(rng, [], [], zone=(20, 20, 5))
+        assert math.hypot(x - 20, z - 20) <= 5
+
+
+def test_zone_shrinks_and_hurts_more_each_round():
+    assert zone_radius(30, ZONE_ROUND - 1) == 30 and zone_damage(ZONE_ROUND - 1) == 0
+    radii = [zone_radius(30, ZONE_ROUND + i) for i in range(10)]
+    assert radii == sorted(radii, reverse=True) and radii[-1] == 0
+    assert zone_damage(ZONE_ROUND + 1) > zone_damage(ZONE_ROUND) > 0
+
+
+def test_ai_heads_into_zone_and_takes_items():
+    me, foe = Soldier("ai", "AI", 0, 4, 4), Soldier("p", "P", 1, 36, 36)
+    walls = [Box(10, 0, 11, 40, 4)]                               # 서로 안 보임
+    x, z = ai.choose_spot(walls, [me, foe], me, foe, random.Random(0), zone=(30, 4, 3))
+    assert x > me.x                                               # 구역 쪽으로
+    it = Item(1, "heal", 6, 6)
+    x, z = ai.choose_spot(walls, [me, foe], me, foe, random.Random(0), items=[it])
+    assert math.hypot(x - it.x, z - it.z) < 0.9
