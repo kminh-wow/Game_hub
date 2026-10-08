@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>턴제 FPS</title>
-  <link rel="stylesheet" href="static/style.css?v=1">
+  <link rel="stylesheet" href="static/style.css?v=2">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/build/three.module.js"}}</script>
 </head>
 <body>
@@ -100,7 +100,8 @@
           <div class="bar-row"><span>시간</span><div class="bar"><div id="time-bar"></div></div><span id="time-sec"></span></div>
           <!-- 3D 화면과 HUD -->
           <div id="stage" class="stage" tabindex="0">
-            <div id="crosshair" class="crosshair"></div>
+            <div id="crosshair" class="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><b></b></div>
+            <div id="aim-info" class="aim-info"></div>
             <div id="scope" class="scope hidden"></div>
             <div id="hit-flash" class="hit-flash"></div>
             <div id="center-msg" class="center-msg"></div>
@@ -147,6 +148,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="../common/lobby.js?v=banter"></script>
-  <script type="module" src="static/app.js?v=2"></script>
+  <script type="module" src="static/app.js?v=3"></script>
 </body>
 </html>

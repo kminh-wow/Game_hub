@@ -212,10 +212,18 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 /* 3D 화면 */
 .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; margin: 8px 0; border-radius: 12px; overflow: hidden; background: #1b2226; outline: none; cursor: crosshair; }
 .stage canvas { display: block; width: 100%; height: 100%; }
-.crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; pointer-events: none; }
-.crosshair::before, .crosshair::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 2px #000; }
-.crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
-.crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
+/* 조준선: 네 막대 사이 간격(--gap)이 탄 퍼짐, 적을 겨누면 빨갛게 */
+.crosshair { --gap: 6px; --len: 9px; --c: #fff; position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.crosshair i, .crosshair b { position: absolute; background: var(--c); box-shadow: 0 0 2px #000; }
+.crosshair i.t, .crosshair i.b { width: 2px; height: var(--len); left: -1px; }
+.crosshair i.l, .crosshair i.r { height: 2px; width: var(--len); top: -1px; }
+.crosshair i.t { bottom: var(--gap); } .crosshair i.b { top: var(--gap); }
+.crosshair i.l { right: var(--gap); } .crosshair i.r { left: var(--gap); }
+.crosshair b { width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; }
+.crosshair.enemy { --c: #ff4a4a; }
+.crosshair.grenade i { opacity: .35; }
+.aim-info { position: absolute; left: 50%; top: calc(50% + 28px); transform: translateX(-50%); color: #fff; font-size: 13px; font-weight: 700; text-shadow: 0 1px 3px #000; pointer-events: none; white-space: nowrap; }
+.aim-info.enemy { color: #ff7070; }
 .scope { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at center, transparent 0 32%, rgba(0,0,0,.92) 33%); }
 .hit-flash { position: absolute; inset: 0; pointer-events: none; background: rgba(214, 48, 48, .45); opacity: 0; transition: opacity .4s; }
 .hit-flash.on { opacity: 1; transition: none; }

@@ -82,7 +82,8 @@ class Game:
             "size": SIZE,
             "boxes": [b.public() for b in self.boxes],
             "soldiers": [s.public() for s in self.soldiers.values()],
-            "weapons": {k: {"name": w["name"], "stock": w["stock"]} for k, w in WEAPONS.items()},
+            "weapons": {k: {key: w[key] for key in ("name", "stock", "spread", "speed", "radius", "fuse") if key in w}
+                        for k, w in WEAPONS.items()},
             "current_id": None if self.finished else self.current_id,
             "turn": self.turn,
             "move_left": round(self.move_left, 2),

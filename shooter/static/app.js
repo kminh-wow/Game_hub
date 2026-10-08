@@ -14,6 +14,7 @@ const SENS = 0.0022;            // 마우스 감도
 const FOV = 75;
 const ZOOM_FOV = { rifle: 45, sniper: 14, grenade: 60 };
 const WEAPON_KEYS = { Digit1: "rifle", Digit2: "sniper", Digit3: "grenade" };
+const GRAVITY = 9.8;            // 수류탄 궤적 미리보기 (서버와 같은 값)
 
 const lobby = GameLobby.init({
   storageKey: "shooter",
@@ -500,6 +501,93 @@ function sendInput(g, now) {
   lobby.send("move", { dx, dz });
 }
 
+// ---------- 조준선 ----------
+
+const raycaster = new THREE.Raycaster();
+const center = new THREE.Vector2(0, 0);
+
+// 탄 퍼짐을 화면 픽셀로 (퍼짐 각도 → 시야각 대비 비율)
+function spreadPx(deg) {
+  const half = THREE.MathUtils.degToRad(camera.fov / 2);
+  return Math.tan(THREE.MathUtils.degToRad(deg)) / Math.tan(half) * (stage.clientHeight / 2);
+}
+
+// 조준선 모양, 겨눈 대상(이름·거리), 수류탄 궤적
+function updateAim(g, v) {
+  const cross = $("#crosshair");
+  const info = $("#aim-info");
+  const alive = !!me(g)?.alive && isMe(v?.id);
+  const scoped = zoom && weapon === "sniper";
+  cross.classList.toggle("hidden", !alive || scoped);
+  info.classList.toggle("hidden", !alive);
+  arc.visible = ring.visible = false;
+  if (!alive) return;
+  const spec = g.weapons[weapon] || {};
+  cross.classList.toggle("grenade", weapon === "grenade");
+  cross.style.setProperty("--gap", `${Math.max(3, spreadPx(spec.spread || 0) * 1.2)}px`);
+
+  // 화면 가운데가 가리키는 것
+  raycaster.setFromCamera(center, camera);
+  const targets = [...arena.children.filter((o) => o.isMesh)];
+  for (const [id, m] of soldierMeshes) if (id !== v.id && m.group.visible) targets.push(m.group);
+  const hit = raycaster.intersectObjects(targets, true)[0];
+  let enemy = null;
+  if (hit) {
+    for (const [id, m] of soldierMeshes) {
+      let o = hit.object;
+      while (o && o !== m.group) o = o.parent;
+      if (o) enemy = soldierOf(g, id);
+    }
+  }
+  const live = enemy && enemy.alive;
+  cross.classList.toggle("enemy", !!live && weapon !== "grenade");
+  info.classList.toggle("enemy", !!live);
+  if (weapon === "grenade") {
+    const land = myTurn(g) ? drawArc(g, spec) : null;
+    info.textContent = land ? `착지 ${land.toFixed(1)}m` : "";
+  } else if (hit) {
+    info.textContent = live ? `${enemy.name} · ${hit.distance.toFixed(1)}m` : `${hit.distance.toFixed(1)}m`;
+  } else {
+    info.textContent = "";
+  }
+}
+
+// 수류탄 궤적 미리보기 (서버와 같은 방식으로 날려 보고, 처음 닿는 곳까지 선을 그림)
+const arc = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: 0xfff3b0, dashSize: 0.3, gapSize: 0.2 }));
+arc.frustumCulled = false;
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 40), new THREE.MeshBasicMaterial({ color: 0xff7a3d, transparent: true, opacity: 0.6, side: THREE.DoubleSide }));
+ring.rotation.x = -Math.PI / 2;
+scene.add(arc, ring);
+
+function solidAt(g, p) {
+  if (p.y <= 0) return true;
+  return g.boxes.some(([x0, z0, x1, z1, h]) => p.x >= x0 && p.x <= x1 && p.z >= z0 && p.z <= z1 && p.y <= h);
+}
+
+function drawArc(g, spec) {
+  if (!spec.speed) return null;
+  const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(view.pitch, view.yaw, 0, "YXZ"));
+  const pos = camera.position.clone().add(dir.clone().multiplyScalar(0.6));
+  pos.y -= 0.1;
+  const vel = dir.multiplyScalar(spec.speed);
+  const pts = [pos.clone()];
+  const dt = 1 / 60;
+  for (let t = 0; t < (spec.fuse || 4); t += dt) {
+    vel.y -= GRAVITY * dt;
+    pos.addScaledVector(vel, dt);
+    pts.push(pos.clone());
+    if (solidAt(g, pos)) break;
+  }
+  arc.geometry.setFromPoints(pts);
+  arc.computeLineDistances();
+  arc.visible = true;
+  const end = pts[pts.length - 1];
+  ring.position.set(end.x, Math.max(0.03, end.y + 0.03), end.z);
+  ring.scale.setScalar(spec.radius || 4.5);
+  ring.visible = true;
+  return camera.position.distanceTo(end);
+}
+
 // ---------- 매 프레임 ----------
 
 function tick(now) {
@@ -521,7 +609,7 @@ function tick(now) {
       sendInput(g, now);
       updateSoldiers(g, v?.id);
       for (let i = effects.length - 1; i >= 0; i--) if (effects[i](now)) effects.splice(i, 1);
-      $("#crosshair").classList.toggle("hidden", !me(g)?.alive || (zoom && weapon === "sniper"));
+      updateAim(g, v);
       renderer.render(scene, camera);
     }
   } catch (err) {
