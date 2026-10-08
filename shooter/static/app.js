@@ -15,6 +15,10 @@ const FOV = 75;
 const ZOOM_FOV = { rifle: 45, sniper: 14, grenade: 60 };
 const WEAPON_KEYS = { Digit1: "rifle", Digit2: "sniper", Digit3: "grenade" };
 const GRAVITY = 9.8;            // 수류탄 궤적 미리보기 (서버와 같은 값)
+const CROUCH_EYE = 1.0;         // 앉았을 때 눈 높이 (서버와 같은 값)
+const CROUCH_SCALE = 0.63;      // 앉은 모형 높이 배율
+const CROUCH_COST = 1.5;        // 앉아서 걸을 때 이동 거리 소모 (서버와 같은 값)
+const WEAPON_NAMES = { rifle: "소총", sniper: "저격총", grenade: "수류탄" };
 
 const lobby = GameLobby.init({
   storageKey: "shooter",
@@ -93,6 +97,7 @@ let weapon = "rifle";
 let zoom = false;
 let view = { yaw: 0, pitch: 0 };        // 내 시선 (마우스로 돌림)
 let viewReady = false;
+let eyeY = EYE;                          // 카메라 눈 높이 (앉으면 부드럽게 낮아짐)
 let lastLookSent = 0;
 const keys = new Set();
 let lastMove = 0;
@@ -123,6 +128,8 @@ function buildArena(g) {
   arena.clear();
   for (const m of soldierMeshes.values()) scene.remove(m.group);
   soldierMeshes.clear();
+  for (const m of itemMeshes.values()) scene.remove(m);
+  itemMeshes.clear();
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(g.size, g.size), new THREE.MeshLambertMaterial({ color: 0x8a9a6b }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(g.size / 2, 0, g.size / 2);
@@ -214,6 +221,8 @@ function updateSoldiers(g, viewerId) {
     m.group.visible = s.id !== viewerId;
     m.group.rotation.z = s.alive ? 0 : Math.PI / 2;      // 쓰러짐
     m.group.position.y = s.alive ? 0 : 0.4;
+    m.crouch = (m.crouch ?? 1) + ((s.crouch && s.alive ? CROUCH_SCALE : 1) - (m.crouch ?? 1)) * 0.3;   // 앉기
+    m.group.scale.y = m.crouch;
     drawLabel(m, s);
   }
 }
@@ -232,7 +241,8 @@ function updateCamera(g) {
   if (!v) return;
   const m = soldierMeshes.get(v.id);
   const pos = m ? m.shown : v;
-  camera.position.set(pos.x, EYE, pos.z);
+  eyeY += ((v.crouch ? CROUCH_EYE : EYE) - eyeY) * 0.3;
+  camera.position.set(pos.x, eyeY, pos.z);
   if (isMe(v.id)) {
     if (!viewReady) {
       view = { yaw: v.yaw, pitch: v.pitch };
@@ -353,6 +363,8 @@ function onEvent(e, g) {
   if (e.kind === "timeout") lobby.logSystem(`${name(e.player_id)}님 시간 초과`);
   if (e.kind === "pass") lobby.logSystem(`${name(e.player_id)}님 차례 끝`);
   if (e.kind === "left") lobby.logSystem(`${name(e.player_id)}님이 나가서 탈락했어요.`);
+  if (e.kind === "round") onRound(e, g, name);
+  if (e.kind === "pickup") onPickup(e, name);
   if (e.kind !== "shot") return;
   const shooter = soldierOf(g, e.player_id);
   if (shooter && !isMe(shooter.id)) Object.assign(shooter, { yaw: e.yaw, pitch: e.pitch });
@@ -362,12 +374,197 @@ function onEvent(e, g) {
     for (const r of e.results) {
       const what = r.part === "head" ? "헤드샷" : r.part === "blast" ? "폭발" : "명중";
       lobby.logSystem(`${name(e.player_id)} → ${name(r.id)} ${what} -${r.damage}${r.dead ? " (탈락)" : ""}`, r.dead ? "fail" : "sys");
-      if (isMe(r.id)) flash();
+      damageNumber(g, r);
+      if (r.dead) killFeed(name(e.player_id), `${WEAPON_NAMES[e.weapon]}${r.part === "head" ? " 헤드샷" : ""}`, name(r.id), isMe(e.player_id) || isMe(r.id));
+      if (isMe(r.id)) {
+        flash();
+        if (!isMe(e.player_id)) hitDirection(e.weapon === "grenade" ? e.at : e.from);
+      }
       if (isMe(e.player_id) && r.id !== e.player_id) centerMessage(r.dead ? "처치!" : r.part === "head" ? "헤드샷!" : `명중 -${r.damage}`);
       if (isMe(r.id) && r.dead) centerMessage("쓰러졌어요… 관전으로 바뀝니다");
     }
     if (!e.results.length && isMe(e.player_id)) centerMessage("빗나감");
   }, e.landed_ms);
+}
+
+// 새 라운드 (구역 밖 피해)
+function onRound(e, g, name) {
+  const zone = g.zone;
+  if (e.round === zone.start) lobby.logSystem(`${e.round}라운드: 안전 구역이 줄어들기 시작해요!`, "fail");
+  else if (e.round > zone.start) lobby.logSystem(`${e.round}라운드: 안전 구역 반경 ${e.r.toFixed(0)}m`);
+  for (const r of e.results) {
+    lobby.logSystem(`구역 밖 피해 → ${name(r.id)} -${r.damage}${r.dead ? " (탈락)" : ""}`, "fail");
+    damageNumber(g, r);
+    if (r.dead) killFeed("구역", "", name(r.id), isMe(r.id));
+    if (isMe(r.id)) {
+      flash();
+      centerMessage(r.dead ? "구역 밖에서 쓰러졌어요…" : `구역 밖! -${r.damage}`);
+    }
+  }
+}
+
+// 보급 상자 줍기
+function onPickup(e, name) {
+  const parts = Object.entries(e.gains).map(([k, n]) => (k === "hp" ? `체력 +${n}` : `${WEAPON_NAMES[k]} +${n}`));
+  const label = e.item === "heal" ? "구급상자" : "탄약 상자";
+  lobby.logSystem(`${name(e.player_id)}님이 ${label}를 주웠어요 (${parts.join(", ")})`);
+  if (isMe(e.player_id)) centerMessage(`${label}: ${parts.join(" · ")}`);
+}
+
+// 처치 알림 (오른쪽 위)
+function killFeed(killer, how, victim, mine) {
+  const feed = $("#killfeed");
+  const li = lobby.el("li", { className: mine ? "me" : "" }, killer, lobby.el("em", {}, how ? `[${how}]` : "→"), victim);
+  feed.append(li);
+  while (feed.children.length > 5) feed.firstChild.remove();
+  setTimeout(() => li.remove(), 8000);
+}
+
+// 맞은 방향 (화면 가운데 둘레 빨간 호)
+function hitDirection(from) {
+  const mine = me(lobby.state.game);
+  if (!mine || !from) return;
+  const dx = from[0] - mine.x;
+  const dz = from[2] - mine.z;
+  if (Math.hypot(dx, dz) < 0.3) return;
+  const rel = Math.atan2(-dx, -dz) - view.yaw;            // 0 이면 정면, + 면 왼쪽
+  const arc = lobby.el("i");
+  arc.style.transform = `rotate(${(-rel * 180) / Math.PI}deg)`;
+  $("#hit-dir").append(arc);
+  setTimeout(() => arc.remove(), 1600);
+}
+
+// 피해 숫자 (맞은 사람 머리 위로 떠오름)
+function damageNumber(g, r) {
+  const s = soldierOf(g, r.id);
+  const m = soldierMeshes.get(r.id);
+  if (!s) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 64;
+  const c = canvas.getContext("2d");
+  c.font = "900 44px 'Malgun Gothic', sans-serif";
+  c.textAlign = "center";
+  c.lineWidth = 6;
+  c.strokeStyle = "rgba(0,0,0,.8)";
+  const text = `-${r.damage}${r.part === "head" ? " 헤드샷" : ""}`;
+  c.strokeText(text, 128, 48);
+  c.fillStyle = r.part === "head" ? "#ffd84a" : r.part === "zone" ? "#c58bff" : "#ff5a5a";
+  c.fillText(text, 128, 48);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false, transparent: true }));
+  const base = m ? m.shown : s;
+  sprite.position.set(base.x, s.crouch ? 1.6 : 2.4, base.z);
+  scene.add(sprite);
+  const y0 = sprite.position.y;
+  const start = performance.now();
+  effects.push((now) => {
+    const t = (now - start) / 1200;
+    const d = Math.max(3, camera.position.distanceTo(sprite.position));   // 멀어도 같은 크기로
+    sprite.scale.set(0.32 * d, 0.08 * d, 1);
+    sprite.position.y = y0 + t * 0.03 * d;
+    sprite.material.opacity = Math.max(0, 1 - t * t);
+    if (t < 1) return false;
+    scene.remove(sprite);
+    sprite.material.map.dispose();
+    return true;
+  });
+}
+
+// ---------- 보급 상자, 안전 구역, 이동 범위 ----------
+
+const itemMeshes = new Map();
+
+// 보급 상자 모형 (탄약: 국방색 상자 / 구급: 흰 상자 + 빨간 십자)
+function itemMesh(it) {
+  const group = new THREE.Group();
+  const heal = it.kind === "heal";
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.45), new THREE.MeshLambertMaterial({ color: heal ? 0xf4f4f4 : 0x5b6b3a }));
+  group.add(box);
+  const markMat = new THREE.MeshBasicMaterial({ color: heal ? 0xe03030 : 0xf0c040 });
+  if (heal) {
+    const a = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.02, 0.1), markMat);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 0.34), markMat);
+    a.position.y = b.position.y = 0.21;
+    group.add(a, b);
+  } else {
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.08, 0.47), markMat);
+    group.add(band);
+  }
+  group.position.set(it.x, 0.35, it.z);
+  scene.add(group);
+  return group;
+}
+
+function syncItems(g, now) {
+  const ids = new Set((g.items || []).map((it) => it.id));
+  for (const [id, m] of itemMeshes) {
+    if (!ids.has(id)) {
+      scene.remove(m);
+      itemMeshes.delete(id);
+    }
+  }
+  for (const it of g.items || []) {
+    let m = itemMeshes.get(it.id);
+    if (!m) itemMeshes.set(it.id, (m = itemMesh(it)));
+    m.rotation.y = now / 900 + it.id;
+    m.position.y = 0.35 + Math.sin(now / 400 + it.id) * 0.08;
+  }
+}
+
+// 원 둘레 선 (반지름 1, scale 로 크기 조절)
+function circleLine(color, opacity) {
+  const pts = [];
+  for (let i = 0; i < 128; i++) pts.push(new THREE.Vector3(Math.cos((i / 128) * Math.PI * 2), 0, Math.sin((i / 128) * Math.PI * 2)));
+  const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+  line.frustumCulled = false;
+  scene.add(line);
+  return line;
+}
+
+const zoneWall = new THREE.Mesh(
+  new THREE.CylinderGeometry(1, 1, 10, 96, 1, true),
+  new THREE.MeshBasicMaterial({ color: 0xff3b6b, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })
+);
+zoneWall.frustumCulled = false;
+scene.add(zoneWall);
+const zoneNext = circleLine(0xffffff, 0.85);
+const moveRing = circleLine(0x6fd18b, 0.9);
+
+// 안전 구역(붉은 벽 + 다음 라운드 흰 원)과 내 이동 범위(초록 원)
+function updateZone(g) {
+  const z = g.zone;
+  const playing = !!lobby.state.room?.playing;
+  zoneWall.visible = !!z && playing && g.round >= z.start;
+  zoneNext.visible = !!z && playing && z.next_r < z.r;
+  if (z) {
+    zoneWall.position.set(z.x, 5, z.z);
+    zoneWall.scale.set(Math.max(z.r, 0.01), 1, Math.max(z.r, 0.01));
+    zoneNext.position.set(z.x, 0.05, z.z);
+    zoneNext.scale.setScalar(Math.max(z.next_r, 0.01));
+  }
+  const mine = me(g);
+  const reach = mine && myTurn(g) ? g.move_left / (mine.crouch ? CROUCH_COST : 1) : 0;
+  moveRing.visible = reach > 0.05;
+  if (moveRing.visible) {
+    const m = soldierMeshes.get(mine.id);
+    moveRing.position.set(m ? m.shown.x : mine.x, 0.04, m ? m.shown.z : mine.z);
+    moveRing.scale.setScalar(reach);
+  }
+  // 안내 문구
+  const info = $("#zone-info");
+  let text = "";
+  let warn = false;
+  if (z && playing) {
+    const left = z.start - g.round;
+    if (left > 1) text = `${g.round}라운드 · 안전 구역은 ${left}라운드 뒤부터 줄어요`;
+    else text = `${g.round}라운드 · 다음 라운드 구역 반경 ${z.next_r.toFixed(0)}m`;
+    if (mine?.alive && z.next_damage > 0 && Math.hypot(mine.x - z.x, mine.z - z.z) > z.next_r) {
+      text = `⚠ 구역 밖! 다음 라운드에 -${z.next_damage} (흰 원 안으로)`;
+      warn = true;
+    }
+  }
+  info.textContent = text;
+  info.classList.toggle("warn", warn);
 }
 
 // ---------- 화면 (DOM) ----------
@@ -388,6 +585,7 @@ function renderGame(g, room) {
   else if (g.acting) text = "사격 중…";
   else if (myTurn(g)) text = "내 차례!";
   else text = `${soldierOf(g, g.current_id)?.name || ""}님 차례`;
+  if (!finished && g.round) text = `${g.round}라운드 · ${text}`;
   $("#turn-info").textContent = text;
   $("#game-view .bar-row").classList.toggle("hidden", finished);
   renderHud(g);
@@ -398,6 +596,7 @@ function renderHud(g) {
   const playing = !!mine && !!lobby.state.room?.playing;
   $("#help").classList.toggle("hidden", !playing);
   $("#hp-val").textContent = mine ? mine.hp : "-";
+  $("#crouch-tag").classList.toggle("hidden", !mine?.crouch);
   $("#move-bar").style.width = `${myTurn(g) ? (g.move_left / g.move_max) * 100 : 0}%`;
   const mineTurn = myTurn(g) || (!!g.acting && isMe(g.current_id));
   if (g.turn_weapon && isMe(g.current_id)) weapon = g.turn_weapon;     // 한 차례에 한 종류
@@ -472,6 +671,7 @@ document.addEventListener("keydown", (e) => {
   if (typing(e) || $("#game-view").classList.contains("hidden")) return;
   if (WEAPON_KEYS[e.code]) return selectWeapon(WEAPON_KEYS[e.code]);
   if (e.code === "KeyE" && myTurn(lobby.state.game)) return endTurn();
+  if (e.code === "KeyC" && myTurn(lobby.state.game)) return lobby.send("crouch", { on: !me(lobby.state.game).crouch });
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code) && lobby.state.room?.playing) {
     keys.add(e.code);
     e.preventDefault();
@@ -514,7 +714,7 @@ function sendInput(g, now) {
   let dx = -sin * f + cos * r;
   let dz = -cos * f - sin * r;
   const len = Math.hypot(dx, dz);
-  const stepLen = (SPEED * MOVE_EVERY) / 1000;
+  const stepLen = (SPEED * MOVE_EVERY * (me(g).crouch ? 0.6 : 1)) / 1000;
   dx = (dx / len) * stepLen;
   dz = (dz / len) * stepLen;
   lobby.send("move", { dx, dz });
@@ -627,6 +827,8 @@ function tick(now) {
       const v = updateCamera(g);
       sendInput(g, now);
       updateSoldiers(g, v?.id);
+      syncItems(g, now);
+      updateZone(g);
       for (let i = effects.length - 1; i >= 0; i--) if (effects[i](now)) effects.splice(i, 1);
       updateAim(g, v);
       renderer.render(scene, camera);
@@ -636,9 +838,6 @@ function tick(now) {
     lobby.reportError?.(err, "화면");
   }
   requestAnimationFrame(tick);
-
-// 점검용 손잡이 (자동 테스트·디버깅)
-window.__shooter = { lobby, fire: () => fire(lobby.state.game), setView: (yaw, pitch) => (view = { yaw, pitch }), setZoom: (on) => (zoom = on) };
 }
 requestAnimationFrame(tick);
 

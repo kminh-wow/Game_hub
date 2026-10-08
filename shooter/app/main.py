@@ -26,5 +26,10 @@ async def end_turn(room: Room, player: Player, msg: dict) -> str | None:
     return await room.game.end_turn(player)
 
 
-server = GameServer(Room, actions={"look": look, "move": move, "fire": fire, "end_turn": end_turn})
+async def crouch(room: Room, player: Player, msg: dict) -> str | None:
+    return await room.game.crouch(player, msg.get("on"))
+
+
+server = GameServer(Room, actions={"look": look, "move": move, "fire": fire, "end_turn": end_turn,
+                                   "crouch": crouch})
 app = create_app(server, STATIC_DIR, "Turn FPS")

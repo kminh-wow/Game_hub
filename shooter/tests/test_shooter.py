@@ -193,3 +193,59 @@ def test_spectator_and_leaving(client):
     assert over["winner"]["id"] == cur.id
     for c in (cur, spec):
         c.close()
+
+
+def test_crouch_costs_more_movement(client):
+    a, b, cur, other, _, g = pair(client)
+    cur.send("crouch", on=True)
+    assert other.until("soldier")["soldier"]["crouch"] is True
+    start = me_of(g, cur.id)
+    cur.send("move", dx=0.5, dz=0)
+    m = other.until("soldier")
+    moved = abs(m["soldier"]["x"] - start["x"]) + abs(m["soldier"]["z"] - start["z"])
+    assert moved > 0 and m["move_left"] == pytest.approx(MOVE_MAX - moved * 1.5, abs=0.01)
+    other.send("crouch", on=True)
+    assert "차례" in other.until("error")["message"]
+    for c in (a, b):
+        c.close()
+
+
+def test_pickup_item_by_walking(client):
+    from app.main import server
+    from app.world import Item
+    a, b, cur, other, room_id, g = pair(client)
+    game = server.rooms[room_id].game
+    s = game.soldiers[cur.id]
+    s.hp = 50
+    game.items = [Item(99, "heal", s.x + 0.5, s.z)]
+    cur.send("move", dx=0.3, dz=0)
+    m = other.until("game", lambda m: any(e["kind"] == "pickup" for e in m["events"]))
+    e = next(e for e in m["events"] if e["kind"] == "pickup")
+    assert e["player_id"] == cur.id and e["gains"] == {"hp": 35}
+    assert me_of(m["game"], cur.id)["hp"] == 85 and all(it["id"] != 99 for it in m["game"]["items"])
+    for c in (a, b):
+        c.close()
+
+
+def test_zone_hurts_outside_at_new_round(client, monkeypatch):
+    import app.game as game_module
+    import app.world as world_module
+    from app.main import server
+    monkeypatch.setattr(world_module, "ZONE_ROUND", 2)
+    monkeypatch.setattr(game_module, "ZONE_ROUND", 2)
+    me = Conn(client, "z" + uuid.uuid4().hex[:4])
+    me.send("create_room", title="구역")
+    room_id = me.until("room")["room"]["id"]
+    me.send("start")
+    g = me.game()["game"]
+    assert g["round"] == 1 and g["zone"]["next_damage"] == world_module.ZONE_DAMAGE
+    game = server.rooms[room_id].game
+    s = game.soldiers[me.id]
+    game.zone_x, game.zone_z, game.zone_r0 = 40 - s.x, 40 - s.z, 2.0     # 반대편 작은 원
+    me.send("end_turn")
+    m = me.until("game", lambda m: any(e["kind"] == "round" for e in m["events"]))
+    e = next(e for e in m["events"] if e["kind"] == "round")
+    hurt = {r["id"]: r for r in e["results"]}
+    assert e["round"] == 2 and hurt[me.id]["damage"] == world_module.ZONE_DAMAGE and hurt[me.id]["part"] == "zone"
+    assert m["game"]["round"] == 2 and len(m["game"]["items"]) >= 4
+    me.close()
