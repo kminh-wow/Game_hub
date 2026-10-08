@@ -37,6 +37,7 @@ hangman/         행맨     (FastAPI 앱: hangman/app/main.py)
 omok/            오목     (FastAPI 앱: omok/app/main.py)
 yacht/           요트 다이스 (FastAPI 앱: yacht/app/main.py)
 fortress/        포트리스 (FastAPI 앱: fortress/app/main.py)
+shooter/         턴제 FPS (FastAPI 앱: shooter/app/main.py)
 deploy/          서버 설치, 업데이트 스크립트
 docs/            이 문서, README용 스크린샷
 tests/           허브 통합 테스트
@@ -52,6 +53,7 @@ tests/           허브 통합 테스트
 | `/omok/` | 오목 |
 | `/yacht/` | 요트 다이스 |
 | `/fortress/` | 포트리스 |
+| `/shooter/` | 턴제 FPS |
 | `/common/` | 공통 프론트엔드 파일 (`lobby.js`) |
 
 - 각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
@@ -470,4 +472,26 @@ fortress/
 - 파워는 화면의 게이지에서 정해 `fire {power, weapon}`으로 보냅니다(0~100 중 어떤 값이든 정당한 선택이라 서버는 범위만 확인합니다). 각도·방향은 `aim {angle, facing}`, 이동은 `move {dir}` 한 번에 3씩이며 연료를 씁니다. 서버는 다른 사람에게 `aim`·`tank` 메시지로 바로 알려 줍니다.
 - 메시지: `game`(상태 + `events`: turn, shot, timeout, left), `aim`, `tank`, `game_over`(`ranking`, `winner`).
 - 검증: `cd fortress && python -m pytest tests` (물리 엔진이 필요 없습니다).
+
+---
+
+## 턴제 FPS
+
+```
+shooter/
+  app/
+    main.py     GameServer·앱 생성 (게임 메시지: look, move, fire)
+    room.py     방 설정(한 차례 제한 시간, 혼자일 때 상대, AI 말투), 1~4명
+    game.py     차례 진행: 이동 거리, 시선, 발사, 재생 대기, AI 차례, 퇴장, 순위, AI 대사
+    world.py    아레나·엄폐물 생성, 이동 충돌(미끄러짐), 광선 판정(몸 원기둥·머리 공·상자·바닥), 소총·저격총, 수류탄 포물선·폭발
+    ai.py       갈 자리 고르기(상대가 보이는 곳), 무기 고르기, 조준 오차(난이도), 수류탄 각도 찾기
+    banter.py   AI 대사 (순한맛). 매운맛은 private/spicy.json 의 "shooter"
+  static/       index.html, style.css, app.js (lobby.js + three.js, 도형 그래픽)
+  tests/
+```
+
+- 좌표는 미터, 바닥 y=0, 아레나 0~40. 시선 `yaw`는 three.js 카메라와 같아서 0이면 -z를 봅니다(`world.direction`). 사람은 반지름 0.4 원기둥 몸(높이 1.4까지)과 머리 공(높이 1.62, 반지름 0.24), 눈 높이 1.6.
+- 화면은 `look {yaw, pitch}`(시선, 0.12초마다), `move {dx, dz}`(한 번에 0.6m까지, 차례마다 7m), `fire {weapon, yaw, pitch}`를 보냅니다. 맞았는지는 서버가 퍼짐을 섞은 광선으로 판정해 `shot` 이벤트(`from`/`to` 또는 수류탄 `frames`/`at`, `results`)로 보냅니다.
+- 화면은 내가 살아 있으면 내 눈, 탈락했거나 관전 중이면 지금 차례인 사람의 눈으로 봅니다. 그래픽은 three.js 기본 도형이라 디자인 작업 때 `soldierMesh`, `buildArena`, 효과 함수들을 바꾸면 됩니다.
+- 검증: `cd shooter && python -m pytest tests`
 
