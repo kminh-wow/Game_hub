@@ -343,7 +343,7 @@ function onEvent(e, g) {
   if (e.kind === "turn") {
     zoom = false;
     if (isMe(e.player_id)) {
-      viewReady = false;
+      lastLookSent = 0;                    // 보고 있던 방향 그대로, 바로 서버에 알림
       centerMessage("내 차례! 움직이고, 조준하고, 쏘세요");
     } else {
       centerMessage(`${name(e.player_id)}님 차례`);
