@@ -19,6 +19,7 @@ http://127.0.0.1:8000 을 여세요.
   - 허브 통합 테스트: `pytest tests`
   - 끝말잇기 규칙·접속 관리: `cd wordchain && pytest`
   - 팩맨 규칙: `node --test pacman/tests/logic.test.mjs` (Node 18 이상)
+  - 숫자러너 규칙: `node --test runner/tests/logic.test.mjs`
   - 행맨 게임 흐름: `cd hangman && pytest`
 
 ## 구조
@@ -38,6 +39,7 @@ omok/            오목     (FastAPI 앱: omok/app/main.py)
 yacht/           요트 다이스 (FastAPI 앱: yacht/app/main.py)
 fortress/        포트리스 (FastAPI 앱: fortress/app/main.py)
 shooter/         턴제 FPS (FastAPI 앱: shooter/app/main.py)
+runner/          숫자러너 (FastAPI 앱: runner/app.py, 정적 파일만 제공)
 deploy/          서버 설치, 업데이트 스크립트
 docs/            이 문서, README용 스크린샷
 tests/           허브 통합 테스트
@@ -54,6 +56,7 @@ tests/           허브 통합 테스트
 | `/yacht/` | 요트 다이스 |
 | `/fortress/` | 포트리스 |
 | `/shooter/` | 턴제 FPS |
+| `/runner/` | 숫자러너 |
 | `/common/` | 공통 프론트엔드 파일 (`lobby.js`) |
 
 - 각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
@@ -497,4 +500,31 @@ shooter/
 - 화면 쪽 정보: 처치 알림(오른쪽 위), 맞은 방향(가운데 둘레 빨간 호), 피해 숫자(머리 위), 이동 범위(초록 원), 안전 구역(붉은 벽 + 다음 라운드 흰 원).
 - 화면은 내가 살아 있으면 내 눈, 탈락했거나 관전 중이면 지금 차례인 사람의 눈으로 봅니다. 그래픽은 three.js 기본 도형이라 디자인 작업 때 `soldierMesh`, `buildArena`, 효과 함수들을 바꾸면 됩니다.
 - 검증: `cd shooter && python -m pytest tests`
+
+---
+
+## 숫자러너
+
+브라우저에서만 도는 싱글 게임입니다. 서버(`runner/app.py`)는 정적 파일만 내려줍니다.
+
+```
+runner/
+  app.py             정적 파일 서빙
+  web/
+    index.html, style.css   화면 (임시 스타일)
+    logic.js         규칙: 이동, 사건 배치(문·적·상자·철창·보스), 사격, 맞붙기, 동료, 아이템 (DOM 없음, 시드 난수)
+    game.js          진행(시작·일시정지·끝·최고 기록), 입력(키보드·끌기), three.js 그리기
+    vendor/three/    three.js r180
+  tests/
+    logic.test.mjs   logic.js 테스트 (node --test)
+```
+
+- 좌표: `x`는 도로 가로(-5~5), `d`는 내 무리 앞쪽 거리(m). 무리는 늘 `d=0`에 있고 물체들이 `runSpeed`로 다가옵니다. 화면에서는 `z = -d`.
+- `step(state, 1/60, {dir, targetX})`가 한 틱을 진행하고 사건 목록(`gate`, `kill`, `clash`, `weapon`, `item`, `cage`, `boss`, `bomb`, `boss_down`, `over` …)을 돌려줍니다. 화면은 사건으로 효과·알림만 그립니다.
+- 난이도는 `difficulty(dist) = 1.0016^dist`로 끝없이 커지고, 적 수는 그 0.8제곱, 1명 체력은 0.45제곱으로 늘어납니다. 병사는 최대 999명이라 언젠가는 밀립니다.
+- 사격: 무기마다 1초 발사 횟수(`rate`)와 병사 1명당 초당 피해(`dps`)가 있고, 화면에 보이는 탄 몇 발에 전체 피해를 나눠 싣습니다. 문을 맞히면 `+`/`-` 문 숫자가 1초에 약 7씩 오릅니다.
+- 맞붙기: 적 무리가 무리에 닿으면 1초에 `30 + 0.6 × min(내 수, 적 수)`명씩 서로 쓰러지고, 적 1명이 `power`만큼 병사를 쓰러뜨립니다(거인 10).
+- 보스는 `BOSS_EVERY`(1000m)마다 나오고, 살아 있는 동안은 새 사건이 생기지 않습니다. 폭탄(빨간 원), 부하 소환, 돌진을 번갈아 씁니다.
+- 밸런스를 바꿀 때는 `logic.js` 위쪽 상수와 `WEAPONS`·`ENEMIES` 표만 고치면 됩니다.
+- 디버그: 브라우저 콘솔에서 `__runner.game`으로 상태를 볼 수 있습니다.
 

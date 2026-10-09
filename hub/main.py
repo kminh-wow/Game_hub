@@ -9,6 +9,7 @@
     /yacht/      요트 다이스
     /fortress/   포트리스
     /shooter/    턴제 FPS
+    /runner/     숫자러너
     /common/     게임들이 함께 쓰는 프론트엔드 파일 (lobby.js 등)
 
 게임 상태가 각 앱의 메모리에 있으므로 uvicorn 워커는 반드시 1개로 실행한다.
@@ -39,6 +40,7 @@ GAME_MODULES = {
     "yacht": "yacht.app.main",
     "fortress": "fortress.app.main",
     "shooter": "shooter.app.main",
+    "runner": "runner.app",
 }
 
 

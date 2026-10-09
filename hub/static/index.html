@@ -119,6 +119,11 @@
     .scope-art::before, .scope-art::after { content: ""; position: absolute; background: currentColor; }
     .scope-art::before { left: 50%; top: 6px; bottom: 6px; width: 2px; margin-left: -1px; }
     .scope-art::after { top: 50%; left: 6px; right: 6px; height: 2px; margin-top: -1px; }
+    /* 숫자러너 카드 그림 */
+    .gates-art { display: flex; gap: 6px; }
+    .gates-art b { width: 58px; height: 46px; display: grid; place-items: center; border-radius: 6px; color: #fff; font-size: 18px; }
+    .gates-art .good { background: #3a8dff; }
+    .gates-art .bad { background: #ef4b55; }
 
     footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
 
@@ -242,6 +247,16 @@
       <h2>턴제 FPS</h2>
       <p>1인칭 3D 전장에서 돌아가며 한 명씩! 움직이고, 둘러보고, 소총·저격총·수류탄 중 한 발. 끝까지 살아남아라.</p>
       <div class="tags"><span>1~4명</span><span>멀티플레이</span><span>3D</span><span>PC</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
+    <a class="card" href="runner/">
+      <div class="art" aria-hidden="true">
+        <div class="gates-art"><b class="good">×2</b><b class="bad">-15</b></div>
+      </div>
+      <h2>숫자러너</h2>
+      <p>숫자 문을 골라 병사를 불리고, 끝없이 몰려오는 적을 막아라! 무기 상자, 동료, 보스까지.</p>
+      <div class="tags"><span>1명</span><span>아케이드</span><span>3D</span><span>모바일</span></div>
       <span class="play">플레이 →</span>
     </a>
   </main>
