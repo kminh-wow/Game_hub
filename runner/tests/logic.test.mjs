@@ -2,15 +2,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  BOSS_EVERY, HALF, MAX_LEVEL, MAX_SQUAD, START_SQUAD, applyGate, createGame, difficulty, gateGood, gateLabel,
-  makeGroup, score, squadRadius, step,
+  BOSS_EVERY, HALF, LANES, MAX_LEVEL, MAX_SQUAD, START_SQUAD, applyGate, createGame, difficulty, gateGood, gateLabel,
+  laneOf, laneX, makeGroup, score, squadRadius, step,
 } from "../web/logic.js";
+
+const num = (v) => ({ op: "num", v, acc: 0 });
 
 // 아무것도 없는 판 (사건이 저절로 생기지 않게 멀리 미룸)
 function empty(seed = 1) {
   const s = createGame(seed);
   s.nextSpawn = 1e9;
   s.nextBoss = 1e9;
+  s.nextTrickle = 1e9;
+  s.x = 0;
   return s;
 }
 
@@ -42,25 +46,29 @@ test("같은 시드면 같은 판", () => {
   assert.equal(JSON.stringify(a.gates), JSON.stringify(b.gates));
 });
 
-test("서 있는 쪽 문이 적용된다", () => {
+test("도로는 4칸, 서 있는 칸의 문이 적용된다", () => {
+  assert.equal(LANES, 4);
+  assert.deepEqual([0, 1, 2, 3].map((i) => laneOf(laneX(i))), [0, 1, 2, 3]);
+  assert.equal(laneOf(-HALF - 1), 0);
+  assert.equal(laneOf(HALF + 1), 3);
   const s = empty();
-  s.gates.push({ id: 1, d: 5, left: { op: "num", v: 20, acc: 0 }, right: { op: "div", v: 2, acc: 0 }, passed: false });
-  s.weapon = "pistol";
-  s.x = -2;
-  const ev = run(s, 1.5, { targetX: -2 });
+  s.gates.push({ id: 1, d: 5, lanes: [num(-5), num(20), { op: "div", v: 2, acc: 0 }, num(-9)], passed: false });
+  s.x = laneX(1);
+  const ev = run(s, 1.5, { targetX: laneX(1) });
   const gate = ev.find((e) => e.type === "gate");
-  assert.equal(gate.side, "left");
+  assert.equal(gate.lane, 1);
   assert.equal(gate.after, START_SQUAD + 20 + (gate.after - gate.before - 20));   // 쏴서 오른 만큼 더해질 수 있음
   assert.ok(s.count >= START_SQUAD + 20);
 });
 
 test("문을 쏘면 숫자가 올라간다", () => {
   const s = empty();
-  s.gates.push({ id: 1, d: 25, left: { op: "num", v: -20, acc: 0 }, right: { op: "num", v: -20, acc: 0 }, passed: false });
-  s.x = 3;
-  run(s, 1.2, { targetX: 3 });
-  assert.ok(s.gates[0].right.v > -20 && s.gates[0].right.v <= 0);
-  assert.equal(s.gates[0].left.v, -20);                     // 무리가 오른쪽이라 오른쪽 문만 맞음
+  s.gates.push({ id: 1, d: 25, lanes: [num(-20), num(-20), num(-20), num(-20)], passed: false });
+  s.x = laneX(3);
+  run(s, 1.2, { targetX: laneX(3) });
+  const [a, b, c, d] = s.gates[0].lanes.map((g) => g.v);
+  assert.ok(d > -20 && d <= 0);
+  assert.deepEqual([a, b], [-20, -20]);                     // 내 앞 칸 문만 맞음
 });
 
 test("총으로 적 무리를 줄이고, 맞붙으면 서로 줄어든다", () => {
@@ -90,10 +98,10 @@ test("병사가 0이 되면 게임 오버", () => {
 
 test("옆으로 비키면 적 무리를 피한다", () => {
   const s = empty();
-  s.x = -3;
-  s.groups.push(makeGroup(s, "mob", 3.5, 20, 30));
+  s.x = laneX(0);
+  s.groups.push(makeGroup(s, "mob", laneX(3), 20, 30));
   s.groups[0].pool = s.groups[0].unitHp * 30 * 1000;       // 총으로는 안 죽게
-  run(s, 4, { targetX: -3.5 });
+  run(s, 4, { targetX: laneX(0) });
   assert.equal(s.count, START_SQUAD);
 });
 
@@ -165,8 +173,8 @@ test("보스 폭탄은 비켜 서면 안 맞는다", () => {
   const s = empty();
   s.count = 100;
   s.bombs.push({ x: 3, r: 1.5, t: 0.2, total: 1.3 });
-  s.x = -3;
-  const ev = run(s, 0.5, { targetX: -3 });
+  s.x = -4;
+  const ev = run(s, 0.5, { targetX: -4 });
   assert.equal(ev.find((e) => e.type === "bomb").lost, 0);
   s.bombs.push({ x: s.x, r: 1.5, t: 0.2, total: 1.3 });
   const ev2 = run(s, 0.5, { targetX: s.x });
@@ -189,4 +197,18 @@ test("가만히 있어도 언젠가는 끝나고, 값이 망가지지 않는다"
     }
     assert.ok(s.over, `seed ${seed}`);
   }
+});
+
+test("큰 사건 사이에도 작은 적 무리가 계속 온다", () => {
+  const s = createGame(5);
+  s.nextSpawn = 1e9;
+  s.nextBoss = 1e9;
+  s.count = 999;
+  let spawned = 0;
+  let seen = new Set();
+  for (let t = 0; t < 30; t += 1 / 60) {
+    step(s, 1 / 60, {});
+    for (const g of s.groups) if (!seen.has(g.id)) (seen.add(g.id), spawned++);
+  }
+  assert.ok(spawned >= 15, `작은 무리 ${spawned}개`);       // 30초에 약 300m → 7~12m마다
 });

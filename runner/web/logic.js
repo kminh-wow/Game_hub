@@ -1,8 +1,10 @@
 // 숫자러너 규칙 (화면과 분리된 순수 로직, DOM 없음).
-// 좌표: x 는 도로 가로(-5 ~ 5, 왼쪽이 -), d 는 내 무리 맨 앞에서부터 앞쪽 거리(m). 무리는 늘 d=0 에 있고 세상이 다가온다.
+// 좌표: x 는 도로 가로(-8 ~ 8, 왼쪽이 -), d 는 내 무리 맨 앞에서부터 앞쪽 거리(m). 무리는 늘 d=0 에 있고 세상이 다가온다.
 // 한 판 상태는 createGame() 이 만들고, step(state, dt, input) 이 시간을 흘리며 사건 목록을 돌려준다.
 
-export const ROAD_W = 10;
+export const LANES = 4;              // 도로 칸 수 (칸마다 숫자 문 하나)
+export const LANE_W = 4;
+export const ROAD_W = LANES * LANE_W;
 export const HALF = ROAD_W / 2;
 export const SPAWN_D = 62;          // 새 물체가 나타나는 거리
 export const MAX_SQUAD = 999;
@@ -11,7 +13,7 @@ export const BOSS_EVERY = 1000;     // 이 거리마다 보스
 export const REST_EVERY = 700;      // 이 거리마다 적 없는 정비 구간
 export const REST_LEN = 90;
 export const MAX_LEVEL = 5;
-const MOVE_SPEED = 11;              // 좌우 이동 속도(m/s)
+const MOVE_SPEED = 15;              // 좌우 이동 속도(m/s)
 const CLASH_RATE = 30;              // 맞붙었을 때 1초에 쓰러지는 적 수 (기본)
 const GATE_RATE = 7;                // 문을 계속 쏘면 1초에 오르는 숫자
 const SPLASH_MUL = 3;               // 폭발은 무리 여럿을 함께 맞힘
@@ -69,6 +71,20 @@ export function makeRng(seed) {
 }
 
 // ---- 계산 도우미 ----
+
+// 처음 500m는 적을 줄여서 시작 (0.4 → 1)
+function warmup(dist) {
+  return Math.min(1, 0.4 + dist / 500);
+}
+
+// 칸 번호 (0 = 맨 왼쪽)와 칸 가운데 x
+export function laneOf(x) {
+  return Math.max(0, Math.min(LANES - 1, Math.floor((x + HALF) / LANE_W)));
+}
+
+export function laneX(i) {
+  return -HALF + LANE_W * (i + 0.5);
+}
 
 // 거리별 난이도 배율 (끝없이 커짐)
 export function difficulty(dist) {
@@ -132,7 +148,7 @@ export function createGame(seed = Date.now()) {
     t: 0,
     dist: 0,
     count: START_SQUAD,
-    x: 0,
+    x: -LANE_W / 2,           // 두 번째 칸 가운데에서 시작
     weapon: "pistol",
     level: 1,
     allies: {},               // 종류 → 레벨
@@ -144,8 +160,9 @@ export function createGame(seed = Date.now()) {
     bonus: 0,
     over: false,
     nextSpawn: 30,            // 다음 사건을 놓을 거리
+    nextTrickle: 70,          // 다음 작은 무리를 놓을 거리
     nextBoss: BOSS_EVERY,
-    sinceGate: 0,
+    sinceGate: 3,             // 첫 사건은 문
     boss: null,
     groups: [],               // 적 무리
     gates: [],                // 문 한 쌍씩
@@ -206,6 +223,10 @@ function moveSquad(s, dt, input) {
 function direct(s, events) {
   const r = s.rng;
   if (s.boss) return;
+  if (s.dist >= s.nextTrickle) {                     // 큰 사건 사이에도 작은 무리가 쉬지 않고 옴
+    s.nextTrickle = s.dist + r.range(7, 12);
+    spawnTrickle(s);
+  }
   if (s.dist >= s.nextBoss) {
     spawnBoss(s, events);
     return;
@@ -240,18 +261,23 @@ function makeGate(s, good) {
 function spawnGates(s) {
   const r = s.rng;
   s.sinceGate = 0;
-  let left;
-  let right;
+  // 좋은 문 1개 + 나쁜 문 2개 + (좋은 문 / 동료 / 나쁜 문 중 하나), 칸에 무작위로
   const roll = r.next();
-  if (roll < 0.68) [left, right] = [makeGate(s, true), makeGate(s, false)];      // 좋은 문 + 나쁜 문
-  else if (roll < 0.84) [left, right] = [makeGate(s, true), makeGate(s, true)];  // 둘 다 좋은 문 (고르기)
-  else [left, right] = [makeGate(s, true), { op: "ally", ally: r.pick(Object.keys(ALLIES)) }];
-  if (r.next() < 0.5) [left, right] = [right, left];
-  for (const g of [left, right]) {
+  const extra = roll < 0.45 ? makeGate(s, true) : roll < 0.7 ? { op: "ally", ally: r.pick(Object.keys(ALLIES)) } : makeGate(s, false);
+  const lanes = shuffle(r, [makeGate(s, true), makeGate(s, false), makeGate(s, false), extra]);
+  for (const g of lanes) {
     g.acc = 0;
     if (g.op === "num" && r.next() < 0.12) g.hidden = true;                      // 미스터리 문
   }
-  s.gates.push({ id: id(s), d: SPAWN_D, left, right, passed: false });
+  s.gates.push({ id: id(s), d: SPAWN_D, lanes, passed: false });
+}
+
+function shuffle(r, arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(r.next() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 function enemyTypes(dist) {
@@ -282,14 +308,23 @@ function spawnWave(s) {
   const r = s.rng;
   s.sinceGate += 1;
   const diff = difficulty(s.dist);
-  const lanes = 1 + (s.dist > 250 ? 1 : 0) + (s.dist > 1000 && r.next() < 0.5 ? 1 : 0);
-  const xs = [-3, 0, 3].sort(() => r.next() - 0.5).slice(0, lanes);
+  const lanes = 1 + (s.dist > 250 ? 1 : 0) + (s.dist > 1000 && r.next() < 0.5 ? 1 : 0) + (s.dist > 2000 && r.next() < 0.5 ? 1 : 0);
+  const xs = shuffle(r, [0, 1, 2, 3]).slice(0, lanes).map(laneX);
   for (const x of xs) {
     const type = weighted(r, enemyTypes(s.dist));
     const base = type === "brute" ? 1 : type === "rusher" ? r.range(5, 10) : r.range(10, 17);
-    const n = type === "brute" ? 1 : Math.max(1, Math.round(base * Math.pow(diff, 0.8) / lanes ** 0.3));
+    const n = type === "brute" ? 1 : Math.max(1, Math.round(base * Math.pow(diff, 0.8) * warmup(s.dist) / lanes ** 0.3));
     s.groups.push(makeGroup(s, type, x + r.range(-0.8, 0.8), SPAWN_D + r.range(0, 4), n));
   }
+}
+
+// 작은 무리 (졸병, 400m부터 가끔 돌격병)
+function spawnTrickle(s) {
+  const r = s.rng;
+  const diff = difficulty(s.dist);
+  const type = s.dist > 400 && r.next() < 0.3 ? "rusher" : "mob";
+  const n = Math.max(1, Math.round(r.range(2, 5) * Math.pow(diff, 0.8) * warmup(s.dist)));
+  s.groups.push(makeGroup(s, type, laneX(r.int(0, LANES - 1)) + r.range(-1, 1), SPAWN_D + r.range(0, 8), n));
 }
 
 function spawnCrate(s) {
@@ -307,7 +342,7 @@ function spawnCrate(s) {
     what = r.pick(Object.keys(ITEMS));
   }
   const hp = Math.round(14 * Math.pow(diff, 0.8));
-  s.crates.push({ id: id(s), kind, what, x: r.pick([-3, 0, 3]), d: SPAWN_D, hp, maxHp: hp });
+  s.crates.push({ id: id(s), kind, what, x: laneX(r.int(0, LANES - 1)), d: SPAWN_D, hp, maxHp: hp });
 }
 
 function spawnCage(s) {
@@ -316,7 +351,7 @@ function spawnCage(s) {
   const diff = difficulty(s.dist);
   const hp = Math.round(10 * Math.pow(diff, 0.8));
   const n = Math.round(r.range(5, 12) * Math.pow(diff, 0.55));
-  s.cages.push({ id: id(s), x: r.pick([-3, 0, 3]), d: SPAWN_D, hp, maxHp: hp, n });
+  s.cages.push({ id: id(s), x: laneX(r.int(0, LANES - 1)), d: SPAWN_D, hp, maxHp: hp, n });
 }
 
 function spawnBoss(s, events) {
@@ -366,7 +401,7 @@ function moveBoss(s, dt, events) {
   } else if (b.state === "idle" && b.t <= 0) {
     const roll = r.next();
     if (roll < 0.4) {
-      for (const x of [s.x, s.x + r.range(2, 3.5), s.x - r.range(2, 3.5)]) {
+      for (const x of [s.x, s.x + r.range(2.5, 4.5), s.x - r.range(2.5, 4.5), r.range(-HALF + 1, HALF - 1)]) {
         if (Math.abs(x) < HALF) s.bombs.push({ x, r: 1.5, t: 1.3, total: 1.3 });
       }
       events.push({ type: "boss_bombs" });
@@ -382,7 +417,7 @@ function moveBoss(s, dt, events) {
     if (b.state === "idle" && b.t <= 0) {
       b.state = "windup";
       b.t = 0.9;
-      b.tx = Math.max(-3, Math.min(3, s.x));
+      b.tx = Math.max(-HALF + 2, Math.min(HALF - 2, s.x));
       events.push({ type: "boss_windup" });
     }
   } else if (b.state === "windup") {
@@ -422,13 +457,13 @@ function lose(s, n) {
   return take;
 }
 
-// 문 지나기 (무리 가운데가 어느 쪽에 있나)
+// 문 지나기 (무리 가운데가 있는 칸의 문)
 function passGates(s, events) {
   for (const g of s.gates) {
     if (g.passed || g.d > 0) continue;
     g.passed = true;
-    const side = s.x < 0 ? "left" : "right";
-    const gate = g[side];
+    const lane = laneOf(s.x);
+    const gate = g.lanes[lane];
     const before = s.count;
     if (gate.op === "ally") {
       s.allies[gate.ally] = Math.min(MAX_LEVEL, (s.allies[gate.ally] || 0) + 1);
@@ -436,7 +471,7 @@ function passGates(s, events) {
     } else {
       s.count = applyGate(s.count, gate);
     }
-    events.push({ type: "gate", side, gate: { ...gate, hidden: false }, before, after: s.count, id: g.id });
+    events.push({ type: "gate", lane, gate: { ...gate, hidden: false }, before, after: s.count, id: g.id });
   }
 }
 
@@ -520,7 +555,7 @@ function collide(s, b, d0, events) {
   // 문 (앞쪽 문만, 닿으면 총알은 사라짐)
   for (const g of s.gates) {
     if (g.passed || !(d0 < g.d && b.d >= g.d)) continue;
-    const gate = b.x < 0 ? g.left : g.right;
+    const gate = g.lanes[laneOf(b.x)];
     if (gate.op === "num") {
       gate.acc += b.gate;
       const up = Math.floor(gate.acc);
