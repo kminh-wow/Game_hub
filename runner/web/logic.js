@@ -17,7 +17,8 @@ const MOVE_SPEED = 15;              // 좌우 이동 속도(m/s)
 const CLASH_RATE = 30;              // 맞붙었을 때 1초에 쓰러지는 적 수 (기본)
 const GATE_RATE = 7;                // 문을 계속 쏘면 1초에 오르는 숫자
 const SPLASH_MUL = 3;               // 폭발은 무리 여럿을 함께 맞힘
-export const GROUP_MAX_R = 2.0;     // 적 무리 가로 반지름 한도 (큰 무리는 앞뒤로 길어짐)
+export const GROUP_MAX_R = 2.0;
+const BOSS_SECONDS = 10;            // 보스 체력 = 나타날 때 화력으로 이만큼 걸리는 양     // 적 무리 가로 반지름 한도 (큰 무리는 앞뒤로 길어짐)
 
 // 무기: 1초 발사 횟수, 병사 1명당 초당 피해, 탄속, 퍼짐, 사거리, 한 번에 보이는 탄 수, 산탄·관통·폭발
 export const WEAPONS = {
@@ -90,9 +91,9 @@ export function laneX(i) {
 // 거리별 난이도 배율 (끝없이 커짐)
 export function difficulty(dist) {
   const d = Math.max(0, dist);
-  // 1500m까지 가파르게, 3500m까지 완만하게, 그 뒤로는 아주 천천히
+  // 1500m까지 가파르게, 3500m까지 완만하게, 7000m까지 조금 가파르게, 그 뒤로는 천천히
   return Math.pow(1.0025, Math.min(d, 1500)) * Math.pow(1.0013, Math.min(Math.max(0, d - 1500), 2000))
-    * Math.pow(1.0015, Math.max(0, d - 3500));
+    * Math.pow(1.0015, Math.min(Math.max(0, d - 3500), 3500)) * Math.pow(1.001, Math.max(0, d - 7000));
 }
 
 // 무리 반지름 (병사가 많을수록 넓게)
@@ -108,6 +109,11 @@ export function groupRadius(type, n) {
 // 한 번 발사 주기에 나가는 탄 수 (병사가 많을수록 많이, 피해 총량은 같음)
 export function shotsPerVolley(w, count) {
   return Math.max(1, Math.round(w.bullets * Math.min(20, 1 + Math.sqrt(Math.max(0, count)) / 3)));   // 약 3200명부터는 그대로
+}
+
+// 초당 총 화력
+export function firepower(s) {
+  return s.count * WEAPONS[s.weapon].dps * levelMul(s.level);
 }
 
 export function levelMul(level) {
@@ -361,7 +367,10 @@ function spawnCage(s) {
 
 function spawnBoss(s, events) {
   const idx = s.bossKills + 1;
-  const hp = Math.round(900 * difficulty(s.dist));
+  // 체력: 거리 기준값과 '지금 화력으로 약 10초(보스 번호마다 10%씩 더)' 중 작은 쪽, 너무 약하지 않게 바닥값
+  const byDist = 900 * difficulty(s.dist);
+  const byFire = firepower(s) * BOSS_SECONDS * (1 + 0.1 * (idx - 1));
+  const hp = Math.round(Math.max(500 * Math.pow(difficulty(s.dist), 0.6), Math.min(byDist, byFire)));
   // 보스는 12m 앞에 머묾 (화염방사기 사거리 14m 안)
   s.boss = { idx, hp, maxHp: hp, x: 0, d: SPAWN_D, hold: 12, state: "enter", t: 0, tx: 0, hitCd: 0 };
   events.push({ type: "boss", idx });
