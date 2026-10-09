@@ -37,10 +37,10 @@ export const ALLIES = {
 
 // 적: 1명 체력, 다가오는 속도, 내 쪽으로 꺾는 속도, 맞붙을 때 1명이 쓰러뜨리는 병사 수, 크기, 방패(정면 총알 피해 배율)
 export const ENEMIES = {
-  mob: { name: "졸병", hp: 1, speed: 3.5, homing: 0.8, power: 1, size: 0.3 },
-  rusher: { name: "돌격병", hp: 1, speed: 9, homing: 2.2, power: 2, size: 0.3 },
-  shield: { name: "방패병", hp: 2, speed: 2.5, homing: 0.6, power: 1, size: 0.34, armor: 0.3 },
-  brute: { name: "거인", hp: 30, speed: 2, homing: 0.5, power: 10, size: 1.0 },
+  mob: { name: "졸병", hp: 1, speed: 1.2, homing: 0.8, power: 1, size: 0.3 },
+  rusher: { name: "돌격병", hp: 1, speed: 4.5, homing: 2.2, power: 2, size: 0.3 },
+  shield: { name: "방패병", hp: 2, speed: 0.8, homing: 0.6, power: 1, size: 0.34, armor: 0.3 },
+  brute: { name: "거인", hp: 30, speed: 0.6, homing: 0.5, power: 10, size: 1.0 },
 };
 
 // 일회용 아이템 상자
@@ -88,7 +88,8 @@ export function laneX(i) {
 
 // 거리별 난이도 배율 (끝없이 커짐)
 export function difficulty(dist) {
-  return Math.pow(1.0025, Math.max(0, dist));
+  const d = Math.max(0, dist);
+  return Math.pow(1.0025, Math.min(d, 1500)) * Math.pow(1.0013, Math.max(0, d - 1500));   // 1500m부터는 완만하게
 }
 
 // 무리 반지름 (병사가 많을수록 넓게)
@@ -111,7 +112,7 @@ export function levelMul(level) {
 }
 
 export function runSpeed(dist) {
-  return 8 + Math.min(4, dist / 1000);
+  return 8 + Math.min(2, dist / 1500);
 }
 
 // 문 적용 결과
