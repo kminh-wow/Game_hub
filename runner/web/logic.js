@@ -72,7 +72,7 @@ export function makeRng(seed) {
 
 // 거리별 난이도 배율 (끝없이 커짐)
 export function difficulty(dist) {
-  return Math.pow(1.0016, Math.max(0, dist));
+  return Math.pow(1.0025, Math.max(0, dist));
 }
 
 // 무리 반지름 (병사가 많을수록 넓게)
@@ -83,6 +83,11 @@ export function squadRadius(count) {
 export function groupRadius(type, n) {
   const spec = ENEMIES[type];
   return type === "brute" ? spec.size : spec.size + 0.2 * Math.sqrt(Math.max(1, n));
+}
+
+// 한 번 발사 주기에 나가는 탄 수 (병사가 많을수록 많이, 피해 총량은 같음)
+export function shotsPerVolley(w, count) {
+  return Math.max(1, Math.round(w.bullets * (1 + Math.sqrt(Math.max(0, count)) / 3)));
 }
 
 export function levelMul(level) {
@@ -206,11 +211,11 @@ function direct(s, events) {
     return;
   }
   if (s.dist < s.nextSpawn) return;
-  s.nextSpawn = s.dist + r.range(32, 44);
+  s.nextSpawn = s.dist + r.range(28, 38);
   const rest = s.dist > 300 && s.dist % REST_EVERY < REST_LEN;
   const roll = r.next();
-  if (s.sinceGate >= 2 || roll < 0.32) spawnGates(s);
-  else if (!rest && roll < 0.74) spawnWave(s);
+  if (s.sinceGate >= 3 || roll < 0.28) spawnGates(s);
+  else if (!rest && roll < 0.78) spawnWave(s);
   else if (roll < 0.88 || rest) spawnCrate(s);
   else spawnCage(s);
 }
@@ -223,14 +228,13 @@ function id(s) {
 function makeGate(s, good) {
   const r = s.rng;
   const diff = difficulty(s.dist);
-  const big = Math.round(r.range(8, 20) * Math.pow(diff, 0.6));
   const roll = r.next();
   if (good) {
-    if (roll < 0.22) return { op: "mul", v: s.dist > 1500 && r.next() < 0.3 ? 3 : 2 };
-    return { op: "num", v: big };
+    if (roll < 0.14) return { op: "mul", v: s.dist > 1500 && r.next() < 0.3 ? 3 : 2 };
+    return { op: "num", v: Math.round(r.range(6, 16) * Math.pow(diff, 0.55)) };
   }
-  if (roll < 0.25) return { op: "div", v: s.dist > 1500 && r.next() < 0.3 ? 3 : 2 };
-  return { op: "num", v: -big };
+  if (roll < 0.28) return { op: "div", v: s.dist > 1200 && r.next() < 0.35 ? 3 : 2 };
+  return { op: "num", v: -Math.round(r.range(10, 24) * Math.pow(diff, 0.65)) };
 }
 
 function spawnGates(s) {
@@ -252,9 +256,9 @@ function spawnGates(s) {
 
 function enemyTypes(dist) {
   const out = [["mob", 6]];
-  if (dist > 300) out.push(["rusher", 2]);
-  if (dist > 500) out.push(["shield", 2]);
-  if (dist > 700) out.push(["brute", 1.5]);
+  if (dist > 200) out.push(["rusher", 2]);
+  if (dist > 400) out.push(["shield", 2]);
+  if (dist > 550) out.push(["brute", 1.5]);
   return out;
 }
 
@@ -278,11 +282,11 @@ function spawnWave(s) {
   const r = s.rng;
   s.sinceGate += 1;
   const diff = difficulty(s.dist);
-  const lanes = 1 + (s.dist > 400 ? 1 : 0) + (s.dist > 1500 && r.next() < 0.5 ? 1 : 0);
+  const lanes = 1 + (s.dist > 250 ? 1 : 0) + (s.dist > 1000 && r.next() < 0.5 ? 1 : 0);
   const xs = [-3, 0, 3].sort(() => r.next() - 0.5).slice(0, lanes);
   for (const x of xs) {
     const type = weighted(r, enemyTypes(s.dist));
-    const base = type === "brute" ? 1 : type === "rusher" ? r.range(4, 8) : r.range(8, 14);
+    const base = type === "brute" ? 1 : type === "rusher" ? r.range(5, 10) : r.range(10, 17);
     const n = type === "brute" ? 1 : Math.max(1, Math.round(base * Math.pow(diff, 0.8) / lanes ** 0.3));
     s.groups.push(makeGroup(s, type, x + r.range(-0.8, 0.8), SPAWN_D + r.range(0, 4), n));
   }
@@ -470,28 +474,26 @@ function allies(s, dt, events) {
 // ---- 사격 ----
 
 function fire(s, dt) {
+  if (s.count <= 0) return;
   const w = WEAPONS[s.weapon];
-  s.fireAcc += dt;
-  const gap = 1 / w.rate;
   const r = s.rng;
   const radius = squadRadius(s.count);
+  const shooters = Math.min(s.count, shotsPerVolley(w, s.count));
+  const pellets = w.pellets || 1;
+  const nb = shooters * pellets;
+  const dmg = (s.count * w.dps * levelMul(s.level)) / (w.rate * nb);
+  const gate = GATE_RATE / (w.rate * nb);
+  const gap = 1 / (w.rate * shooters);              // 병사들이 번갈아 한 발씩 (같은 총량)
+  s.fireAcc += dt;
   while (s.fireAcc >= gap) {
     s.fireAcc -= gap;
-    if (s.count <= 0) return;
-    const shooters = Math.min(s.count, w.bullets);
-    const pellets = w.pellets || 1;
-    const nb = shooters * pellets;
-    const dmg = (s.count * w.dps * levelMul(s.level)) / (w.rate * nb);
-    const gate = GATE_RATE / (w.rate * nb);
-    for (let i = 0; i < shooters; i++) {
-      const x = s.x + r.range(-radius, radius) * 0.8;
-      for (let p = 0; p < pellets; p++) {
-        const angle = pellets > 1 ? (p / (pellets - 1) - 0.5) * w.spread * 2 + r.gauss() * 0.03 : r.gauss() * w.spread;
-        s.bullets.push({
-          x, d: 0.6, vx: Math.sin(angle) * w.speed, vd: Math.cos(angle) * w.speed, dmg, gate,
-          ttl: w.range / w.speed, pierce: w.pierce || 0, splash: w.splash || 0, hit: null,
-        });
-      }
+    const x = s.x + r.range(-radius, radius) * 0.8;
+    for (let p = 0; p < pellets; p++) {
+      const angle = pellets > 1 ? (p / (pellets - 1) - 0.5) * w.spread * 2 + r.gauss() * 0.03 : r.gauss() * w.spread;
+      s.bullets.push({
+        x, d: 0.6, vx: Math.sin(angle) * w.speed, vd: Math.cos(angle) * w.speed, dmg, gate,
+        ttl: w.range / w.speed, pierce: w.pierce || 0, splash: w.splash || 0, hit: null,
+      });
     }
   }
 }

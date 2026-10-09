@@ -9,7 +9,7 @@ const $ = (sel) => document.querySelector(sel);
 const DT = 1 / 60;
 const MAX_SOLDIERS = 260;       // 그리는 병사 수 한도 (숫자는 그대로)
 const MAX_ENEMIES = 700;
-const MAX_BULLETS = 900;
+const MAX_BULLETS = 1200;
 const PER_GROUP = 70;           // 적 무리 하나에 그리는 수 한도
 const ROAD_LEN = 150;
 const BEST_KEY = "runner-best";
@@ -112,7 +112,7 @@ function drawTrees(dist) {
   let i = 0;
   for (const side of [-1, 1]) {
     for (let k = 0; k < treeCount / 2; k++) {
-      const z = 15 - ((k * TREE_GAP + dist + (side > 0 ? TREE_GAP / 2 : 0)) % ROAD_LEN);
+      const z = 15 - ROAD_LEN + ((k * TREE_GAP + dist + (side > 0 ? TREE_GAP / 2 : 0)) % ROAD_LEN);   // 달릴수록 다가옴
       const x = side * (HALF + 3 + ((k * 7) % 5));
       tmp.position.set(x, 0.6, z);
       tmp.rotation.set(0, 0, 0);
