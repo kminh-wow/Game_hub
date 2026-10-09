@@ -7,7 +7,7 @@ export const LANE_W = 4;
 export const ROAD_W = LANES * LANE_W;
 export const HALF = ROAD_W / 2;
 export const SPAWN_D = 62;          // 새 물체가 나타나는 거리
-export const MAX_SQUAD = 999;
+export const MAX_SQUAD = 99999;       // 사실상 무제한 (값이 터지지 않게만)
 export const START_SQUAD = 10;
 export const BOSS_EVERY = 1000;     // 이 거리마다 보스
 export const REST_EVERY = 700;      // 이 거리마다 적 없는 정비 구간
@@ -251,7 +251,8 @@ function makeGate(s, good) {
   const diff = difficulty(s.dist);
   const roll = r.next();
   if (good) {
-    if (roll < 0.14) return { op: "mul", v: s.dist > 1500 && r.next() < 0.3 ? 3 : 2 };
+    const mulChance = s.count > 1000 ? 0.05 : 0.14;                // 많아지면 곱하기 문은 드물게
+    if (roll < mulChance) return { op: "mul", v: s.dist > 1500 && r.next() < 0.3 ? 3 : 2 };
     return { op: "num", v: Math.round(r.range(6, 16) * Math.pow(diff, 0.55)) };
   }
   if (roll < 0.28) return { op: "div", v: s.dist > 1200 && r.next() < 0.35 ? 3 : 2 };
