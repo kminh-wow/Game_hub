@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>숫자러너</title>
+  <link rel="stylesheet" href="style.css?v=1">
+  <script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js"}}</script>
+</head>
+<body>
+  <main class="game-shell">
+  <header>
+    <a href="../">← Ddan Jit</a>
+    <h1>숫자러너<span class="title-dot" aria-hidden="true"></span></h1>
+  </header>
+
+  <!-- 점수판 -->
+  <div id="hud">
+    <span>거리 <b id="dist">0m</b></span>
+    <span>점수 <b id="score">0</b></span>
+    <span>처치 <b id="kills">0</b></span>
+    <span>무기 <b id="weapon">권총 Lv1</b></span>
+    <span>최고 <b id="best">0</b></span>
+  </div>
+
+  <!-- 3D 화면과 겹쳐 띄우는 정보 -->
+  <div class="board-wrap" id="board-wrap">
+    <canvas id="board" aria-label="숫자러너 3D 도로"></canvas>
+    <div id="boss" class="boss hidden"><span id="boss-name">보스</span><div class="bar"><div id="boss-bar"></div></div></div>
+    <div id="buffs" class="buffs"></div>
+    <div id="banner" class="banner"></div>
+    <div id="panel" class="panel">
+      <h2 id="panel-title">숫자러너</h2>
+      <p id="panel-text">좌우로 움직여 숫자 문을 고르고, 몰려오는 적을 막아라!</p>
+      <button id="panel-btn" type="button">시작하기</button>
+    </div>
+  </div>
+
+  <p class="help">←→ / A D: 좌우 이동 · 화면 끌기(마우스·터치)도 돼요 · 사격은 자동 · 문을 쏘면 숫자가 올라가요 · 상자·철창은 쏴서 부숴요 · P / Esc: 일시정지 · Enter: 시작</p>
+  </main>
+
+  <script type="module" src="game.js?v=1"></script>
+</body>
+</html>
