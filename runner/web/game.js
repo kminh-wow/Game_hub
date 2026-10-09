@@ -2,7 +2,7 @@
 // 규칙은 logic.js 에 있고, 여기서는 그 상태를 매 프레임 그린다. 그래픽은 도형으로 대충 만든 것 (디자인은 나중에 교체).
 import * as THREE from "three";
 import {
-  ALLIES, HALF, ITEMS, ROAD_W, WEAPONS, createGame, gateGood, gateLabel, score, squadRadius, step,
+  ALLIES, HALF, ITEMS, LANES, LANE_W, ROAD_W, WEAPONS, createGame, gateGood, gateLabel, laneOf, laneX, score, squadRadius, step,
 } from "./logic.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -21,7 +21,6 @@ let game = null;
 let mode = "ready";             // ready → play ↔ pause → over
 let acc = 0;
 let last = performance.now();
-const keys = new Set();
 let targetX = null;
 let shake = 0;
 let best = readBest();
@@ -74,7 +73,7 @@ const roadTex = stripeTexture((c) => {
   c.fillStyle = "#5d6168";
   c.fillRect(0, 0, 128, 256);
   c.fillStyle = "#f2f2f2";
-  c.fillRect(62, 0, 4, 130);
+  for (let i = 1; i < LANES; i++) c.fillRect((128 * i) / LANES - 2, 0, 4, 130);   // 칸 구분선
   c.fillStyle = "#e9c46a";
   c.fillRect(0, 0, 5, 256);
   c.fillRect(123, 0, 5, 256);
@@ -271,7 +270,7 @@ function gatePanel() {
   c.height = 160;
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 2.8), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(LANE_W - 0.3, 2.5), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
   return { c, tex, mesh, key: null };
 }
 
@@ -302,18 +301,21 @@ function paintGate(panel, gate) {
 
 function gateMesh(g) {
   const group = new THREE.Group();
-  const left = gatePanel();
-  const right = gatePanel();
-  left.mesh.position.set(-HALF / 2, 1.6, 0);
-  right.mesh.position.set(HALF / 2, 1.6, 0);
-  group.add(left.mesh, right.mesh);
-  for (const x of [-HALF, 0, HALF]) {
+  const panels = [];
+  for (let i = 0; i < LANES; i++) {
+    const panel = gatePanel();
+    panel.mesh.position.set(laneX(i), 1.5, 0);
+    group.add(panel.mesh);
+    panels.push(panel);
+  }
+  for (let i = 0; i <= LANES; i++) {
+    const x = -HALF + LANE_W * i;
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.2, 0.22), postMat);
     post.position.set(x, 1.6, 0);
     group.add(post);
   }
   scene.add(group);
-  return { group, left, right };
+  return { group, panels };
 }
 
 function drawGates(s) {
@@ -322,17 +324,16 @@ function drawGates(s) {
     seen.add(g.id);
     let m = gateMeshes.get(g.id);
     if (!m) gateMeshes.set(g.id, (m = gateMesh(g)));
-    paintGate(m.left, g.left);
-    paintGate(m.right, g.right);
+    m.panels.forEach((panel, i) => {
+      paintGate(panel, g.lanes[i]);
+      panel.mesh.material.opacity = g.passed ? 0.25 : 1;
+    });
     m.group.position.z = -g.d;
-    const fade = g.passed ? 0.25 : 1;
-    m.left.mesh.material.opacity = m.right.mesh.material.opacity = fade;
   }
   for (const [id, m] of gateMeshes) {
     if (!seen.has(id)) {
       scene.remove(m.group);
-      m.left.tex.dispose();
-      m.right.tex.dispose();
+      for (const panel of m.panels) panel.tex.dispose();
       gateMeshes.delete(id);
     }
   }
@@ -651,10 +652,15 @@ $("#panel-btn").onclick = () => {
 
 // ---------- 입력 ----------
 
+const LANE_KEYS = { ArrowLeft: -1, KeyA: -1, ArrowRight: 1, KeyD: 1 };
+
 document.addEventListener("keydown", (e) => {
-  if (["ArrowLeft", "ArrowRight", "KeyA", "KeyD"].includes(e.code)) {
-    keys.add(e.code);
-    targetX = null;
+  if (LANE_KEYS[e.code]) {
+    // 한 번 누르면 한 칸 (누르고 있으면 계속)
+    if (game && mode === "play") {
+      const from = laneOf(targetX ?? game.x);
+      targetX = laneX(Math.max(0, Math.min(LANES - 1, from + LANE_KEYS[e.code])));
+    }
     e.preventDefault();
   } else if (e.code === "Enter" || e.code === "Space") {
     if (mode === "ready" || mode === "over") start();
@@ -664,18 +670,14 @@ document.addEventListener("keydown", (e) => {
     pause(mode === "play");
   }
 });
-document.addEventListener("keyup", (e) => keys.delete(e.code));
-window.addEventListener("blur", () => {
-  keys.clear();
-  pause(true);
-});
+window.addEventListener("blur", () => pause(true));
 document.addEventListener("visibilitychange", () => document.hidden && pause(true));
 
 // 끌기: 화면 가로 위치 → 도로 위치
 let dragging = false;
 function pointerTarget(e) {
   const rect = canvas.getBoundingClientRect();
-  targetX = ((e.clientX - rect.left) / rect.width - 0.5) * ROAD_W * 1.3;
+  targetX = ((e.clientX - rect.left) / rect.width - 0.5) * ROAD_W * 1.1;
 }
 canvas.addEventListener("pointerdown", (e) => {
   dragging = true;
@@ -687,8 +689,7 @@ canvas.addEventListener("pointerup", () => (dragging = false));
 canvas.addEventListener("pointercancel", () => (dragging = false));
 
 function input() {
-  const dir = (keys.has("ArrowRight") || keys.has("KeyD") ? 1 : 0) - (keys.has("ArrowLeft") || keys.has("KeyA") ? 1 : 0);
-  return { dir, targetX };
+  return { dir: 0, targetX };
 }
 
 // ---------- 매 프레임 ----------
@@ -700,18 +701,20 @@ function resize() {
   if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    camera.fov = w / h < 1 ? 70 : 55;            // 세로 화면은 넓게
+    camera.fov = w / h < 1 ? 80 : 58;            // 세로 화면은 넓게
     camera.updateProjectionMatrix();
   }
 }
 
 // 카메라: 무리 머리 뒤 살짝 위
 function updateCamera(s, dt) {
-  const x = s ? s.x * 0.55 : 0;
+  const portrait = camera.aspect < 1;                            // 세로 화면은 더 가까이, 더 따라감
+  const x = s ? s.x * (portrait ? 0.85 : 0.55) : 0;
   shake = Math.max(0, shake - dt);
   const j = shake > 0 ? shake * 0.5 : 0;
-  camera.position.set(x + (Math.random() - 0.5) * j, 5.4 + (Math.random() - 0.5) * j, 8);
-  camera.lookAt(x, 0.6, -16);
+  const [y, z, look] = portrait ? [5.5, 6.5, -14] : [6.3, 9.5, -16];
+  camera.position.set(x + (Math.random() - 0.5) * j, y + (Math.random() - 0.5) * j, z);
+  camera.lookAt(x, portrait ? 0 : 0.6, look);
 }
 
 function tick(now) {
