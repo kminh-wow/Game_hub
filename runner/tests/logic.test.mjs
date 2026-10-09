@@ -24,12 +24,13 @@ function run(s, seconds, input = {}) {
   return events;
 }
 
-test("문 계산: 더하기·빼기·곱하기·나누기, 0~999 사이", () => {
+test("문 계산: 더하기·빼기·곱하기·나누기, 0 이상", () => {
   assert.equal(applyGate(10, { op: "num", v: 15 }), 25);
   assert.equal(applyGate(10, { op: "num", v: -30 }), 0);
   assert.equal(applyGate(10, { op: "mul", v: 3 }), 30);
   assert.equal(applyGate(11, { op: "div", v: 2 }), 6);
-  assert.equal(applyGate(600, { op: "mul", v: 2 }), MAX_SQUAD);
+  assert.equal(applyGate(1500, { op: "mul", v: 2 }), 3000);                  // 999명 넘게도 늘어남
+  assert.equal(applyGate(MAX_SQUAD, { op: "mul", v: 2 }), MAX_SQUAD);
   assert.equal(gateLabel({ op: "num", v: -5 }), "-5");
   assert.equal(gateLabel({ op: "mul", v: 2 }), "×2");
   assert.equal(gateLabel({ op: "num", v: 9, hidden: true }), "?");

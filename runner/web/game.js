@@ -654,12 +654,20 @@ $("#panel-btn").onclick = () => {
 
 const LANE_KEYS = { ArrowLeft: -1, KeyA: -1, ArrowRight: 1, KeyD: 1 };
 
+const held = new Set();                 // 누르고 있는 방향 키
+
+// 다음 칸으로 목표 옮기기
+function stepLane(dir) {
+  const from = laneOf(targetX ?? game.x);
+  targetX = laneX(Math.max(0, Math.min(LANES - 1, from + dir)));
+}
+
 document.addEventListener("keydown", (e) => {
   if (LANE_KEYS[e.code]) {
-    // 한 번 누르면 한 칸 (누르고 있으면 계속)
-    if (game && mode === "play") {
-      const from = laneOf(targetX ?? game.x);
-      targetX = laneX(Math.max(0, Math.min(LANES - 1, from + LANE_KEYS[e.code])));
+    // 한 번 누르면 한 칸, 누르고 있으면 멈춤 없이 계속 (키 반복은 무시)
+    if (!e.repeat && game && mode === "play") {
+      held.add(e.code);
+      stepLane(LANE_KEYS[e.code]);
     }
     e.preventDefault();
   } else if (e.code === "Enter" || e.code === "Space") {
@@ -670,7 +678,11 @@ document.addEventListener("keydown", (e) => {
     pause(mode === "play");
   }
 });
-window.addEventListener("blur", () => pause(true));
+document.addEventListener("keyup", (e) => held.delete(e.code));
+window.addEventListener("blur", () => {
+  held.clear();
+  pause(true);
+});
 document.addEventListener("visibilitychange", () => document.hidden && pause(true));
 
 // 끌기: 화면 가로 위치 → 도로 위치
@@ -688,7 +700,12 @@ canvas.addEventListener("pointermove", (e) => dragging && pointerTarget(e));
 canvas.addEventListener("pointerup", () => (dragging = false));
 canvas.addEventListener("pointercancel", () => (dragging = false));
 
+// 키를 누르고 있으면 목표 칸에 닿기 전에 다음 칸으로 미리 넘김
 function input() {
+  if (game && held.size && targetX != null) {
+    const dir = [...held].reduce((sum, code) => sum + LANE_KEYS[code], 0);
+    if (dir && Math.abs(game.x - targetX) < 1.2) stepLane(Math.sign(dir));
+  }
   return { dir: 0, targetX };
 }
 
