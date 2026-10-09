@@ -7,7 +7,7 @@ export const LANE_W = 4;
 export const ROAD_W = LANES * LANE_W;
 export const HALF = ROAD_W / 2;
 export const SPAWN_D = 62;          // 새 물체가 나타나는 거리
-export const MAX_SQUAD = 99999;       // 사실상 무제한 (값이 터지지 않게만)
+export const MAX_SQUAD = 9999999;       // 사실상 무제한 (값이 터지지 않게만)
 export const START_SQUAD = 10;
 export const BOSS_EVERY = 1000;     // 이 거리마다 보스
 export const REST_EVERY = 700;      // 이 거리마다 적 없는 정비 구간
@@ -17,6 +17,7 @@ const MOVE_SPEED = 15;              // 좌우 이동 속도(m/s)
 const CLASH_RATE = 30;              // 맞붙었을 때 1초에 쓰러지는 적 수 (기본)
 const GATE_RATE = 7;                // 문을 계속 쏘면 1초에 오르는 숫자
 const SPLASH_MUL = 3;               // 폭발은 무리 여럿을 함께 맞힘
+export const GROUP_MAX_R = 2.0;     // 적 무리 가로 반지름 한도 (큰 무리는 앞뒤로 길어짐)
 
 // 무기: 1초 발사 횟수, 병사 1명당 초당 피해, 탄속, 퍼짐, 사거리, 한 번에 보이는 탄 수, 산탄·관통·폭발
 export const WEAPONS = {
@@ -25,7 +26,7 @@ export const WEAPONS = {
   shotgun: { name: "샷건", rate: 1.4, dps: 1.7, speed: 30, spread: 0.3, range: 20, bullets: 3, pellets: 5, color: 0xffb36b },
   sniper: { name: "저격총", rate: 0.9, dps: 1.3, speed: 75, spread: 0, range: 70, bullets: 3, pierce: 8, color: 0xff7a7a },
   rocket: { name: "로켓", rate: 0.8, dps: 1.0, speed: 24, spread: 0.02, range: 50, bullets: 2, splash: 2.8, color: 0xff9a3d },
-  flame: { name: "화염방사기", rate: 12, dps: 1.9, speed: 16, spread: 0.2, range: 11, bullets: 3, pierce: 4, color: 0xff6a2a },
+  flame: { name: "화염방사기", rate: 12, dps: 1.9, speed: 16, spread: 0.2, range: 14, bullets: 3, pierce: 4, color: 0xff6a2a },
 };
 
 // 동료 (동료 문으로 합류, 다시 얻으면 레벨 업)
@@ -72,9 +73,9 @@ export function makeRng(seed) {
 
 // ---- 계산 도우미 ----
 
-// 처음 500m는 적을 줄여서 시작 (0.4 → 1)
+// 처음 400m는 적을 조금 줄여서 시작 (0.7 → 1)
 function warmup(dist) {
-  return Math.min(1, 0.4 + dist / 500);
+  return Math.min(1, 0.7 + dist / 1300);
 }
 
 // 칸 번호 (0 = 맨 왼쪽)와 칸 가운데 x
@@ -89,7 +90,9 @@ export function laneX(i) {
 // 거리별 난이도 배율 (끝없이 커짐)
 export function difficulty(dist) {
   const d = Math.max(0, dist);
-  return Math.pow(1.0025, Math.min(d, 1500)) * Math.pow(1.0013, Math.max(0, d - 1500));   // 1500m부터는 완만하게
+  // 1500m까지 가파르게, 3500m까지 완만하게, 그 뒤로는 아주 천천히
+  return Math.pow(1.0025, Math.min(d, 1500)) * Math.pow(1.0013, Math.min(Math.max(0, d - 1500), 2000))
+    * Math.pow(1.0015, Math.max(0, d - 3500));
 }
 
 // 무리 반지름 (병사가 많을수록 넓게)
@@ -99,12 +102,12 @@ export function squadRadius(count) {
 
 export function groupRadius(type, n) {
   const spec = ENEMIES[type];
-  return type === "brute" ? spec.size : spec.size + 0.2 * Math.sqrt(Math.max(1, n));
+  return type === "brute" ? spec.size : Math.min(GROUP_MAX_R, spec.size + 0.2 * Math.sqrt(Math.max(1, n)));   // 한 칸 폭까지만
 }
 
 // 한 번 발사 주기에 나가는 탄 수 (병사가 많을수록 많이, 피해 총량은 같음)
 export function shotsPerVolley(w, count) {
-  return Math.max(1, Math.round(w.bullets * (1 + Math.sqrt(Math.max(0, count)) / 3)));
+  return Math.max(1, Math.round(w.bullets * Math.min(20, 1 + Math.sqrt(Math.max(0, count)) / 3)));   // 약 3200명부터는 그대로
 }
 
 export function levelMul(level) {
@@ -225,7 +228,7 @@ function direct(s, events) {
   const r = s.rng;
   if (s.boss) return;
   if (s.dist >= s.nextTrickle) {                     // 큰 사건 사이에도 작은 무리가 쉬지 않고 옴
-    s.nextTrickle = s.dist + r.range(7, 12);
+    s.nextTrickle = s.dist + r.range(6, 10);
     spawnTrickle(s);
   }
   if (s.dist >= s.nextBoss) {
@@ -252,12 +255,12 @@ function makeGate(s, good) {
   const diff = difficulty(s.dist);
   const roll = r.next();
   if (good) {
-    const mulChance = s.count > 1000 ? 0.05 : 0.14;                // 많아지면 곱하기 문은 드물게
+    const mulChance = s.count > 10000 ? 0 : s.count > 1000 ? 0.05 : 0.14;   // 많아지면 곱하기 문은 드물게
     if (roll < mulChance) return { op: "mul", v: s.dist > 1500 && r.next() < 0.3 ? 3 : 2 };
-    return { op: "num", v: Math.round(r.range(6, 16) * Math.pow(diff, 0.55)) };
+    return { op: "num", v: Math.round(r.range(6, 16) * Math.pow(diff, 0.8)) };
   }
   if (roll < 0.28) return { op: "div", v: s.dist > 1200 && r.next() < 0.35 ? 3 : 2 };
-  return { op: "num", v: -Math.round(r.range(10, 24) * Math.pow(diff, 0.65)) };
+  return { op: "num", v: -Math.round(r.range(10, 24) * Math.pow(diff, 0.82)) };
 }
 
 function spawnGates(s) {
@@ -302,7 +305,7 @@ function weighted(r, pairs) {
 
 export function makeGroup(s, type, x, d, n) {
   const diff = difficulty(s.dist);
-  const unitHp = ENEMIES[type].hp * Math.pow(diff, 0.45);
+  const unitHp = ENEMIES[type].hp * Math.pow(diff, 0.3);
   return { id: id(s), type, x, d, n, unitHp, pool: n * unitHp, r: groupRadius(type, n), engaged: false, clashAcc: 0 };
 }
 
@@ -352,14 +355,15 @@ function spawnCage(s) {
   s.sinceGate += 1;
   const diff = difficulty(s.dist);
   const hp = Math.round(10 * Math.pow(diff, 0.8));
-  const n = Math.round(r.range(5, 12) * Math.pow(diff, 0.55));
+  const n = Math.round(r.range(5, 12) * Math.pow(diff, 0.75));
   s.cages.push({ id: id(s), x: laneX(r.int(0, LANES - 1)), d: SPAWN_D, hp, maxHp: hp, n });
 }
 
 function spawnBoss(s, events) {
   const idx = s.bossKills + 1;
   const hp = Math.round(900 * difficulty(s.dist));
-  s.boss = { idx, hp, maxHp: hp, x: 0, d: SPAWN_D, hold: 16, state: "enter", t: 0, tx: 0, hitCd: 0 };
+  // 보스는 12m 앞에 머묾 (화염방사기 사거리 14m 안)
+  s.boss = { idx, hp, maxHp: hp, x: 0, d: SPAWN_D, hold: 12, state: "enter", t: 0, tx: 0, hitCd: 0 };
   events.push({ type: "boss", idx });
 }
 
