@@ -209,6 +209,7 @@ export function step(s, dt, input = {}) {
   fire(s, dt);
   moveBullets(s, dt, events);
   clash(s, dt, events);
+  leak(s, events);
   cleanup(s);
   if (s.count <= 0 && !s.over) {
     s.count = 0;
@@ -719,6 +720,18 @@ function clash(s, dt, events) {
     if (s.count <= 0) break;
   }
   if (lostTotal || killed) events.push({ type: "clash", lost: lostTotal, killed });
+}
+
+// 놓친 적: 맞붙지 않고 뒤로 지나간 적 1명당 병사 1명 (보호막·방패병 반영)
+function leak(s, events) {
+  const radius = squadRadius(s.count);
+  for (const g of s.groups) {
+    if (g.pool <= 0 || g.engaged || g.d > -radius - 1) continue;
+    const lost = lose(s, g.n);
+    events.push({ type: "leak", n: g.n, lost, x: g.x });
+    g.pool = 0;
+    g.n = 0;
+  }
 }
 
 function cleanup(s) {

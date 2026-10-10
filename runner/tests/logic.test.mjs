@@ -97,13 +97,21 @@ test("병사가 0이 되면 게임 오버", () => {
   assert.deepEqual(step(s, 1 / 60), []);                    // 끝나면 더 진행 안 함
 });
 
-test("옆으로 비키면 적 무리를 피한다", () => {
-  const s = empty();
-  s.x = laneX(0);
-  s.groups.push(makeGroup(s, "mob", laneX(3), 20, 30));
-  s.groups[0].pool = s.groups[0].unitHp * 30 * 1000;       // 총으로는 안 죽게
-  run(s, 4, { targetX: laneX(0) });
-  assert.equal(s.count, START_SQUAD);
+test("옆으로 비켜 놓친 적은 1명당 병사 1명 (맞붙는 것보다 덜 잃음)", () => {
+  const dodge = empty();
+  dodge.count = 100;
+  dodge.x = laneX(0);
+  dodge.groups.push(makeGroup(dodge, "brute", laneX(3), 20, 1));
+  dodge.groups[0].pool = 1e9;                                 // 총으로는 안 죽게
+  const ev = run(dodge, 5, { targetX: laneX(0) });
+  assert.deepEqual(ev.filter((e) => e.type === "leak").map((e) => e.lost), [1]);
+  assert.equal(dodge.count, 99);
+  const hit = empty();
+  hit.count = 100;
+  hit.groups.push(makeGroup(hit, "brute", 0, 3, 1));
+  hit.groups[0].pool = hit.groups[0].unitHp;                  // 맞붙으면 거인 1명에 10명
+  run(hit, 2);
+  assert.equal(hit.count, 90);
 });
 
 test("무기 상자: 다른 무기면 바꾸고, 같은 무기면 레벨 업", () => {

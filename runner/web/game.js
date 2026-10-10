@@ -521,6 +521,8 @@ function banner(text, warn = false) {
 
 let clashLost = 0;
 let clashShown = 0;
+let leakLost = 0;
+let leakShown = 0;
 
 // 규칙 쪽 사건 → 화면 효과
 function onEvents(events, now) {
@@ -546,6 +548,8 @@ function onEvents(events, now) {
     } else if (e.type === "kill" && puffs < 4) {
       puffs++;
       explosion(e.x, e.d, e.group === "brute" ? 1.4 : 0.5, 0xff5050);
+    } else if (e.type === "leak" && e.lost) {
+      leakLost += e.lost;
     } else if (e.type === "clash") {
       clashLost += e.lost;
       shake = Math.max(shake, 0.12);
@@ -571,11 +575,16 @@ function onEvents(events, now) {
       gameOver();
     }
   }
-  // 맞붙어 잃은 병사는 모아서 보여 줌
+  // 맞붙어 잃은 병사, 놓쳐서 잃은 병사는 모아서 보여 줌
   if (clashLost && now - clashShown > 300) {
     floatText(`-${clashLost}`, game.x, 2.6, 0, "#ff6b6b");
     clashLost = 0;
     clashShown = now;
+  }
+  if (leakLost && now - leakShown > 400) {
+    floatText(`놓침 -${leakLost}`, game.x, 3.4, 0, "#ffb36b");
+    leakLost = 0;
+    leakShown = now;
   }
 }
 
