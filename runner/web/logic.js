@@ -126,6 +126,11 @@ export function levelMul(level) {
   return 1 + 0.3 * (level - 1);
 }
 
+// 문이 스스로 다가오는 속도 (고를 시간 줄이기, 멀리 갈수록 빨라짐)
+export function gateSpeed(dist) {
+  return Math.min(15, 6 + dist / 350);
+}
+
 export function runSpeed(dist) {
   return 8 + Math.min(2, dist / 1500);
 }
@@ -382,7 +387,8 @@ function spawnBoss(s, events) {
 // ---- 움직임 ----
 
 function moveWorld(s, dt, run, events) {
-  for (const list of [s.gates, s.crates, s.cages]) for (const o of list) o.d -= run * dt;
+  for (const list of [s.crates, s.cages]) for (const o of list) o.d -= run * dt;
+  for (const g of s.gates) g.d -= (run + gateSpeed(s.dist)) * dt;
   const slow = s.slow > 0 ? 0.35 : 1;
   for (const g of s.groups) {
     if (g.engaged) continue;
