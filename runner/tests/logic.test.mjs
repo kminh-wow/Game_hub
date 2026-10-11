@@ -109,7 +109,7 @@ test("옆으로 비켜 놓친 적은 1명당 병사 1명 (맞붙는 것보다 �
   const hit = empty();
   hit.count = 100;
   hit.groups.push(makeGroup(hit, "brute", 0, 3, 1));
-  hit.groups[0].pool = hit.groups[0].unitHp;                  // 맞붙으면 거인 1명에 10명
+  hit.fireAcc = -10;                                          // 쏘지 않고 바로 맞붙기 (거인 1명에 10명)
   run(hit, 2);
   assert.equal(hit.count, 90);
 });

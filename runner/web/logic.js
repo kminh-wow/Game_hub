@@ -96,12 +96,12 @@ export function difficulty(dist) {
     * Math.pow(1.0015, Math.min(Math.max(0, d - 3500), 3500)) * Math.pow(1.001, Math.max(0, d - 7000));
 }
 
-// 조정값: 병사 1명 화력, 적 무리 크기 배율(처음 → 3000m)
-export const TUNE = { soldierDps: 0.3, crowdStart: 1, crowdMax: 8 };
+// 조정값: 병사 1명 화력, 적 무리 크기 배율(처음 → crowdDist 에서 최대)
+export const TUNE = { soldierDps: 0.4, crowdStart: 1, crowdMax: 5, crowdDist: 5000 };
 
 // 적 무리 크기 배율 (병사 1명 = 적 1명이라, 난이도는 적 숫자로)
 export function crowd(dist) {
-  return TUNE.crowdStart + (TUNE.crowdMax - TUNE.crowdStart) * Math.min(1, Math.max(0, dist) / 3000);
+  return TUNE.crowdStart + (TUNE.crowdMax - TUNE.crowdStart) * Math.min(1, Math.max(0, dist) / TUNE.crowdDist);
 }
 
 // 거리별 숫자 규모: 적 무리 크기, 숫자 문, 철창, 보상이 모두 이 비율로 커진다 (병사 수와 적 수를 같은 규모로)
