@@ -151,7 +151,7 @@ def test_limited_weapons_and_bad_input(client):
 
 def test_timeout_passes_turn(client, monkeypatch):
     from app.room import Room
-    monkeypatch.setattr(Room, "setting_limits", {"turn_time": (1, 60), "solo_opponent": (0, 3), "ai_talk": (0, 1)})
+    monkeypatch.setattr(Room, "setting_limits", {"turn_time": (1, 60), "solo_opponent": (0, 3)})
     me = Conn(client, "t" + uuid.uuid4().hex[:4])
     me.send("create_room", title="시간")
     me.until("room")

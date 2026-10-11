@@ -65,9 +65,8 @@ const lobby = GameLobby.init({
   isTurn: (p, room) => room.playing && lobby.state.game?.current_id === p.id,
   canStart: (room, others) => others.every((p) => p.ready),
   waitingNote(room, amHost, others) {
-    // 혼자일 때 상대·말투 고르기
+    // 혼자일 때 상대 고르기
     $("#solo-row").classList.toggle("hidden", others.length > 0);
-    $("#ai-talk-row").classList.toggle("hidden", others.length > 0 || !room.settings.solo_opponent || !room.spicy);
     if (others.length === 0) {
       if (!amHost) return "";
       return room.settings.solo_opponent

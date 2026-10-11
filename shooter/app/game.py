@@ -8,7 +8,7 @@ import math
 import random
 from typing import TYPE_CHECKING, Any
 
-from common.multiplayer import room_event, spicy
+from common.multiplayer import room_event
 from common.multiplayer.banter import Banter
 
 from . import ai
@@ -72,8 +72,7 @@ class Game:
         self.order: list[str] = [pid for pid, _ in names if pid != DUMMY_ID]   # 차례 순서
         self.banter = None                       # AI 대사 (AI 와 대결할 때만)
         if AI_ID in self.soldiers:
-            self.banter = Banter(room, {"id": AI_ID, "name": self.soldiers[AI_ID].name}, LINES, self.rng,
-                                 spicy=spicy.lines("shooter") if self.settings.ai_talk else None)
+            self.banter = Banter(room, {"id": AI_ID, "name": self.soldiers[AI_ID].name}, LINES, self.rng)
         self.human = room.players[0] if self.banter else None
         self.turn_idx = self.rng.randrange(len(self.order))
         self.turn = 0

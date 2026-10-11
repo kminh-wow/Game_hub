@@ -78,74 +78,18 @@ def test_chat_is_classified(monkeypatch, text, kind):
     run(scenario())
 
 
-# ---- 매운맛 (실제 데이터는 git 에 없는 private/spicy.json, 테스트는 가짜 단어로) ----
-
-FAKE_SPICY = {
-    "insult": "욕일|욕이",
-    "hate": "혐오말",
-    "lines": {"omok": {"start": ["욕일 시작"]}, "fortress": {"start": ["욕이 시작 {name}"]}},
-}
-
-
-@pytest.fixture
-def fake_spicy(monkeypatch):
-    from common.multiplayer import spicy
-    monkeypatch.setattr(spicy, "data", lambda: FAKE_SPICY)
-    return FAKE_SPICY
-
-
-def test_spicy_lines(fake_spicy):
-    from common.multiplayer import spicy
-    assert spicy.available() and spicy.lines("omok") == {"start": ["욕일 시작"]}
-    b = Banter(RoomStub(), {"id": "ai", "name": "AI"}, LINES, random.Random(0), spicy={"hit": ["욕일 정확하지"]})
-    assert b.spicy and b.pick("hit") == "욕일 정확하지"
-    assert b.pick("chat_other") == "그렇군요."                   # 매운맛에 없는 상황은 원래 대사
-
-
-def test_without_private_file_spicy_is_unavailable(monkeypatch):
-    from common.multiplayer import spicy
-    monkeypatch.setattr(spicy, "data", lambda: {})
-    assert not spicy.available() and spicy.lines("omok") is None and spicy.pattern("insult") is None
-
-
-def test_broken_regex_is_ignored(monkeypatch, caplog):
-    from common.multiplayer import spicy
-    monkeypatch.setattr(spicy, "data", lambda: {"insult": "(욕일", "hate": 3})
-    assert spicy.pattern("insult") is None and spicy.pattern("hate") is None
-    assert "정규식이 틀렸어요" in caplog.text
-
+# ---- 대사 다듬기 ----
 
 def test_broken_lines_are_skipped():
-    spicy = {"_join": "많이", "_prefix": ["앞말 {", 7], "_suffix": ["{0}"],
-             "hit": ["안녕 {}", "{name 시작", "{name!x}", "멀쩡한 대사 {name}"], "win": "대사 아님"}
-    b = Banter(RoomStub(), {"id": "ai", "name": "AI"}, LINES, random.Random(0), spicy=spicy)
-    assert b.join == banter_module.JOIN and b.prefixes == ["앞말 {"]
+    lines = {**LINES, "hit": ["안녕 {}", "{name 시작", "{name!x}", "멀쩡한 대사 {name}"]}
+    b = Banter(RoomStub(), {"id": "ai", "name": "AI"}, lines, random.Random(0))
     for _ in range(10):
-        assert b.pick("hit", name="철수") == "멀쩡한 대사 철수"       # 틀린 대사·앞말·뒷말은 건너뛴다
-    assert b.pick("win", name="철수") is None
+        assert b.pick("hit", name="철수") == "멀쩡한 대사 철수"       # 중괄호가 틀린 대사는 건너뛴다
 
 
-def test_private_spicy_lines_have_no_hate():
-    from common.multiplayer import spicy
-    real = spicy.data()
-    if not real:
-        pytest.skip("private/spicy.json 이 없다")
-    hate = spicy.pattern("hate")
-    for table in real["lines"].values():
-        for kind, lines in table.items():
-            if kind == "_join":
-                continue
-            for line in lines:                               # 대사와 앞말·뒷말 모두
-                assert not (hate and hate.search(line)), line
-
-
-def test_lines_need_their_values_and_get_prefix_suffix(monkeypatch):
-    spicy = {"_join": [1.0, 1.0], "_prefix": ["앞말"], "_suffix": ["뒷말", "파워 {power}"], "hit": ["파워 {power}로 맞혔다", "그냥 맞혔다"]}
-    b = Banter(RoomStub(), {"id": "ai", "name": "AI"}, LINES, random.Random(0), spicy=spicy)
+def test_lines_need_their_values():
+    lines = {**LINES, "hit": ["파워 {power}로 맞혔다", "그냥 맞혔다"]}
+    b = Banter(RoomStub(), {"id": "ai", "name": "AI"}, lines, random.Random(0))
     for _ in range(10):
-        text = b.pick("hit")                            # 값이 없으면 {power} 대사·뒷말은 안 고른다
-        assert "{" not in text and text.startswith("앞말 그냥 맞혔다")
-    texts = {b.pick("hit", power=73) for _ in range(30)}
-    assert any("파워 73로 맞혔다" in t for t in texts)
-    assert all(t.startswith("앞말 ") for t in texts)
-    assert "_prefix" not in b.lines
+        assert b.pick("hit") == "그냥 맞혔다"                      # 값이 없으면 {power} 대사는 안 고른다
+    assert any(b.pick("hit", power=73) == "파워 73로 맞혔다" for _ in range(30))

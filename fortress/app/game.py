@@ -10,7 +10,6 @@ from common.multiplayer import room_event
 from common.multiplayer.banter import Banter
 
 from . import ai
-from common.multiplayer import spicy
 
 from .banter import LINES
 from .world import (
@@ -57,8 +56,7 @@ class Game:
         self.order: list[str] = [pid for pid, _ in names if pid != DUMMY_ID]   # 차례 순서 (탱크 id)
         self.banter = None                       # AI 대사 (AI 와 대결할 때만)
         if AI_ID in self.tanks:
-            self.banter = Banter(room, {"id": AI_ID, "name": self.tanks[AI_ID].name}, LINES, self.rng,
-                                 spicy=spicy.lines("fortress") if self.settings.ai_talk else None)
+            self.banter = Banter(room, {"id": AI_ID, "name": self.tanks[AI_ID].name}, LINES, self.rng)
         self.human = room.players[0] if self.banter else None
         self.turn_idx = self.rng.randrange(len(self.order))
         self.turn = 0

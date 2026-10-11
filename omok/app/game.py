@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from common.multiplayer.banter import Banter
 
 from .ai import LEVEL_NAMES, ai_move, judge_move
-from common.multiplayer import spicy
 
 from .banter import LINES
 from .rules import BLACK, LINES as DIRECTIONS, WHITE, in_bounds, is_full, new_board, other, winning_line
@@ -58,8 +57,7 @@ class Game:
         ai = next((p for p in (self.black, self.white) if isinstance(p, AIPlayer)), None)
         self.banter = None                       # AI 대사 (AI 와 둘 때만)
         if ai:
-            self.banter = Banter(room, ai.public(), LINES,
-                                 spicy=spicy.lines("omok") if self.settings.ai_talk else None)
+            self.banter = Banter(room, ai.public(), LINES)
         self.human = next((p for p in (self.black, self.white) if not isinstance(p, AIPlayer)), None)
         self._judged: str | None = None          # 사람이 방금 둔 수 평가
 
