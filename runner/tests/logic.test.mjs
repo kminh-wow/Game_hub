@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   BOSS_EVERY, HALF, LANES, MAX_LEVEL, MAX_SQUAD, START_SQUAD, applyGate, createGame, difficulty, gateGood, gateLabel,
-  laneOf, laneX, makeGroup, score, squadRadius, step,
+  laneOf, laneX, makeGroup, scale, score, squadRadius, step,
 } from "../web/logic.js";
 
 const num = (v) => ({ op: "num", v, acc: 0 });
@@ -220,4 +220,30 @@ test("큰 사건 사이에도 작은 적 무리가 계속 온다", () => {
     for (const g of s.groups) if (!seen.has(g.id)) (seen.add(g.id), spawned++);
   }
   assert.ok(spawned >= 15, `작은 무리 ${spawned}개`);       // 30초에 약 300m → 7~12m마다
+});
+
+test("병사와 적이 같은 규모로 커진다 (의무병·곱하기 문이 혼자 불어나지 않게)", () => {
+  // 의무병: 병사가 아무리 많아도 거리 규모의 0.3배×레벨까지만
+  const s = empty();
+  s.dist = 5000;
+  s.count = 9_000_000;
+  s.allies.medic = 5;
+  const ev = run(s, 2.05);
+  const heal = ev.find((e) => e.type === "heal").n;
+  assert.ok(heal <= Math.ceil(0.3 * scale(s.dist) * 5) && heal < 9_000_000 * 0.001, `회복 ${heal}`);
+  // 곱하기 문: 거리 규모의 80배가 넘으면 안 나옴
+  const g = createGame(9);
+  g.dist = 5000;
+  g.count = scale(5000) * 100;
+  for (let i = 0; i < 300; i++) g.gates.length = 0, g.sinceGate = 3, g.nextSpawn = 0, step(g, 1 / 60, {});
+  assert.ok(g.gates.every((x) => x.lanes.every((lane) => lane.op !== "mul")));
+});
+
+test("적 무리 크기도 거리 규모를 따른다", () => {
+  const s = empty();
+  for (const dist of [1000, 3000, 5000]) {
+    s.dist = dist;
+    const g = makeGroup(s, "mob", 0, 30, Math.round(13 * scale(dist)));
+    assert.ok(g.n >= scale(dist) * 10 && g.r <= 2.0);
+  }
 });

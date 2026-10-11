@@ -223,11 +223,11 @@ function drawEnemies(s, now) {
     // 큰 무리는 가로 한도(g.r)를 넘는 만큼 앞뒤로 길게 (앞줄 위치는 그대로)
     const natural = ENEMIES[g.type].size + 0.2 * Math.sqrt(g.n);
     const stretch = brute ? 1 : Math.min(4, Math.max(1, natural / g.r));
-    const m = brute ? 1 : Math.min(Math.round(PER_GROUP * Math.sqrt(stretch)), g.n);
+    const m = brute ? Math.min(6, g.n) : Math.min(Math.round(PER_GROUP * Math.sqrt(stretch)), g.n);
     const scale = brute ? 3 : 1;
     color.setHex(ENEMY_COLORS[g.type]);
     for (let k = 0; k < m && i < MAX_ENEMIES; k++, i++) {
-      const [ox, oz] = brute ? [0, 0] : sunflower(k, m, g.r * 0.9);
+      const [ox, oz] = m === 1 ? [0, 0] : sunflower(k, m, g.r * 0.9);
       const bob = Math.abs(Math.sin(now / 80 + k * 2.1)) * 0.1 * (g.engaged ? 2 : 1);
       tmp.position.set(g.x + ox, (0.32 + bob) * scale, -g.d + oz * stretch - (stretch - 1) * g.r);
       tmp.rotation.set(0, 0, 0);

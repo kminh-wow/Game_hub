@@ -74,9 +74,9 @@ export function makeRng(seed) {
 
 // ---- 계산 도우미 ----
 
-// 처음 400m는 적을 조금 줄여서 시작 (0.7 → 1)
+// 적 수 배율: 처음 400m는 조금 줄여서 시작(0.7 → 1), 그 뒤로는 3000m마다 1배씩 더 (갈수록 숫자 문보다 적이 더 빨리 늘어남)
 function warmup(dist) {
-  return Math.min(1, 0.7 + dist / 1300);
+  return Math.min(1, 0.7 + dist / 1300) * (1 + Math.max(0, dist - 400) / 3000);
 }
 
 // 칸 번호 (0 = 맨 왼쪽)와 칸 가운데 x
@@ -96,6 +96,11 @@ export function difficulty(dist) {
     * Math.pow(1.0015, Math.min(Math.max(0, d - 3500), 3500)) * Math.pow(1.001, Math.max(0, d - 7000));
 }
 
+// 거리별 숫자 규모: 적 무리 크기, 숫자 문, 철창, 보상이 모두 이 비율로 커진다 (병사 수와 적 수를 같은 규모로)
+export function scale(dist) {
+  return Math.pow(difficulty(dist), 0.8);
+}
+
 // 무리 반지름 (병사가 많을수록 넓게)
 export function squadRadius(count) {
   return Math.min(2.4, 0.35 + 0.11 * Math.sqrt(Math.max(0, count)));
@@ -103,7 +108,8 @@ export function squadRadius(count) {
 
 export function groupRadius(type, n) {
   const spec = ENEMIES[type];
-  return type === "brute" ? spec.size : Math.min(GROUP_MAX_R, spec.size + 0.2 * Math.sqrt(Math.max(1, n)));   // 한 칸 폭까지만
+  const spread = type === "brute" ? 0.35 * Math.sqrt(Math.max(1, n) - 1) : 0.2 * Math.sqrt(Math.max(1, n));
+  return Math.min(GROUP_MAX_R, spec.size + spread);   // 한 칸 폭까지만
 }
 
 // 한 번 발사 주기에 나가는 탄 수 (병사가 많을수록 많이, 피해 총량은 같음)
@@ -259,15 +265,15 @@ function id(s) {
 
 function makeGate(s, good) {
   const r = s.rng;
-  const diff = difficulty(s.dist);
   const roll = r.next();
   if (good) {
-    const mulChance = s.count > 10000 ? 0 : s.count > 1000 ? 0.05 : 0.14;   // 많아지면 곱하기 문은 드물게
+    const ahead = s.count / scale(s.dist);                         // 지금 거리 규모에 비해 병사가 얼마나 많은지
+    const mulChance = ahead > 80 ? 0 : ahead > 30 ? 0.05 : 0.14;    // 이미 많으면 곱하기 문은 드물게
     if (roll < mulChance) return { op: "mul", v: s.dist > 1500 && r.next() < 0.3 ? 3 : 2 };
-    return { op: "num", v: Math.round(r.range(6, 16) * Math.pow(diff, 0.8)) };
+    return { op: "num", v: Math.round(r.range(5, 12) * scale(s.dist)) };
   }
   if (roll < 0.28) return { op: "div", v: s.dist > 1200 && r.next() < 0.35 ? 3 : 2 };
-  return { op: "num", v: -Math.round(r.range(10, 24) * Math.pow(diff, 0.82)) };
+  return { op: "num", v: -Math.round(r.range(10, 24) * scale(s.dist)) };
 }
 
 function spawnGates(s) {
@@ -319,13 +325,12 @@ export function makeGroup(s, type, x, d, n) {
 function spawnWave(s) {
   const r = s.rng;
   s.sinceGate += 1;
-  const diff = difficulty(s.dist);
   const lanes = 1 + (s.dist > 250 ? 1 : 0) + (s.dist > 1000 && r.next() < 0.5 ? 1 : 0) + (s.dist > 2000 && r.next() < 0.5 ? 1 : 0);
   const xs = shuffle(r, [0, 1, 2, 3]).slice(0, lanes).map(laneX);
   for (const x of xs) {
     const type = weighted(r, enemyTypes(s.dist));
-    const base = type === "brute" ? 1 : type === "rusher" ? r.range(5, 10) : r.range(10, 17);
-    const n = type === "brute" ? 1 : Math.max(1, Math.round(base * Math.pow(diff, 0.8) * warmup(s.dist) / lanes ** 0.3));
+    const base = type === "brute" ? r.range(0.6, 1.4) : type === "rusher" ? r.range(5, 10) : r.range(10, 17);   // 거인은 1명당 10명 몫
+    const n = Math.max(1, Math.round(base * scale(s.dist) * warmup(s.dist) / lanes ** 0.3));
     s.groups.push(makeGroup(s, type, x + r.range(-0.8, 0.8), SPAWN_D + r.range(0, 4), n));
   }
 }
@@ -333,16 +338,14 @@ function spawnWave(s) {
 // 작은 무리 (졸병, 400m부터 가끔 돌격병)
 function spawnTrickle(s) {
   const r = s.rng;
-  const diff = difficulty(s.dist);
   const type = s.dist > 400 && r.next() < 0.3 ? "rusher" : "mob";
-  const n = Math.max(1, Math.round(r.range(2, 5) * Math.pow(diff, 0.8) * warmup(s.dist)));
+  const n = Math.max(1, Math.round(r.range(2, 5) * scale(s.dist) * warmup(s.dist)));
   s.groups.push(makeGroup(s, type, laneX(r.int(0, LANES - 1)) + r.range(-1, 1), SPAWN_D + r.range(0, 8), n));
 }
 
 function spawnCrate(s) {
   const r = s.rng;
   s.sinceGate += 1;
-  const diff = difficulty(s.dist);
   let kind;
   let what;
   if (r.next() < 0.7) {
@@ -353,16 +356,15 @@ function spawnCrate(s) {
     kind = "item";
     what = r.pick(Object.keys(ITEMS));
   }
-  const hp = Math.round(14 * Math.pow(diff, 0.8));
+  const hp = Math.round(14 * scale(s.dist));
   s.crates.push({ id: id(s), kind, what, x: laneX(r.int(0, LANES - 1)), d: SPAWN_D, hp, maxHp: hp });
 }
 
 function spawnCage(s) {
   const r = s.rng;
   s.sinceGate += 1;
-  const diff = difficulty(s.dist);
-  const hp = Math.round(10 * Math.pow(diff, 0.8));
-  const n = Math.round(r.range(5, 12) * Math.pow(diff, 0.75));
+  const hp = Math.round(10 * scale(s.dist));
+  const n = Math.round(r.range(5, 12) * scale(s.dist));
   s.cages.push({ id: id(s), x: laneX(r.int(0, LANES - 1)), d: SPAWN_D, hp, maxHp: hp, n });
 }
 
@@ -407,6 +409,10 @@ function moveBoss(s, dt, events) {
   const b = s.boss;
   const r = s.rng;
   b.t -= dt;
+  if (b.state === "idle" || b.state === "enter") {                // 쉬는 동안 내 칸 쪽으로 천천히 옮겨 옴
+    const dx = s.x - b.x;
+    b.x += Math.sign(dx) * Math.min(Math.abs(dx), 2.5 * dt);
+  }
   if (b.state === "enter") {
     b.d -= 10 * dt;
     if (b.d <= b.hold) {
@@ -424,7 +430,7 @@ function moveBoss(s, dt, events) {
       b.state = "idle";
       b.t = 2.6;
     } else if (roll < 0.65) {
-      const n = Math.round(8 * Math.pow(difficulty(s.dist), 0.65));
+      const n = Math.round(8 * scale(s.dist));
       s.groups.push(makeGroup(s, "mob", b.x, b.d - 2.5, n));
       events.push({ type: "boss_summon" });
       b.state = "idle";
@@ -449,7 +455,6 @@ function moveBoss(s, dt, events) {
     }
   } else if (b.state === "back") {
     b.d += 12 * dt;
-    b.x += (0 - b.x) * Math.min(1, dt * 2);
     if (b.d >= b.hold) {
       b.d = b.hold;
       b.state = "idle";
@@ -483,7 +488,7 @@ function passGates(s, events) {
     const before = s.count;
     if (gate.op === "ally") {
       s.allies[gate.ally] = Math.min(MAX_LEVEL, (s.allies[gate.ally] || 0) + 1);
-      if (gate.ally === "shield") s.shieldHp = Math.round(30 * Math.pow(difficulty(s.dist), 0.6)) * s.allies.shield;
+      if (gate.ally === "shield") s.shieldHp = Math.round(25 * scale(s.dist)) * s.allies.shield;
     } else {
       s.count = applyGate(s.count, gate);
     }
@@ -497,7 +502,9 @@ function allies(s, dt, events) {
     s.medicAcc += dt;
     if (s.medicAcc >= 2) {
       s.medicAcc -= 2;
-      const add = Math.min(MAX_SQUAD - s.count, Math.max(1, Math.round(s.count * 0.02 * s.allies.medic)));
+      // 병사의 1%×레벨, 단 거리 규모의 0.3배×레벨까지 (많을수록 불어나지 않게)
+      const heal = Math.min(s.count * 0.01, 0.3 * scale(s.dist)) * s.allies.medic;
+      const add = Math.min(MAX_SQUAD - s.count, Math.max(1, Math.round(heal)));
       if (add > 0) {
         s.count += add;
         events.push({ type: "heal", n: add });
@@ -510,7 +517,7 @@ function allies(s, dt, events) {
       s.artAcc -= 3;
       const target = s.groups.filter((g) => g.d < 50 && g.d > -1).sort((a, b) => b.pool - a.pool)[0];
       const boss = s.boss && s.boss.state !== "enter" ? s.boss : null;
-      const dmg = 10 * Math.pow(difficulty(s.dist), 0.9) * s.allies.artillery;
+      const dmg = 4 * scale(s.dist) * Math.pow(difficulty(s.dist), 0.3) * s.allies.artillery;   // 레벨당 졸병 약 12명
       if (target) {
         splash(s, target.x, target.d, 3, dmg * SPLASH_MUL, events);
         events.push({ type: "explode", x: target.x, d: target.d, r: 3 });
@@ -641,7 +648,7 @@ function hurtBoss(s, dmg, events) {
   if (b.hp > 0) return;
   s.bossKills += 1;
   s.bonus += 500 * b.idx;
-  s.count = Math.min(MAX_SQUAD, s.count + 20);
+  s.count = Math.min(MAX_SQUAD, s.count + Math.round(20 * scale(s.dist)));
   s.level = Math.min(MAX_LEVEL, s.level + 1);
   s.nextBoss = s.dist + BOSS_EVERY;
   s.nextSpawn = s.dist + 25;
