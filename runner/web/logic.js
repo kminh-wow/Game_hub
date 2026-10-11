@@ -37,12 +37,12 @@ export const ALLIES = {
   artillery: { name: "포병" },    // 3초마다 가장 큰 적 무리에 포격
 };
 
-// 적: 1명 체력, 다가오는 속도, 내 쪽으로 꺾는 속도, 맞붙을 때 1명이 쓰러뜨리는 병사 수, 크기, 방패(정면 총알 피해 배율)
+// 적: 1명 체력(병사 1명 = 적 1명), 다가오는 속도, 내 쪽으로 꺾는 속도, 맞붙을 때 1명이 쓰러뜨리는 병사 수, 크기, 방패(정면 총알 피해 배율)
 export const ENEMIES = {
-  mob: { name: "졸병", hp: 1, speed: 1.2, homing: 0.8, power: 1, size: 0.3 },
-  rusher: { name: "돌격병", hp: 1, speed: 4.5, homing: 2.2, power: 2, size: 0.3 },
-  shield: { name: "방패병", hp: 2, speed: 0.8, homing: 0.6, power: 1, size: 0.34, armor: 0.3 },
-  brute: { name: "거인", hp: 30, speed: 0.6, homing: 0.5, power: 10, size: 1.0 },
+  mob: { name: "졸병", hp: 1, speed: 1.2, homing: 1.6, power: 1, size: 0.3 },
+  rusher: { name: "돌격병", hp: 1, speed: 4.5, homing: 2.6, power: 2, size: 0.3 },
+  shield: { name: "방패병", hp: 1, speed: 0.8, homing: 1.2, power: 1, size: 0.34, armor: 0.3 },
+  brute: { name: "거인", hp: 10, speed: 0.6, homing: 0.9, power: 10, size: 1.0 },   // 거인 1명 = 병사 10명분
 };
 
 // 일회용 아이템 상자
@@ -96,10 +96,12 @@ export function difficulty(dist) {
     * Math.pow(1.0015, Math.min(Math.max(0, d - 3500), 3500)) * Math.pow(1.001, Math.max(0, d - 7000));
 }
 
-// 적 1명 체력 배율: 처음 400m에 1 → 13배, 3000m까지 50배로 오르고 그 뒤로는 그대로 (병사·적 수가 같은 규모라 총으로 줄이는 비율이 일정)
-export function enemyHp(dist) {
-  const d = Math.max(0, dist);
-  return 1 + 12 * Math.min(1, d / 400) + 37 * Math.min(1, Math.max(0, d - 400) / 2600);
+// 조정값: 병사 1명 화력, 적 무리 크기 배율(처음 → 3000m)
+export const TUNE = { soldierDps: 0.3, crowdStart: 1, crowdMax: 8 };
+
+// 적 무리 크기 배율 (병사 1명 = 적 1명이라, 난이도는 적 숫자로)
+export function crowd(dist) {
+  return TUNE.crowdStart + (TUNE.crowdMax - TUNE.crowdStart) * Math.min(1, Math.max(0, dist) / 3000);
 }
 
 // 거리별 숫자 규모: 적 무리 크기, 숫자 문, 철창, 보상이 모두 이 비율로 커진다 (병사 수와 적 수를 같은 규모로)
@@ -125,7 +127,7 @@ export function shotsPerVolley(w, count) {
 
 // 초당 총 화력
 export function firepower(s) {
-  return s.count * WEAPONS[s.weapon].dps * levelMul(s.level);
+  return s.count * WEAPONS[s.weapon].dps * levelMul(s.level) * TUNE.soldierDps;
 }
 
 export function levelMul(level) {
@@ -327,8 +329,8 @@ function weighted(r, pairs) {
   return pairs[pairs.length - 1][0];
 }
 
-export function makeGroup(s, type, x, d, n, hpMul = enemyHp(s.dist)) {
-  const unitHp = ENEMIES[type].hp * hpMul;
+export function makeGroup(s, type, x, d, n) {
+  const unitHp = ENEMIES[type].hp;
   return { id: id(s), type, x, d, n, unitHp, pool: n * unitHp, r: groupRadius(type, n), engaged: false, clashAcc: 0 };
 }
 
@@ -340,7 +342,7 @@ function spawnWave(s) {
   for (const x of xs) {
     const type = weighted(r, enemyTypes(s.dist));
     const base = type === "brute" ? r.range(0.6, 1.4) : type === "rusher" ? r.range(5, 10) : r.range(10, 17);   // 거인은 1명당 10명 몫
-    const n = Math.max(1, Math.round(base * scale(s.dist) * warmup(s.dist) / lanes ** 0.3));
+    const n = Math.max(1, Math.round(base * scale(s.dist) * warmup(s.dist) * crowd(s.dist) / lanes ** 0.3));
     // 큰 무리는 앞뒤로 여러 덩어리로 나눠서 (한 번에 다 맞지 않게)
     const parts = type === "brute" || n < 12 ? 1 : n < 40 ? 2 : 3;
     let d = SPAWN_D + r.range(0, 3);
@@ -355,9 +357,8 @@ function spawnWave(s) {
 function spawnTrickle(s) {
   const r = s.rng;
   const type = s.dist > 400 && r.next() < 0.3 ? "rusher" : "mob";
-  const n = Math.max(1, Math.round(r.range(2, 5) * scale(s.dist) * warmup(s.dist)));
-  // 작은 무리는 체력 배율의 세제곱근만 (쉬지 않고 오니까 총으로 정리할 수 있게)
-  s.groups.push(makeGroup(s, type, laneX(r.int(0, LANES - 1)) + r.range(-1, 1), SPAWN_D + r.range(0, 8), n, Math.cbrt(enemyHp(s.dist))));
+  const n = Math.max(1, Math.round(r.range(2, 5) * scale(s.dist) * warmup(s.dist) * Math.sqrt(crowd(s.dist))));   // 작은 무리는 배율의 제곱근만
+  s.groups.push(makeGroup(s, type, laneX(r.int(0, LANES - 1)) + r.range(-1, 1), SPAWN_D + r.range(0, 8), n));
 }
 
 function spawnCrate(s) {
@@ -448,7 +449,7 @@ function moveBoss(s, dt, events) {
       b.state = "idle";
       b.t = 2.6;
     } else if (roll < 0.65) {
-      const n = Math.round(8 * scale(s.dist));
+      const n = Math.round(8 * scale(s.dist) * crowd(s.dist));
       s.groups.push(makeGroup(s, "mob", b.x, b.d - 2.5, n));
       events.push({ type: "boss_summon" });
       b.state = "idle";
@@ -535,7 +536,7 @@ function allies(s, dt, events) {
       s.artAcc -= 3;
       const target = s.groups.filter((g) => g.d < 50 && g.d > -1).sort((a, b) => b.pool - a.pool)[0];
       const boss = s.boss && s.boss.state !== "enter" ? s.boss : null;
-      const dmg = 4 * scale(s.dist) * enemyHp(s.dist) * s.allies.artillery;   // 레벨당 졸병 약 12명
+      const dmg = 4 * scale(s.dist) * crowd(s.dist) * s.allies.artillery;   // 레벨당 졸병 약 12명 × 무리 배율
       if (target) {
         splash(s, target.x, target.d, 3, dmg * SPLASH_MUL, events);
         events.push({ type: "explode", x: target.x, d: target.d, r: 3 });
