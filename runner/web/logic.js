@@ -96,9 +96,10 @@ export function difficulty(dist) {
     * Math.pow(1.0015, Math.min(Math.max(0, d - 3500), 3500)) * Math.pow(1.001, Math.max(0, d - 7000));
 }
 
-// 적 1명 체력 배율: 800m까지 1, 3000m까지 50배로 오르고 그 뒤로는 그대로 (병사·적 수가 같은 규모라 총으로 줄이는 비율이 일정)
+// 적 1명 체력 배율: 처음 400m에 1 → 13배, 3000m까지 50배로 오르고 그 뒤로는 그대로 (병사·적 수가 같은 규모라 총으로 줄이는 비율이 일정)
 export function enemyHp(dist) {
-  return 1 + 49 * Math.min(1, Math.max(0, dist - 800) / 2200);
+  const d = Math.max(0, dist);
+  return 1 + 12 * Math.min(1, d / 400) + 37 * Math.min(1, Math.max(0, d - 400) / 2600);
 }
 
 // 거리별 숫자 규모: 적 무리 크기, 숫자 문, 철창, 보상이 모두 이 비율로 커진다 (병사 수와 적 수를 같은 규모로)
@@ -280,7 +281,7 @@ function makeGate(s, good) {
     const ahead = s.count / scale(s.dist);                         // 지금 거리 규모에 비해 병사가 얼마나 많은지
     const mulChance = ahead > 80 ? 0 : ahead > 30 ? 0.05 : 0.14;    // 이미 많으면 곱하기 문은 드물게
     if (roll < mulChance) return { op: "mul", v: s.dist > 1500 && r.next() < 0.3 ? 3 : 2 };
-    return { op: "num", v: Math.round(r.range(7, 15) * scale(s.dist)) };
+    return { op: "num", v: Math.round(r.range(9, 18) * scale(s.dist)) };
   }
   if (roll < 0.28) return { op: "div", v: s.dist > 1200 && r.next() < 0.35 ? 3 : 2 };
   return { op: "num", v: -Math.round(r.range(10, 24) * scale(s.dist)) };
@@ -310,9 +311,9 @@ function shuffle(r, arr) {
 
 function enemyTypes(dist) {
   const out = [["mob", 6]];
-  if (dist > 200) out.push(["rusher", 2]);
-  if (dist > 400) out.push(["shield", 2]);
-  if (dist > 550) out.push(["brute", 1.5]);
+  if (dist > 400) out.push(["rusher", 2]);
+  if (dist > 900) out.push(["shield", 2]);      // 정면 총알에 강해서 무기를 갖춘 뒤에
+  if (dist > 1200) out.push(["brute", 1.5]);
   return out;
 }
 
@@ -355,8 +356,8 @@ function spawnTrickle(s) {
   const r = s.rng;
   const type = s.dist > 400 && r.next() < 0.3 ? "rusher" : "mob";
   const n = Math.max(1, Math.round(r.range(2, 5) * scale(s.dist) * warmup(s.dist)));
-  // 작은 무리는 체력 배율의 제곱근만 (쉬지 않고 오니까 총으로 정리할 수 있게)
-  s.groups.push(makeGroup(s, type, laneX(r.int(0, LANES - 1)) + r.range(-1, 1), SPAWN_D + r.range(0, 8), n, Math.sqrt(enemyHp(s.dist))));
+  // 작은 무리는 체력 배율의 세제곱근만 (쉬지 않고 오니까 총으로 정리할 수 있게)
+  s.groups.push(makeGroup(s, type, laneX(r.int(0, LANES - 1)) + r.range(-1, 1), SPAWN_D + r.range(0, 8), n, Math.cbrt(enemyHp(s.dist))));
 }
 
 function spawnCrate(s) {
