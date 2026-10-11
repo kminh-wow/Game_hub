@@ -11,8 +11,6 @@ from common.multiplayer import room_event
 from .rules import CATEGORIES, CATEGORY_IDS, DICE, MAX_ROLLS, ROUNDS, all_notes, all_scores, best_category, explain, score, totals
 from .physics import initial_poses, throw_dice
 
-YACHT_ASSIST = 0.25  # 같은 눈을 모으는 중일 때 두 번 던지는 비율 (요트 확률 약 +1.5%p)
-
 if TYPE_CHECKING:
     from common.multiplayer import Player
     from .room import Room
@@ -150,23 +148,11 @@ class Game:
             self._settler = None
             await self.broadcast_state()
 
-    # 요트 보정 (같은 눈을 모으는 중이면 두 번 던져 더 나은 쪽 선택)
-    async def _maybe_rethrow(self, result: dict[str, Any]) -> dict[str, Any]:
-        kept = {self.dice[i] for i in range(DICE) if self.held[i]}
-        if sum(self.held) < 2 or len(kept) != 1 or self.rng.random() >= YACHT_ASSIST:
-            return result
-        face = kept.pop()
-        second = await asyncio.to_thread(throw_dice, self.rng, self.poses, self.held)
-        if second["dice"].count(face) > result["dice"].count(face):
-            return second
-        return result
-
     async def _roll(self) -> str | None:
         self.rolling = True
         generation = self._generation
         try:
             result = await asyncio.to_thread(throw_dice, self.rng, self.poses, self.held)
-            result = await self._maybe_rethrow(result)
         except Exception:
             logging.getLogger(__name__).exception("Dice simulation failed")
             if generation == self._generation:
