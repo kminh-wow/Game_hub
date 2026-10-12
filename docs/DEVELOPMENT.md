@@ -29,6 +29,7 @@ http://127.0.0.1:8000 을 여세요.
 ```
 hub/
   main.py        메인 앱: 게임 앱들을 경로별로 붙인다 (mount), 캐시 헤더
+  leaderboard.py 점수 게임 순위 API (/api/leaderboard/…, SQLite)
   static/        메인 화면
 common/
   multiplayer/   멀티 게임 공통 서버: 접속·닉네임·로비·방·채팅·WebSocket (끝말잇기, 행맨, 오목, 요트 다이스)
@@ -597,4 +598,18 @@ crossy/
 - 죽는 조건: 도로·철길에서 차·기차와 겹침, 강에서 통나무·연잎이 없음(물), 통나무 타고 화면 밖(떠내려감), 가장 멀리 간 줄에서 뒤로 3줄(독수리), 화면 아래 끝(`edge`)에 따라잡힘(독수리). 화면 아래 끝은 첫 걸음 뒤부터 초당 0.42줄씩 올라오고 가장 멀리 간 줄보다 4줄 넘게 처지지 않아서, 가만히 있으면 10초쯤에 독수리가 옵니다.
 - 앞으로 갈수록(`pace`, 220줄에서 2배까지) 차·통나무가 빨라지고 차 간격이 좁아지며 도로·강 묶음이 길어집니다.
 - 디버그: 브라우저 콘솔에서 `__crossy.game`, `__crossy.move("up")`.
+
+---
+
+## 순위표
+
+혼자 하는 점수 게임(길건너기, 숫자러너, 팩맨 난이도별)의 이번 주·전체 상위 10명입니다.
+
+- 서버: `hub/leaderboard.py`. `GET /api/leaderboard/{board}`는 `{all, week}`(이름별 최고 점수 상위 10), `POST /api/leaderboard/{board}` `{name, score, duration, token}`은 기록을 쌓고 이번 기록의 순위(`rank`, `week_rank`)와 목록을 돌려줍니다. 순위표 이름은 `crossy`, `runner`, `pacman-easy|normal|midhigh|hard`입니다.
+- 저장: SQLite 파일 `private/leaderboard.sqlite3`(git에 없음, 환경 변수 `LEADERBOARD_DB`로 바꿀 수 있음). `update.sh`의 `git reset`/`pull`은 이 파일을 건드리지 않습니다.
+- 이번 주: 한국 시간 월요일 0시부터.
+- 점수는 브라우저가 계산해서 보내므로 완벽히 막지는 못합니다. 걸린 시간에 비해 말이 안 되는 점수만 거릅니다(길건너기 초당 9.5칸, 숫자러너 초당 10m + 보스 보너스, 팩맨 초당 500점). 같은 곳에서 2초 안에 다시 올리면 거절합니다. 브라우저 식별값(`token`)도 같이 저장해 두어서, 나중에 이름을 브라우저에 묶을 수 있습니다.
+- 화면: `common/web/leaderboard.js`(`Leaderboard.submit`, `Leaderboard.mount`). 길건너기·숫자러너는 시작·결과 창(`#lb`), 팩맨은 화면 아래 순위 칸, 허브 메인은 아래쪽 🏆 순위에 띄웁니다. 닉네임이 없으면 올리지 않고 안내만 합니다.
+- 기록 지우기(서버): `sqlite3 private/leaderboard.sqlite3 "DELETE FROM scores WHERE name = '이름';"`
+- 검증: `pytest tests/test_leaderboard.py`
 

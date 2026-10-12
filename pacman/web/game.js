@@ -71,6 +71,13 @@ function setDifficulty(key) {
   difficulty = key;
   try { localStorage.setItem("pacman-difficulty", key); } catch {}
   newGame();
+  showBoard();
+}
+
+// 순위표 (난이도별)
+function showBoard(result = null) {
+  document.getElementById("lb-level").textContent = diff().label;
+  window.Leaderboard?.mount(document.getElementById("lb"), `pacman-${difficulty}`, { result });
 }
 
 function newGame() {
@@ -78,6 +85,7 @@ function newGame() {
     phase: "start",      // start → ready → playing → dying / clear → … → over
     phaseTime: 0,
     score: 0,
+    elapsed: 0,          // 한 판 동안 흐른 시간 (순위 점수 확인용)
     high: loadHigh(),
     lives: diff().lives,
     level: 1,
@@ -140,6 +148,7 @@ function addScore(n) {
 
 function update(dt) {
   game.phaseTime += dt;
+  if (game.phase !== "start" && game.phase !== "over" && !game.paused) game.elapsed += dt;
   switch (game.phase) {
     case "ready":
       if (game.phaseTime > 2) setPhase("playing");
@@ -149,6 +158,7 @@ function update(dt) {
         game.lives -= 1;
         if (game.lives <= 0) {
           setPhase("over");
+          window.Leaderboard?.submit(`pacman-${difficulty}`, game.score, game.elapsed).then(showBoard);   // 순위에 올리기
         } else {
           resetActors();
           setPhase("ready");
@@ -393,6 +403,7 @@ function frame(now) {
 }
 
 newGame();
+showBoard();
 createRenderer(canvas).then((view) => {
   visual = view;
   last = performance.now();

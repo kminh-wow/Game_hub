@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>팩맨</title>
-  <link rel="stylesheet" href="style.css?v=difficulty-3d">
+  <link rel="stylesheet" href="style.css?v=leaderboard">
   <script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js","three/addons/":"./vendor/three/examples/jsm/"}}</script>
 </head>
 <body>
@@ -34,9 +34,16 @@
     <div id="message" role="status">게임을 불러오는 중</div>
   </div>
 
+  <!-- 순위 (난이도별) -->
+  <section class="lb-wrap">
+    <h2>순위 · <span id="lb-level"></span></h2>
+    <div id="lb"></div>
+  </section>
+
   <p class="help">방향키 / WASD: 이동 · Enter: 시작 · P: 일시정지 · 1~4: 난이도 (시작 전) · 모바일: 화면을 쓸어서 이동</p>
   </main>
 
-  <script type="module" src="game.js?v=difficulty-3d"></script>
+  <script src="../common/leaderboard.js?v=1"></script>
+  <script type="module" src="game.js?v=leaderboard"></script>
 </body>
 </html>

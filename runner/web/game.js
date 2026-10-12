@@ -614,11 +614,13 @@ function drawHud(s) {
   }
 }
 
-function showPanel(title, text, button) {
+function showPanel(title, text, button, board = false) {
   $("#panel-title").textContent = title;
   $("#panel-text").textContent = text;
   $("#panel-btn").textContent = button;
   $("#panel").classList.remove("hidden");
+  $("#lb").replaceChildren();
+  if (board) window.Leaderboard?.mount($("#lb"), "runner");
 }
 
 // ---------- 진행 ----------
@@ -655,6 +657,8 @@ function gameOver() {
   showPanel(isBest ? "🏆 최고 기록!" : "게임 오버",
     `거리 ${Math.floor(game.dist)}m · 점수 ${sc}\n처치 ${game.kills} · 보스 ${game.bossKills} · ${WEAPONS[game.weapon].name} Lv${game.level}`,
     "다시 하기");
+  // 순위에 올리고 결과 보여 주기
+  window.Leaderboard?.submit("runner", sc, game.t).then((res) => window.Leaderboard.mount($("#lb"), "runner", { result: res }));
 }
 
 $("#panel-btn").onclick = () => {
@@ -786,7 +790,7 @@ function tick(now) {
 const idle = createGame(1);
 idle.gates = [];
 setText("best", String(best));
-showPanel("숫자러너", "좌우로 움직여 숫자 문을 고르고,\n끝없이 몰려오는 적을 막아라!", "시작하기");
+showPanel("숫자러너", "좌우로 움직여 숫자 문을 고르고,\n끝없이 몰려오는 적을 막아라!", "시작하기", true);
 requestAnimationFrame(tick);
 
 // 점검용 손잡이 (자동 테스트·디버깅)

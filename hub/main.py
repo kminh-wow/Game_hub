@@ -13,6 +13,7 @@
     /pingpong/   탁구
     /crossy/     길건너기
     /common/     게임들이 함께 쓰는 프론트엔드 파일 (lobby.js 등)
+    /api/leaderboard/  점수 게임 순위 (hub/leaderboard.py)
 
 게임 상태가 각 앱의 메모리에 있으므로 uvicorn 워커는 반드시 1개로 실행한다.
 """
@@ -26,6 +27,8 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import MutableHeaders
+
+from hub.leaderboard import router as leaderboard_router
 
 log = logging.getLogger("hub")
 
@@ -94,6 +97,7 @@ class RevalidateMiddleware:
 
 
 app.add_middleware(RevalidateMiddleware)
+app.include_router(leaderboard_router)
 
 
 def _redirect_to(path: str):

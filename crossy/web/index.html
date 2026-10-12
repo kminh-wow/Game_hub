@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>길건너기</title>
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=2">
   <script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js"}}</script>
 </head>
 <body>
@@ -22,6 +22,7 @@
     <div id="panel" class="panel">
       <h2 id="panel-title">길건너기</h2>
       <p id="panel-text"></p>
+      <div id="lb" class="panel-lb"></div>
       <button id="panel-btn" type="button">시작하기</button>
     </div>
   </div>
@@ -29,6 +30,7 @@
   <p class="help">↑↓←→ / WASD: 한 칸씩 뛰기 · 스페이스: 앞으로 · 모바일: 탭하면 앞으로, 밀면 그 방향 · 가만히 있거나 뒤로 3칸 가면 독수리가 와요</p>
   </main>
 
-  <script type="module" src="game.js?v=2"></script>
+  <script src="../common/leaderboard.js?v=1"></script>
+  <script type="module" src="game.js?v=3"></script>
 </body>
 </html>

@@ -349,11 +349,13 @@ function setText(id, text) {
   $(`#${id}`).textContent = text;
 }
 
-function showPanel(title, text, button) {
+function showPanel(title, text, button, board = false) {
   $("#panel-title").textContent = title;
   $("#panel-text").textContent = text;
   $("#panel-btn").textContent = button;
   $("#panel").classList.remove("hidden");
+  $("#lb").replaceChildren();
+  if (board) window.Leaderboard?.mount($("#lb"), "crossy", { unit: "칸" });
 }
 
 // ---------- 진행 ----------
@@ -382,9 +384,11 @@ function gameOver(s, now) {
   const isBest = s.score > best;
   best = Math.max(best, s.score);
   writeNum(BEST_KEY, best);
-  setTimeout(() => {
+  const posted = window.Leaderboard?.submit("crossy", s.score, s.t);          // 순위에 올리기
+  setTimeout(async () => {
     if (mode !== "over") return;
     showPanel(isBest ? "🏆 최고 기록!" : CAUSES[s.cause] || "끝", `${s.score}칸 건넜어요 · 최고 ${best}\n이번 판 동전 ${s.coins} · 모은 동전 ${bank}`, "다시 하기");
+    if (posted) window.Leaderboard.mount($("#lb"), "crossy", { unit: "칸", result: await posted });
   }, 900);
 }
 
@@ -500,7 +504,7 @@ function tick(now) {
 
 // 시작 전 화면용 (출발점 풍경)
 const idle = createGame(7);
-showPanel("길건너기", "차와 기차를 피하고, 통나무를 타고 강을 건너\n최대한 멀리 가세요!", "시작하기");
+showPanel("길건너기", "차와 기차를 피하고, 통나무를 타고 강을 건너\n최대한 멀리 가세요!", "시작하기", true);
 requestAnimationFrame(tick);
 
 // 점검용 손잡이 (자동 테스트·디버깅)
