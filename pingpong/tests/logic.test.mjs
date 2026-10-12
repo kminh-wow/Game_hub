@@ -199,3 +199,51 @@ test("라켓은 구역 밖으로 못 나가고, 서브할 때는 끝선 뒤에 �
   run(s, 1, () => ({ x: 3, z: -2 }));
   assert.ok(s.pads.me.x <= ZONE.x + 1e-9 && s.pads.me.z >= ZONE.near - 1e-9);
 });
+
+// 서브가 상대 탁구대에서 몇 번 튀는지
+function serveBounces(s, side, intent) {
+  const sol = serveVelocity(s, side, intent);
+  const sides = [];
+  simulate({ p: s.ball.p, v: sol.v, w: sol.w }, 3, (b, hit) => {
+    if (hit === "table") sides.push(sideOfZ(b.p.z));
+    return sides.length >= 3;
+  });
+  return sides;
+}
+
+test("서브는 보통 길게 (상대 끝선 너머로), 짧은 서브는 원할 때만", () => {
+  for (const type of ["drive", "cut", "block"]) {
+    for (let i = 0; i < 12; i++) {
+      const s = createMatch({ seed: i + 1, first: AI });
+      s.ball.p = { x: (i % 5 - 2) * 0.2, y: 0.22, z: -(HALF_L + 0.2) };
+      const long = serveBounces(s, AI, { type, power: (i % 4) / 3, tx: ((i % 7) - 3) * 0.15 });
+      assert.deepEqual(long.slice(0, 2), [AI, ME]);
+      assert.notEqual(long[2], ME, `${type} ${i}: 상대 탁구대에서 두 번 튐`);
+    }
+  }
+  const s = createMatch({ seed: 3, first: AI });
+  s.ball.p = { x: 0, y: 0.22, z: -(HALF_L + 0.2) };
+  assert.deepEqual(serveBounces(s, AI, { type: "cut", power: 0.5, tx: 0, short: true }).slice(0, 3), [AI, ME, ME]);
+  assert.equal(LEVELS[0].short, 0);
+});
+
+// AI 가 친 공이 네트를 막 넘어 내 쪽으로 오는 장면
+function incoming(padZ) {
+  const s = createMatch({ seed: 2, first: AI, level: 1 });
+  Object.assign(s, { phase: "rally", hitter: AI, serving: false, bounces: 0, flight: 0, netTouch: false });
+  s.ball = { p: { x: 0, y: 0.25, z: 0.1 }, v: { x: 0, y: 0.3, z: 6 }, w: { x: 0, y: 0, z: 0 } };
+  s.pads.me = { x: 0, z: padZ, px: 0, pz: padZ, vx: 0, vz: 0 };
+  const ev = [];
+  for (let t = 0; t < 2 && !ev.some((e) => e.type === "point"); t += 1 / 240) ev.push(...step(s, 1 / 240, { x: 0, z: padZ }));
+  return ev;
+}
+
+test("내 쪽에 튀기 전에 탁구대 위에서 라켓에 닿으면 반칙, 끝선 뒤에서는 아웃 공", () => {
+  const foul = incoming(ZONE.near);
+  const p = foul.find((e) => e.type === "point");
+  assert.equal(p.reason, "volley");
+  assert.equal(p.winner, AI);
+  assert.ok(foul.some((e) => e.type === "hit" && e.foul));
+  const out = incoming(HALF_L + 0.6).find((e) => e.type === "point");   // 탁구대에 안 튀고 끝선 넘어간 공
+  assert.equal(out.winner, ME);
+});

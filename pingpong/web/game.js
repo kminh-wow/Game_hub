@@ -984,7 +984,7 @@ function onEvents(events) {
       if (e.type === "hit") flash(e.x, e.y, e.z, hot);
       if (hot) shake = 0.25;
       tok(hot ? 520 : 820, hot ? 0.45 : 0.3, 0.06);
-      if (e.side === ME && e.type === "hit") {
+      if (e.side === ME && e.type === "hit" && !e.foul) {
         const pct = e.shot === "drive" || e.shot === "smash" ? ` ${Math.round(e.power * 100)}%` : "";
         banner(`${SHOTS[e.shot].name}!${pct}`, hot ? "hot" : "shot");
       }

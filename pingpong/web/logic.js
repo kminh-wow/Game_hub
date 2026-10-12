@@ -28,7 +28,7 @@ const PLAYER_ERROR = 0.04;           // 사람 샷 기본 흔들림(m)
 const MAX_FLIGHT = 5;
 
 // 라켓이 움직일 수 있는 곳 (내 쪽 기준, AI 쪽은 z 를 뒤집음)
-export const ZONE = { x: 1.25, near: 0.45, far: HALF_L + 0.85, home: HALF_L + 0.4 };   // near: 짧은 공은 탁구대 위로 손을 뻗어 받음
+export const ZONE = { x: 1.25, near: 0.7, far: HALF_L + 0.85, home: HALF_L + 0.4 };   // near: 짧은 공은 탁구대 위로 손을 뻗어 받음
 
 // 샷: 가로 속도(m/s), 회전(+ 탑스핀, - 백스핀, rad/s), 네트에서 떨어지는 거리(m) — [힘 0, 힘 1]
 export const SHOTS = {
@@ -38,11 +38,11 @@ export const SHOTS = {
   cut: { name: "커트", speed: [4.2, 5.3], top: [-50, -90], depth: [0.6, 0.95] },
 };
 
-// AI 난이도: 라켓 속도(m/s), 반응 시간(s), 샷 흔들림(m), 평소 힘, 높은 공 스매시 확률, 노리는 폭
+// AI 난이도: 라켓 속도(m/s), 반응 시간(s), 샷 흔들림(m), 평소 힘, 높은 공 스매시 확률, 노리는 폭, 짧은 서브 확률
 export const LEVELS = [
-  { name: "하", speed: 1.6, reaction: 0.36, error: 0.34, power: 0.1, smash: 0.1, aim: 0.25 },
-  { name: "중", speed: 2.2, reaction: 0.26, error: 0.26, power: 0.3, smash: 0.3, aim: 0.38 },
-  { name: "상", speed: 3.2, reaction: 0.15, error: 0.12, power: 0.65, smash: 0.75, aim: 0.55 },
+  { name: "하", speed: 1.6, reaction: 0.36, error: 0.34, power: 0.1, smash: 0.1, aim: 0.25, short: 0 },
+  { name: "중", speed: 2.2, reaction: 0.26, error: 0.26, power: 0.3, smash: 0.3, aim: 0.38, short: 0.08 },
+  { name: "상", speed: 3.2, reaction: 0.15, error: 0.12, power: 0.65, smash: 0.75, aim: 0.55, short: 0.15 },
 ];
 
 // 점수 난 이유
@@ -53,6 +53,7 @@ export const REASONS = {
   own_side: "내 코트에 떨어짐",
   serve_fault: "서브 실패",
   slow: "시간 초과",
+  volley: "바운드 전에 침",
 };
 
 export const dirOf = (side) => (side === ME ? 1 : -1);   // 그 사람 쪽 z 부호
@@ -385,10 +386,11 @@ function botIntent(s, side) {
   return { type, power, tx, error: lv.error };
 }
 
-// 컴퓨터 서브 고르기
+// 컴퓨터 서브 고르기 (보통 긴 서브, 난이도에 따라 가끔 짧은 서브)
 function botServeIntent(s) {
   const r = s.rng();
-  return { type: r < 0.4 ? "drive" : r < 0.75 ? "cut" : "block", power: s.rng(), tx: (s.rng() * 2 - 1) * 0.5 };
+  const lv = LEVELS[s.bots[s.server]];
+  return { type: r < 0.4 ? "drive" : r < 0.75 ? "cut" : "block", power: s.rng(), tx: (s.rng() * 2 - 1) * 0.5, short: s.rng() < lv.short };
 }
 
 // 샷 → 공 속도·회전 (타이밍·들어온 회전에 따라 흔들림, 너무 짧으면 네트)
@@ -422,16 +424,17 @@ export function makeShot(s, side, intent, off = 0) {
   return sol;
 }
 
-// 서브가 규칙대로 튀는지 (내 쪽 한 번, 상대 쪽 한 번)
-function legalServe(p0, sol, side) {
+// 서브가 규칙대로 튀는지 (내 쪽 한 번, 상대 쪽 한 번) + 짧은 서브인지 (상대 탁구대에서 한 번 더 튐)
+function serveCheck(p0, sol, side) {
   const sides = [];
   let net = false;
   simulate({ p: p0, v: sol.v, w: sol.w }, 3, (b, hit) => {
     if (hit === "net") net = true;
     if (hit === "table") sides.push(sideOfZ(b.p.z));
-    return net || sides.length >= 2;
+    return net || sides.length >= 3;
   });
-  return !net && sides[0] === side && sides[1] === other(side);
+  const legal = !net && sides[0] === side && sides[1] === other(side);
+  return { legal, short: legal && sides[2] === other(side) };
 }
 
 // 서브 속도 찾기 (원하는 회전·방향에 가장 가까운, 규칙에 맞는 서브)
@@ -443,16 +446,21 @@ export function serveVelocity(s, side, intent) {
   const base = intent.type === "drive" ? 4.5 + p : 4.2;
   const tx = clamp(intent.tx, -0.6, 0.6);
   const depth = intent.type === "cut" ? 0.6 : 0.95;
+  // 보통은 상대 끝선 너머로 나가는 긴 서브, intent.short 면 상대 탁구대에서 두 번 튀는 짧은 서브
   let sol = null;
-  for (const speed of [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, 2.5, 3].map((d) => base + d)) {
+  let fallback = null;
+  for (const speed of [0, 0.5, -0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map((d) => base + d)) {
     for (const z1 of [0.8, 0.95, 1.1, 0.65, 1.25, 0.5]) {
       const t = (p0.z - dir * z1) / (p0.z + dir * depth);
       const target = { x: p0.x + (tx - p0.x) * t, z: dir * z1 };
       sol = aimVelocity(p0, target, speed, top);
-      if (legalServe(p0, sol, side)) return sol;
+      const check = serveCheck(p0, sol, side);
+      if (!check.legal) continue;
+      if (check.short === !!intent.short) return sol;
+      fallback ??= sol;
     }
   }
-  return sol;
+  return fallback ?? sol;
 }
 
 // 서브 넣기
@@ -478,9 +486,10 @@ function hitBall(s, side, off, ev) {
   ev.push({ type: "hit", side, shot: intent.type, power: intent.power, x: s.ball.p.x, y: s.ball.p.y, z: s.ball.p.z });
 }
 
-// 받는 사람 라켓을 공이 지나가면 치기
+// 받는 사람 라켓을 공이 지나가면 치기 (내 쪽에 튀기 전, 탁구대 위에서 닿으면 반칙)
 function tryHit(s, prev, f0, f1, ev) {
-  if (s.serving || s.bounces !== 1) return;
+  const early = s.serving || s.bounces === 0;
+  if (!early && s.bounces !== 1) return;
   const side = other(s.hitter);
   const pad = s.pads[side];
   const dir = dirOf(side);
@@ -490,7 +499,20 @@ function tryHit(s, prev, f0, f1, ev) {
   if (!((prev.z - padZ0) * dir < 0 && (b.p.z - padZ1) * dir >= 0)) return;
   const off = Math.abs(b.p.x - lerp(pad.px, pad.x, f1));
   if (off > REACH || b.p.y < -0.45 || b.p.y > 1.3) return;
+  if (early) {
+    if (Math.abs(padZ1) >= HALF_L) return;                     // 끝선 뒤면 어차피 아웃 공
+    return volley(s, side, ev);
+  }
   hitBall(s, side, off, ev);
+}
+
+// 튀기 전에 라켓에 닿음: 공은 라켓에 맞고 튕기고, 상대 점수
+function volley(s, side, ev) {
+  const b = s.ball;
+  b.v = { x: b.v.x * 0.3, y: 1.6, z: -b.v.z * 0.25 };
+  b.w = { x: 0, y: 0, z: 0 };
+  ev.push({ type: "hit", side, shot: "block", power: 0, foul: true, x: b.p.x, y: b.p.y, z: b.p.z });
+  point(s, other(side), "volley", ev);
 }
 
 // 받을 곳 예측 (내 쪽에 한 번 튄 뒤 가장 높이 뜬 곳, 칠 수 있는 구역 안으로)
