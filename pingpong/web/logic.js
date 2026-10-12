@@ -22,7 +22,7 @@ const TABLE_E = 0.88;                // 탁구대 반발
 const TABLE_GRIP = 0.25;             // 튈 때 회전이 앞뒤 속도로 바뀌는 정도
 const SUB = 1 / 240;
 const DEAD_TIME = 1.1;               // 점수 난 뒤 다음 서브까지
-const BOT_SERVE_WAIT = 1.0;
+const BOT_SERVE_WAIT = 1.9;           // AI 가 서브 들고 기다리는 시간 (점수 난 뒤 1.1초 + 이만큼 = 3초, 받을 자리 잡기)
 const PAD_SPEED = 16;                // 사람 라켓이 손을 따라가는 최대 속도(m/s)
 const PLAYER_ERROR = 0.04;           // 사람 샷 기본 흔들림(m)
 const MAX_FLIGHT = 5;
