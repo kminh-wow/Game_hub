@@ -124,6 +124,12 @@
     .gates-art b { width: 58px; height: 46px; display: grid; place-items: center; border-radius: 6px; color: #fff; font-size: 18px; }
     .gates-art .good { background: #3a8dff; }
     .gates-art .bad { background: #ef4b55; }
+    /* 탁구 카드 그림 */
+    .pingpong-art { position: relative; width: 150px; height: 64px; }
+    .pingpong-art .table { position: absolute; left: 10px; right: 10px; bottom: 6px; height: 34px; background: #1f5fa8; border: 2px solid #f4f6f8; border-radius: 3px; transform: perspective(120px) rotateX(35deg); }
+    .pingpong-art .table::after { content: ""; position: absolute; top: -6px; bottom: -2px; left: 50%; width: 2px; margin-left: -1px; background: #222; }
+    .pingpong-art i { position: absolute; left: 92px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #ffb347; }
+    .pingpong-art b { position: absolute; left: 18px; top: 8px; width: 24px; height: 24px; border-radius: 50%; background: #d8262c; box-shadow: 4px 12px 0 -8px #c79a62; }
 
     footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
 
@@ -257,6 +263,16 @@
       <h2>숫자러너</h2>
       <p>숫자 문을 골라 병사를 불리고, 끝없이 몰려오는 적을 막아라! 무기 상자, 동료, 보스까지.</p>
       <div class="tags"><span>1명</span><span>아케이드</span><span>3D</span><span>모바일</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
+    <a class="card" href="pingpong/">
+      <div class="art" aria-hidden="true">
+        <div class="pingpong-art"><div class="table"></div><b></b><i></i></div>
+      </div>
+      <h2>탁구</h2>
+      <p>라켓을 앞으로 휘둘러 드라이브! 회전이 걸린 공으로 AI(하·중·상)와 11점 승부. 스매시, 커트, 블록까지.</p>
+      <div class="tags"><span>1명</span><span>스포츠</span><span>3D</span><span>모바일</span></div>
       <span class="play">플레이 →</span>
     </a>
   </main>

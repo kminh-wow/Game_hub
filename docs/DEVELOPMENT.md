@@ -20,6 +20,7 @@ http://127.0.0.1:8000 을 여세요.
   - 끝말잇기 규칙·접속 관리: `cd wordchain && pytest`
   - 팩맨 규칙: `node --test pacman/tests/logic.test.mjs` (Node 18 이상)
   - 숫자러너 규칙: `node --test runner/tests/logic.test.mjs`
+  - 탁구 규칙·공 물리: `node --test pingpong/tests/logic.test.mjs`
   - 행맨 게임 흐름: `cd hangman && pytest`
 
 ## 구조
@@ -40,6 +41,7 @@ yacht/           요트 다이스 (FastAPI 앱: yacht/app/main.py)
 fortress/        포트리스 (FastAPI 앱: fortress/app/main.py)
 shooter/         턴제 FPS (FastAPI 앱: shooter/app/main.py)
 runner/          숫자러너 (FastAPI 앱: runner/app.py, 정적 파일만 제공)
+pingpong/        탁구     (FastAPI 앱: pingpong/app.py, 정적 파일만 제공)
 deploy/          서버 설치, 업데이트 스크립트
 docs/            이 문서, README용 스크린샷
 tests/           허브 통합 테스트
@@ -57,6 +59,7 @@ tests/           허브 통합 테스트
 | `/fortress/` | 포트리스 |
 | `/shooter/` | 턴제 FPS |
 | `/runner/` | 숫자러너 |
+| `/pingpong/` | 탁구 |
 | `/common/` | 공통 프론트엔드 파일 (`lobby.js`) |
 
 - 각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
@@ -534,4 +537,33 @@ runner/
 - 보스는 `BOSS_EVERY`(1000m)마다 나오고, 살아 있는 동안은 새 사건이 생기지 않습니다. 폭탄(빨간 원), 부하 소환, 돌진을 번갈아 씁니다.
 - 밸런스를 바꿀 때는 `logic.js` 위쪽 상수와 `WEAPONS`·`ENEMIES` 표만 고치면 됩니다.
 - 디버그: 브라우저 콘솔에서 `__runner.game`으로 상태를 볼 수 있습니다.
+
+---
+
+## 탁구
+
+브라우저에서만 도는 싱글 게임(AI 대전)입니다. 서버(`pingpong/app.py`)는 정적 파일만 내려줍니다.
+
+```
+pingpong/
+  app.py             정적 파일 서빙
+  web/
+    index.html, style.css   화면
+    logic.js         규칙·공 물리: 회전·공기 저항·튀기, 샷 계산, 서브, 점수·서브 순서, AI (DOM 없음, 시드 난수)
+    game.js          진행(난이도·시작·일시정지·끝·전적), 입력(마우스·터치·키), three.js 그리기, 소리, 시작 화면 시범 경기
+    vendor/three/    three.js r180
+  tests/
+    logic.test.mjs   logic.js 테스트 (node --test)
+```
+
+- 좌표(m): `x`는 탁구대 가로, `y`는 탁구대 윗면에서 높이, `z`는 길이(내 쪽 +, AI 쪽 -, 네트 `z=0`). 탁구대·네트·공 크기는 실제 규격(2.74×1.525m, 네트 15.25cm, 공 지름 4cm)입니다.
+- `step(state, 1/60, {x, z, serve})`가 한 틱을 진행하고 사건(`serve`, `hit`, `table`, `net`, `floor`, `point`, `ready`, `over`)을 돌려줍니다. 공은 한 틱을 1/240초로 4번 나눠 움직입니다. `x`·`z`는 손이 가리키는 탁구대 위 자리(화면 → 높이 0.12m 평면에 레이캐스트)이고, 라켓은 구역(`ZONE`) 안에서 최대 16m/s로 따라갑니다.
+- 공 물리(`fly`·`collide`): 중력, 공기 저항(`DRAG`), 회전에 따른 휨(`MAGNUS`, 회전 벡터 × 속도). 탁구대에 튈 때 반발 0.88, 닿는 점이 미끄러지는 속도의 25%만큼 앞뒤 속도가 바뀌어서 탑스핀은 뻗고 백스핀은 멈칫합니다. 회전 벡터는 `spinVec(진행 방향, 탑스핀, 옆회전)`으로 만들고 `topOf`로 읽습니다.
+- 샷(`makeShot`): 샷 종류별 가로 속도·회전·떨어질 거리(`SHOTS`, 힘 0~1 사이 보간)를 정하고, `aimVelocity`가 그 자리에 떨어지는 위아래 속도를 이분 탐색으로 찾습니다(회전 휨은 3번 고쳐 겨냥). 네트를 못 넘으면 속도를 1m/s씩 줄여 다시 찾습니다. 흔들림은 기본값(사람 4cm, AI는 난이도별) + 라켓 가장자리에 맞은 정도 + 힘에 따라 커지고, 들어온 회전(탑스핀을 블록하면 길게, 백스핀을 약하게 치면 짧게)과 너무 낮은 타점이 떨어질 거리를 바꿉니다. 떨어질 거리가 12cm보다 짧으면 네트로 갑니다.
+- 사람 샷(`swingIntent`): 라켓 속도의 네트 쪽 성분이 0.9m/s보다 크면 드라이브(4.9m/s에서 힘 100%), 공이 0.38m보다 높고 2.6m/s보다 빠르면 스매시, 뒤로 0.5m/s보다 빠르면 커트, 그 밖은 블록입니다. 옆 속도가 겨냥 방향을 정합니다.
+- 치기(`tryHit`): 받는 쪽에 한 번 튄 공이 라켓 평면(라켓 `z`, 틱 사이 보간)을 지나갈 때 가로 거리가 `REACH`(0.3m) 안이면 칩니다. 라켓 높이는 화면에서만 공을 따라갑니다.
+- 서브(`serveVelocity`): 내 쪽 첫 튐 자리와 속도를 몇 가지 바꿔 보며 미리 날려 보고(`simulate`), 내 쪽 → 상대 쪽으로 튀는 첫 조합을 씁니다. 그래서 서브는 늘 규칙대로 들어갑니다. 서브할 때 라켓은 끝선 뒤, 탁구대 폭 안에만 있을 수 있습니다.
+- AI(`think`·`botIntent`): 공이 오면 난이도별 반응 시간 뒤에 받을 자리(내 쪽에 튄 뒤 가장 높은 곳, `predict`)를 계산해 그쪽으로 난이도별 속도로 움직입니다. 높은 공은 확률적으로 스매시, 백스핀 공은 가끔 커트로 받고, 상대 라켓 반대쪽을 노립니다. 난이도는 `LEVELS` 표 한 곳에 있습니다. `createMatch({bots: {me: 2, ai: 2}})`처럼 내 쪽도 AI에게 맡길 수 있고, 시작 화면의 시범 경기가 이렇게 돕니다.
+- 전적은 `localStorage`의 `pingpong-record`(난이도별 승·패), 고른 난이도는 `pingpong-level`에 저장합니다.
+- 디버그: 브라우저 콘솔에서 `__pingpong.game`으로 상태를 볼 수 있고, `__pingpong.project(x, y, z)`는 탁구대 좌표를 화면 좌표로 바꿉니다(자동 플레이 테스트용).
 

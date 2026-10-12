@@ -41,6 +41,7 @@ GAME_MODULES = {
     "fortress": "fortress.app.main",
     "shooter": "shooter.app.main",
     "runner": "runner.app",
+    "pingpong": "pingpong.app",
 }
 
 
