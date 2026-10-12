@@ -1,48 +1,89 @@
 /* 공통 팔레트 */
-:root { color-scheme:light dark; --bg:#f5f5ed; --panel:#fcfcf7; --text:#173d33; --muted:#53665c; --line:#cdd4c7; --accent:#245442; --on-accent:#fcfcf7; --shadow:0 1px 2px rgba(20,24,35,.05),0 8px 24px rgba(20,24,35,.06); }
+:root { color-scheme:light dark; --bg:#f5f5ed; --panel:#fcfcf7; --text:#173d33; --muted:#53665c; --line:#cdd4c7; --accent:#245442; --on-accent:#fcfcf7; --shadow:0 1px 2px rgba(20,24,35,.05),0 8px 24px rgba(20,24,35,.06); --ball:#ff9f2e; --navy:#0f1d36; }
 /* 다크 팔레트 */
 @media(prefers-color-scheme:dark) { :root { --bg:#1c2425; --panel:#263032; --text:#edf2e8; --muted:#b6c5bd; --line:#4d6057; --accent:#b9d787; --on-accent:#173d33; --shadow:0 1px 2px #0005; } }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--text); font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif; min-height:100svh; padding:12px; }
-.game-shell { width:min(920px,100%); margin:auto; }
+.game-shell { width:min(980px,100%); margin:auto; }
 header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
 header a { color:var(--muted); text-decoration:none; font-size:13px; font-weight:600; }
 header a:hover { color:var(--accent); }
 h1 { margin:0; font-size:24px; letter-spacing:-.5px; display:flex; align-items:center; gap:9px; }
-.title-dot { width:12px; height:12px; border-radius:50%; background:#ff9f2e; }
+.title-dot { width:12px; height:12px; border-radius:50%; background:var(--ball); box-shadow:0 0 10px var(--ball); }
 .hidden { display:none !important; }
 
-/* 점수판 */
-#hud { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:clamp(10px,3vw,24px); padding:8px; color:var(--muted); font-size:12px; }
-#hud span { display:flex; align-items:center; gap:7px; white-space:nowrap; }
-#hud b { color:var(--text); font-size:15px; font-variant-numeric:tabular-nums; }
-#hud b.big { font-size:26px; min-width:1.2em; text-align:center; }
-#hud .vs { font-size:20px; font-weight:800; color:var(--text); margin:0 -6px; }
-.serve { width:9px; height:9px; border-radius:50%; background:transparent; border:1px solid var(--line); }
-.serve.on { background:#ff9f2e; border-color:#ff9f2e; }
-
 /* 3D 화면 */
-.board-wrap { position:relative; width:100%; height:clamp(320px,calc(100svh - 170px),900px); border:1px solid var(--line); border-radius:20px; overflow:hidden; background:#1d2f45; box-shadow:var(--shadow); user-select:none; }
+.board-wrap { position:relative; width:100%; height:clamp(340px,calc(100svh - 120px),900px); border-radius:20px; overflow:hidden; background:#0d1726; box-shadow:0 2px 4px rgba(0,0,0,.12),0 18px 40px rgba(10,20,40,.25); user-select:none; }
 canvas { display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
 
-/* 샷·점수 알림 */
-.banner { position:absolute; left:0; right:0; top:14%; text-align:center; color:#fff; font-size:clamp(18px,3.4vw,28px); font-weight:900; text-shadow:0 2px 8px rgba(0,0,0,.7); pointer-events:none; opacity:0; transition:opacity .3s; }
+/* 중계 화면 점수판 */
+.scoreboard { position:absolute; left:14px; top:14px; min-width:150px; border-radius:10px; overflow:hidden; background:rgba(9,17,32,.88); box-shadow:0 6px 20px rgba(0,0,0,.35); color:#fff; pointer-events:none; }
+.scoreboard .row { display:flex; align-items:center; gap:8px; padding:6px 10px 6px 8px; font-size:14px; font-weight:700; }
+.scoreboard .row + .row { border-top:1px solid rgba(255,255,255,.08); }
+.scoreboard .row.me { box-shadow:inset 3px 0 0 #e23a44; }
+.scoreboard .row.ai { box-shadow:inset 3px 0 0 #1f9e78; }
+.scoreboard .name { flex:1; white-space:nowrap; }
+.scoreboard .name small { margin-left:4px; padding:1px 5px; border-radius:4px; background:rgba(255,255,255,.14); font-size:11px; font-weight:700; color:#cfe0ff; }
+.scoreboard b { min-width:30px; text-align:right; font-size:20px; font-weight:900; font-variant-numeric:tabular-nums; color:rgba(255,255,255,.75); }
+.scoreboard .row.lead b { color:var(--ball); }
+.serve { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.12); flex:none; }
+.serve.on { background:var(--ball); box-shadow:0 0 8px var(--ball); }
+.status { padding:4px 10px; background:var(--ball); color:#1b1206; font-size:11px; font-weight:900; letter-spacing:.5px; text-align:center; }
+.rally { position:absolute; right:14px; top:14px; display:flex; align-items:center; gap:6px; padding:7px 12px; border-radius:99px; background:rgba(9,17,32,.8); color:rgba(255,255,255,.7); font-size:12px; font-weight:700; pointer-events:none; }
+.rally b { color:#fff; font-size:15px; font-variant-numeric:tabular-nums; }
+.rally span { margin-left:6px; padding-left:8px; border-left:1px solid rgba(255,255,255,.2); }
+
+/* 샷·점수 알림 (튀어나오는 글자) */
+.banner { position:absolute; left:50%; top:22%; padding:8px 22px; border-radius:12px; transform:translate(-50%,0) scale(.6) skewX(-8deg); color:#fff; font-size:clamp(20px,3.6vw,32px); font-weight:900; font-style:italic; letter-spacing:-.5px; white-space:nowrap; text-shadow:0 2px 10px rgba(0,0,0,.55); pointer-events:none; opacity:0; transition:opacity .25s, transform .25s; }
+.banner.show { opacity:1; transform:translate(-50%,0) scale(1) skewX(-8deg); animation:pop .35s cubic-bezier(.2,1.6,.4,1); }
+@keyframes pop { 0% { transform:translate(-50%,0) scale(.5) skewX(-8deg); } 100% { transform:translate(-50%,0) scale(1) skewX(-8deg); } }
+.banner.shot { background:linear-gradient(90deg,rgba(255,159,46,0),rgba(255,159,46,.28),rgba(255,159,46,0)); }
+.banner.hot { color:#ffd28a; background:linear-gradient(90deg,rgba(255,80,40,0),rgba(255,80,40,.5),rgba(255,80,40,0)); text-shadow:0 0 18px rgba(255,140,40,.9),0 2px 8px rgba(0,0,0,.5); }
 .banner.good { color:#8ff0a4; }
-.banner.warn { color:#ff7b7b; }
-.banner.hot { color:#ffb347; }
+.banner.warn { color:#ff8a8a; }
+.banner.info { font-size:clamp(16px,2.6vw,22px); font-style:normal; background:rgba(9,17,32,.6); }
 
 /* 시작·일시정지·끝 */
-.panel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(340px,86%); padding:20px 22px; border:1px solid var(--line); border-radius:16px; background:var(--panel); color:var(--text); box-shadow:var(--shadow); text-align:center; }
-.panel h2 { margin:0 0 8px; font-size:22px; }
-.panel p { margin:0 0 14px; color:var(--muted); font-size:14px; line-height:1.6; white-space:pre-line; }
-.panel > button { background:var(--accent); color:var(--on-accent); border:0; border-radius:10px; padding:10px 22px; font:inherit; font-weight:800; cursor:pointer; }
+.panel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(380px,90%); max-height:94%; overflow:auto; padding:22px 22px 20px; border:1px solid rgba(255,255,255,.12); border-radius:20px; background:linear-gradient(180deg,rgba(18,30,54,.94),rgba(9,17,32,.94)); color:#fff; box-shadow:0 20px 60px rgba(0,0,0,.45); text-align:center; }
+.panel h2 { margin:6px 0 6px; font-size:26px; font-weight:900; letter-spacing:-.5px; }
+.panel p { margin:0 0 16px; color:rgba(255,255,255,.7); font-size:14px; line-height:1.6; white-space:pre-line; }
+.panel > button { width:100%; padding:13px 22px; border:0; border-radius:12px; background:linear-gradient(180deg,#ffb04f,#ff8a1f); color:#24160a; font:inherit; font-size:16px; font-weight:900; cursor:pointer; box-shadow:0 6px 18px rgba(255,140,30,.35); transition:transform .1s; }
+.panel > button:hover { transform:translateY(-1px); }
+.panel > button:active { transform:translateY(1px); }
+
+/* 공·라켓 로고 */
+.logo { position:relative; width:64px; height:56px; margin:0 auto; }
+.logo::before { content:""; position:absolute; left:6px; top:4px; width:40px; height:42px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#ff5a63,#c81e2a 70%); box-shadow:0 4px 12px rgba(200,30,42,.45); transform:rotate(-25deg); }
+.logo::after { content:""; position:absolute; left:30px; top:36px; width:9px; height:24px; border-radius:3px; background:#d9b27a; transform:rotate(-25deg); }
+.logo i { position:absolute; right:2px; top:0; width:16px; height:16px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#ffd28a,var(--ball)); box-shadow:0 0 12px var(--ball); }
 
 /* 난이도 고르기 */
-.levels { display:flex; gap:8px; justify-content:center; margin:0 0 14px; }
-.levels button { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 4px; font:inherit; font-weight:800; font-size:16px; color:var(--text); background:transparent; border:1px solid var(--line); border-radius:10px; cursor:pointer; }
-.levels button small { font-size:11px; font-weight:500; color:var(--muted); }
-.levels button.on { border-color:var(--accent); outline:2px solid var(--accent); }
+.levels { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:0 0 14px; }
+.levels button { display:flex; flex-direction:column; align-items:center; gap:2px; padding:10px 4px 9px; border:1px solid rgba(255,255,255,.14); border-radius:12px; background:rgba(255,255,255,.05); color:#fff; font:inherit; cursor:pointer; transition:background .15s, border-color .15s; }
+.levels button:hover { background:rgba(255,255,255,.1); }
+.levels button b { font-size:20px; font-weight:900; }
+.levels button span { font-size:11px; color:rgba(255,255,255,.65); }
+.levels button .rec { margin-top:3px; color:rgba(255,255,255,.45); font-variant-numeric:tabular-nums; }
+.levels button.on { border-color:var(--ball); background:rgba(255,159,46,.16); box-shadow:0 0 0 1px var(--ball) inset; }
+.levels button.on b { color:var(--ball); }
+
+/* 조작 안내 */
+.guide { display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; margin:0 0 16px; padding:0; list-style:none; text-align:left; font-size:12px; color:rgba(255,255,255,.7); }
+.guide li { display:flex; align-items:center; gap:8px; }
+.guide kbd { display:inline-grid; place-items:center; width:26px; height:26px; flex:none; border-radius:8px; background:rgba(255,255,255,.1); color:var(--ball); font:inherit; font-weight:900; }
+.guide div { display:flex; flex-direction:column; line-height:1.3; }
+.guide b { color:#fff; font-size:13px; }
+.guide small { color:rgba(255,255,255,.55); font-size:11px; }
 
 .help { color:var(--muted); font-size:11px; line-height:1.7; text-align:center; margin:10px 8px 0; }
 .help b { color:var(--text); }
-@media(max-width:480px) { body { padding:10px 8px; } h1 { font-size:21px; } #hud { gap:10px; } #hud b { font-size:13px; } #hud b.big { font-size:22px; } .board-wrap { border-radius:16px; height:calc(100svh - 190px); } }
+@media(max-width:480px) {
+  body { padding:10px 8px; }
+  h1 { font-size:21px; }
+  .board-wrap { border-radius:16px; height:calc(100svh - 150px); }
+  .scoreboard { left:10px; top:10px; min-width:126px; }
+  .scoreboard .row { font-size:12px; padding:5px 8px 5px 7px; }
+  .scoreboard b { font-size:17px; }
+  .rally { right:10px; top:10px; font-size:11px; padding:6px 10px; }
+  .rally span { display:none; }
+}

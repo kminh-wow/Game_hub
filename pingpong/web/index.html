@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>탁구</title>
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=2">
   <script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js"}}</script>
 </head>
 <body>
@@ -14,28 +14,35 @@
     <h1>탁구<span class="title-dot" aria-hidden="true"></span></h1>
   </header>
 
-  <!-- 점수판 -->
-  <div id="hud">
-    <span class="side"><i id="my-serve" class="serve" title="서브"></i>나 <b id="my-score" class="big">0</b></span>
-    <span class="vs">:</span>
-    <span class="side"><b id="ai-score" class="big">0</b> AI <i id="ai-serve" class="serve" title="서브"></i></span>
-    <span>난이도 <b id="level">중</b></span>
-    <span>랠리 <b id="rally">0</b></span>
-    <span>최장 <b id="longest">0</b></span>
-  </div>
-
   <!-- 3D 화면과 겹쳐 띄우는 정보 -->
   <div class="board-wrap">
     <canvas id="board" aria-label="탁구대 3D 화면"></canvas>
+
+    <!-- 중계 화면 점수판 -->
+    <div id="hud" class="scoreboard">
+      <div class="row me"><i id="my-serve" class="serve" title="서브"></i><span class="name">나</span><b id="my-score">0</b></div>
+      <div class="row ai"><i id="ai-serve" class="serve" title="서브"></i><span class="name">AI <small id="level">중</small></span><b id="ai-score">0</b></div>
+      <div id="status" class="status hidden"></div>
+    </div>
+    <div class="rally">랠리 <b id="rally">0</b><span>최장 <b id="longest">0</b></span></div>
+
     <div id="banner" class="banner"></div>
+
     <div id="panel" class="panel">
+      <div class="logo" aria-hidden="true"><i></i></div>
       <h2 id="panel-title">탁구</h2>
       <p id="panel-text"></p>
       <div id="levels" class="levels">
-        <button type="button" data-level="0">하<small></small></button>
-        <button type="button" data-level="1">중<small></small></button>
-        <button type="button" data-level="2">상<small></small></button>
+        <button type="button" data-level="0"><b>하</b><span>천천히 연습</span><span class="rec"></span></button>
+        <button type="button" data-level="1"><b>중</b><span>제대로 한 판</span><span class="rec"></span></button>
+        <button type="button" data-level="2"><b>상</b><span>프로 도전</span><span class="rec"></span></button>
       </div>
+      <ul id="guide" class="guide">
+        <li><kbd>↑</kbd><div><b>드라이브</b><small>앞으로 휘두르기</small></div></li>
+        <li><kbd>⇈</kbd><div><b>스매시</b><small>높은 공을 세게</small></div></li>
+        <li><kbd>↓</kbd><div><b>커트</b><small>뒤로 당기기</small></div></li>
+        <li><kbd>•</kbd><div><b>블록</b><small>가만히 대기</small></div></li>
+      </ul>
       <button id="panel-btn" type="button">시작하기</button>
     </div>
   </div>
@@ -43,6 +50,6 @@
   <p class="help">마우스·손가락으로 라켓 움직이기 · 공이 올 때 <b>앞으로 휘두르면 드라이브</b>, 높은 공을 세게 치면 스매시, 뒤로 당기면 커트, 가만히 대면 블록 · 옆으로 휘두르면 그쪽으로 · 클릭·스페이스: 서브 · P / Esc: 일시정지 · M: 소리</p>
   </main>
 
-  <script type="module" src="game.js?v=1"></script>
+  <script type="module" src="game.js?v=2"></script>
 </body>
 </html>
