@@ -1,6 +1,8 @@
 // 탁구 화면: 게임 진행(난이도 고르기·시작·일시정지·끝), 입력(마우스·터치·키), three.js 그리기, 소리.
 // 규칙과 공 물리는 logic.js 에 있고, 여기서는 그 상태를 매 프레임 그린다.
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import {
   AI, BALL_R, FLOOR_Y, HALF_L, HALF_W, LEVELS, ME, NET_H, NET_OUT, REASONS, SHOTS, WIN_SCORE, createMatch, dirOf, sideOfZ, simulate, step,
 } from "./logic.js";
@@ -463,11 +465,15 @@ function drawPaddle(s, side, mesh, frame) {
 
 // ---------- 상대 선수 ----------
 
+// 도형으로 만든 선수 (에셋을 못 불러오면 이걸 씀)
+const procBody = new THREE.Group();
+scene.add(procBody);
+
 // 팔다리 (두 점을 잇는 캡슐)
 function limb(radius, material) {
   const m = new THREE.Mesh(new THREE.CapsuleGeometry(radius, 1, 4, 10), material);
   m.castShadow = true;
-  scene.add(m);
+  procBody.add(m);
   return m;
 }
 
@@ -529,7 +535,7 @@ const player = (() => {
   eyes.push(mouth);
   root.add(torso, chest, hips, neck, head, hair, ...eyes);
   root.traverse((o) => (o.castShadow = true));
-  scene.add(root);
+  procBody.add(root);
   return {
     root,
     upperArm: limb(0.045, jerseyMat),
@@ -541,7 +547,7 @@ const player = (() => {
     shoes: [0, 1].map(() => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 0.24), shoeMat);
       m.castShadow = true;
-      scene.add(m);
+      procBody.add(m);
       return m;
     }),
     lean: 0,
@@ -599,6 +605,169 @@ function drawPlayer(s, now, frame) {
     player.shoes[i].position.set(foot.x, FLOOR_Y + 0.03, foot.z + 0.05);
   });
 }
+
+// ---------- 에셋 (경기장 사진·조명, 나무 바닥, Kenney 선수) ----------
+
+const ARENA_TURN = 0;             // 경기장 사진 돌리기 (관중석이 상대 뒤로 오게)
+const PLAYER_HEIGHT = 1.7;        // Kenney 선수 키(m)
+const rig = { model: null, mixer: null, actions: {}, current: null, arm: null, tipDir: null, armLen: 1, base: 0, lockUntil: 0, swing: 0 };
+
+// 경기장 사진 배경과 HDRI 조명
+function loadArena() {
+  new HDRLoader().load("assets/arena.hdr", (tex) => {
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = tex;
+    scene.environmentIntensity = 0.8;
+    scene.environmentRotation.y = ARENA_TURN;
+  }, undefined, (err) => console.warn("arena.hdr", err));
+  new THREE.TextureLoader().load("assets/arena.jpg", (tex) => {
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    scene.background = tex;
+    scene.backgroundIntensity = 0.55;
+    scene.backgroundRotation.y = ARENA_TURN;
+    scene.fog = new THREE.Fog(0x3a2a26, 14, 30);
+    stands.visible = false;
+  }, undefined, (err) => console.warn("arena.jpg", err));
+}
+
+// 나무 바닥 (색·요철·거칠기, 다 불러오면 바꿈)
+async function loadFloor() {
+  const loader = new THREE.TextureLoader();
+  try {
+    const [map, normalMap, roughnessMap] = await Promise.all(["color", "normal", "rough"].map((k) => loader.loadAsync(`assets/wood-${k}.jpg`)));
+    for (const t of [map, normalMap, roughnessMap]) {
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(12, 12);
+      t.anisotropy = 8;
+    }
+    map.colorSpace = THREE.SRGBColorSpace;
+    Object.assign(floor.material, { map, normalMap, roughnessMap, roughness: 1 });
+    floor.material.normalScale.set(0.6, 0.6);
+    floor.material.needsUpdate = true;
+  } catch (err) {
+    console.warn("wood", err);
+  }
+}
+
+// 팔 끝 자리 (팔 뼈에 붙은 꼭짓점 중 어깨에서 가장 먼 곳, 뼈 기준 좌표)
+function armTip(model, bone) {
+  const tip = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  const toBone = new THREE.Matrix4().copy(bone.matrixWorld).invert();
+  bone.traverse((o) => {                                          // 뼈에 바로 붙은 조각 모델
+    if (!o.isMesh || o.isSkinnedMesh) return;
+    const m = new THREE.Matrix4().multiplyMatrices(toBone, o.matrixWorld);
+    const { position } = o.geometry.attributes;
+    for (let i = 0; i < position.count; i++) {
+      v.fromBufferAttribute(position, i).applyMatrix4(m);
+      if (v.lengthSq() > tip.lengthSq()) tip.copy(v);
+    }
+  });
+  model.traverse((o) => {                                         // 뼈대로 휘는 모델
+    if (!o.isSkinnedMesh) return;
+    const k = o.skeleton.bones.indexOf(bone);
+    if (k < 0) return;
+    const { position, skinIndex, skinWeight } = o.geometry.attributes;
+    const toBone = new THREE.Matrix4().multiplyMatrices(o.skeleton.boneInverses[k], o.bindMatrix);
+    for (let i = 0; i < position.count; i++) {
+      let best = 0;
+      for (let j = 1; j < 4; j++) if (skinWeight.getComponent(i, j) > skinWeight.getComponent(i, best)) best = j;
+      if (skinIndex.getComponent(i, best) !== k) continue;
+      v.fromBufferAttribute(position, i).applyMatrix4(toBone);
+      if (v.lengthSq() > tip.lengthSq()) tip.copy(v);
+    }
+  });
+  return tip;
+}
+
+// Kenney 선수 불러오기 (오른팔 길이·방향을 재 둠)
+function loadPlayer() {
+  new GLTFLoader().load("assets/kenney/player.glb", (gltf) => {
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const scale = PLAYER_HEIGHT / (box.max.y - box.min.y);
+    model.scale.setScalar(scale);
+    rig.base = FLOOR_Y - box.min.y * scale;
+    model.traverse((o) => {
+      if (o.isMesh) {
+        o.castShadow = true;
+        o.frustumCulled = false;
+      }
+    });
+    scene.add(model);
+    rig.mixer = new THREE.AnimationMixer(model);
+    for (const clip of gltf.animations) rig.actions[clip.name] = rig.mixer.clipAction(clip);
+    rig.arm = model.getObjectByName("arm-right");
+    if (rig.arm) {
+      model.updateMatrixWorld(true);
+      const tip = armTip(model, rig.arm);
+      rig.tipDir = tip.clone().normalize();
+      rig.armLen = tip.length() * rig.arm.getWorldScale(new THREE.Vector3()).x;
+    }
+    act("idle");
+    rig.model = model;
+    procBody.visible = false;
+  }, undefined, (err) => console.warn("player.glb", err));
+}
+
+const qa = new THREE.Quaternion();
+const qb = new THREE.Quaternion();
+
+// 오른팔을 라켓 손잡이 쪽으로 뻗기 (모자라면 팔을 조금 늘림)
+function aimArm() {
+  const arm = rig.arm;
+  if (!arm || !rig.tipDir) return;
+  rig.model.updateMatrixWorld(true);
+  arm.getWorldPosition(shoulder);
+  hand.copy(aiPaddle.position).add(va.set(0, -0.16, 0).applyEuler(aiPaddle.rotation));
+  arm.getWorldQuaternion(qa);
+  vb.copy(rig.tipDir).applyQuaternion(qa);
+  va.subVectors(hand, shoulder);
+  const dist = va.length();
+  qb.setFromUnitVectors(vb, va.normalize()).multiply(qa);
+  arm.parent.getWorldQuaternion(qa).invert();
+  arm.quaternion.copy(qa.multiply(qb));
+  arm.scale.set(1, Math.max(0.8, Math.min(1.7, dist / rig.armLen)), 1);
+}
+
+// 선수 동작 바꾸기 (once 면 한 번 하고, lock 동안은 다른 동작으로 안 바꿈)
+function act(name, { once = false, speed = 1, lock = 0 } = {}) {
+  const next = rig.actions[name];
+  if (!next || (rig.current === next && !once)) return;
+  next.reset();
+  next.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat);
+  next.clampWhenFinished = true;
+  next.timeScale = speed;
+  next.fadeIn(0.12).play();
+  if (rig.current && rig.current !== next) rig.current.fadeOut(0.12);
+  rig.current = next;
+  rig.lockUntil = performance.now() + lock;
+}
+
+// Kenney 선수 그리기 (라켓 옆에서 걷고, 몸은 끝선 뒤에, 칠 때 몸을 비틂)
+function drawRig(s, now, frame) {
+  const pad = s.pads.ai;
+  rig.model.position.set(pad.x + 0.38, rig.base, Math.min(pad.z - 0.32, -(HALF_L + 0.3)));
+  rig.swing = Math.max(0, rig.swing - frame);
+  rig.model.rotation.y = -Math.sin((rig.swing / 0.3) * Math.PI) * 0.45;
+  if (now >= rig.lockUntil) act(Math.hypot(pad.vx, pad.vz) > 0.6 ? "walk" : "idle");
+  rig.mixer.update(frame);
+  aimArm();
+}
+
+// 사건 → 선수 동작 (치기·서브는 휘두르기, 점수 나면 좋아하거나 아쉬워함)
+function animateEvents(events) {
+  if (!rig.model) return;
+  for (const e of events) {
+    if ((e.type === "hit" || e.type === "serve") && e.side === AI) rig.swing = 0.3;
+    else if (e.type === "point") act(e.winner === AI ? "emote-yes" : "emote-no", { once: true, lock: 1000 });
+  }
+}
+
+loadArena();
+loadFloor();
+loadPlayer();
 
 // ---------- 효과 ----------
 
@@ -940,14 +1109,16 @@ function tick(now) {
       acc += frame;
       while (acc >= DT) {
         acc -= DT;
-        onEvents(step(game, DT, input()));
+        const events = step(game, DT, input());
+        onEvents(events);
+        animateEvents(events);
         if (game.over) break;
       }
     } else if (!game || mode === "ready") {
       acc += frame;
       while (acc >= DT) {
         acc -= DT;
-        step(demo, DT);
+        animateEvents(step(demo, DT));
         if (demo.over) demo = makeDemo();
       }
     }
@@ -956,7 +1127,8 @@ function tick(now) {
     drawMarker(s, now);
     drawPaddle(s, ME, myPaddle, frame);
     drawPaddle(s, AI, aiPaddle, frame);
-    drawPlayer(s, now, frame);
+    if (rig.model) drawRig(s, now, frame);
+    else drawPlayer(s, now, frame);
     for (let i = effects.length - 1; i >= 0; i--) if (effects[i](now)) effects.splice(i, 1);
     drawHud(s);
     updateCamera(s, frame);

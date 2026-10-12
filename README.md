@@ -223,6 +223,7 @@ AI가 한 수 한 수를 어떻게 평가하는지 보여주는 **학습 모드*
 - 끝말잇기 사전: 국립국어원 [표준국어대사전](https://stdict.korean.go.kr), [KKuTu](https://github.com/JJoriping/KKuTu) 단어 DB (GPL v3, 단어만 사용)
 - 행맨 영어 사전: ENABLE word list (퍼블릭 도메인)
 - 3D 렌더링: [three.js](https://threejs.org) (MIT License)
+- 탁구 에셋: 경기장 HDRI [Poly Haven](https://polyhaven.com/a/circus_arena), 나무 바닥 [ambientCG](https://ambientcg.com), 로봇 선수 [Kenney Blocky Characters](https://kenney.nl/assets/blocky-characters) (모두 CC0, [자세히](pingpong/web/assets/CREDITS.md))
 
 <br>
 

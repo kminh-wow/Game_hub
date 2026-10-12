@@ -551,7 +551,8 @@ pingpong/
     index.html, style.css   화면
     logic.js         규칙·공 물리: 회전·공기 저항·튀기, 샷 계산, 서브, 점수·서브 순서, AI (DOM 없음, 시드 난수)
     game.js          진행(난이도·시작·일시정지·끝·전적), 입력(마우스·터치·키), three.js 그리기(경기장·탁구대·AI 선수·효과), 소리, 시작 화면 시범 경기
-    vendor/three/    three.js r180
+    assets/          경기장 사진·HDRI, 나무 바닥 텍스처, Kenney 로봇 선수 (출처: assets/CREDITS.md)
+    vendor/three/    three.js r180 (+ examples/jsm 의 GLTFLoader, HDRLoader)
   tests/
     logic.test.mjs   logic.js 테스트 (node --test)
 ```
@@ -565,6 +566,6 @@ pingpong/
 - 서브(`serveVelocity`): 내 쪽 첫 튐 자리와 속도를 몇 가지 바꿔 보며 미리 날려 보고(`simulate`), 내 쪽 → 상대 쪽으로 튀는 첫 조합을 씁니다. 그래서 서브는 늘 규칙대로 들어갑니다. 서브할 때 라켓은 끝선 뒤, 탁구대 폭 안에만 있을 수 있습니다.
 - AI(`think`·`botIntent`): 공이 오면 난이도별 반응 시간 뒤에 받을 자리(내 쪽에 튄 뒤 가장 높은 곳, `predict`)를 계산해 그쪽으로 난이도별 속도로 움직입니다. 높은 공은 확률적으로 스매시, 백스핀 공은 가끔 커트로 받고, 상대 라켓 반대쪽을 노립니다. 난이도는 `LEVELS` 표 한 곳에 있습니다. `createMatch({bots: {me: 2, ai: 2}})`처럼 내 쪽도 AI에게 맡길 수 있고, 시작 화면의 시범 경기가 이렇게 돕니다.
 - 전적은 `localStorage`의 `pingpong-record`(난이도별 승·패), 고른 난이도는 `pingpong-level`에 저장합니다.
-- 그래픽: 텍스처(바닥·매트·펜스 광고판·관중석·탁구대·네트)는 모두 캔버스로 그려서 이미지 파일이 없습니다. 조명은 위에서 비추는 그림자 조명 하나와 반사용 환경(`buildEnvironment`, PMREM)입니다. AI 선수는 도형으로 만든 몸에 팔다리를 매 프레임 두 마디 관절(`twoBone`)로 계산해서, 오른손이 늘 라켓 손잡이를 잡고 있습니다. 공은 보기 쉽게 실제보다 1.8배 크게 그리고 잔상 9개를 남깁니다(판정은 실제 크기). 처음 2초 동안 평균 40fps가 안 나오면 해상도를 1배로, 그래도 느리면 그림자를 끕니다(`adaptQuality`). 캔버스 위 글자 상자에는 `backdrop-filter`를 쓰지 않습니다(매 프레임 다시 합성해서 느려짐).
+- 그래픽: 경기장 배경은 Poly Haven HDRI의 사진(`assets/arena.jpg`, `scene.background`)이고, 같은 HDRI(`assets/arena.hdr`)가 반사·조명(`scene.environment`)을 맡습니다. 바닥은 ambientCG 나무 텍스처, 매트·펜스 광고판·탁구대·네트는 캔버스로 그립니다. 에셋을 못 불러오면 예전처럼 캔버스 관중석·방 조명(`buildEnvironment`)·도형 선수로 그대로 돕니다(`loadArena`·`loadFloor`·`loadPlayer`). AI 선수는 Kenney Blocky Characters의 로봇(`assets/kenney/player.glb`)입니다. 라켓은 로직 자리에 따로 그리고, 몸은 라켓 옆 끝선 뒤에 서며, 오른팔 뼈를 매 프레임 라켓 손잡이 쪽으로 돌리고 모자라면 늘립니다(`aimArm`). 움직이면 `walk`, 멈추면 `idle`, 칠 때는 몸을 비틀고, 점수가 나면 `emote-yes`/`emote-no` 동작을 합니다. 공은 보기 쉽게 실제보다 1.8배 크게 그리고 잔상 9개를 남깁니다(판정은 실제 크기). 처음 2초 동안 평균 40fps가 안 나오면 해상도를 1배로, 그래도 느리면 그림자를 끕니다(`adaptQuality`). 캔버스 위 글자 상자에는 `backdrop-filter`를 쓰지 않습니다(매 프레임 다시 합성해서 느려짐).
 - 디버그: 브라우저 콘솔에서 `__pingpong.game`으로 상태를 볼 수 있고, `__pingpong.project(x, y, z)`는 탁구대 좌표를 화면 좌표로 바꿉니다(자동 플레이 테스트용).
 
