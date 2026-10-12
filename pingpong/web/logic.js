@@ -28,21 +28,21 @@ const PLAYER_ERROR = 0.04;           // 사람 샷 기본 흔들림(m)
 const MAX_FLIGHT = 5;
 
 // 라켓이 움직일 수 있는 곳 (내 쪽 기준, AI 쪽은 z 를 뒤집음)
-export const ZONE = { x: 1.25, near: HALF_L - 0.3, far: HALF_L + 0.85, home: HALF_L + 0.4 };
+export const ZONE = { x: 1.25, near: 0.45, far: HALF_L + 0.85, home: HALF_L + 0.4 };   // near: 짧은 공은 탁구대 위로 손을 뻗어 받음
 
 // 샷: 가로 속도(m/s), 회전(+ 탑스핀, - 백스핀, rad/s), 네트에서 떨어지는 거리(m) — [힘 0, 힘 1]
 export const SHOTS = {
-  drive: { name: "드라이브", speed: [8, 14], top: [70, 150], depth: [0.85, 1.15] },
-  smash: { name: "스매시", speed: [13, 19], top: [15, 30], depth: [0.9, 1.15] },
-  block: { name: "블록", speed: [6, 6], top: [10, 10], depth: [0.8, 0.8] },
-  cut: { name: "커트", speed: [5.5, 7], top: [-60, -110], depth: [0.6, 0.95] },
+  drive: { name: "드라이브", speed: [6, 10.5], top: [60, 120], depth: [0.85, 1.15] },
+  smash: { name: "스매시", speed: [10, 14], top: [15, 30], depth: [0.9, 1.15] },
+  block: { name: "블록", speed: [4.5, 4.5], top: [10, 10], depth: [0.8, 0.8] },
+  cut: { name: "커트", speed: [4.2, 5.3], top: [-50, -90], depth: [0.6, 0.95] },
 };
 
 // AI 난이도: 라켓 속도(m/s), 반응 시간(s), 샷 흔들림(m), 평소 힘, 높은 공 스매시 확률, 노리는 폭
 export const LEVELS = [
-  { name: "하", speed: 1.8, reaction: 0.32, error: 0.2, power: 0.25, smash: 0.25, aim: 0.35 },
-  { name: "중", speed: 2.6, reaction: 0.2, error: 0.12, power: 0.5, smash: 0.6, aim: 0.5 },
-  { name: "상", speed: 3.6, reaction: 0.12, error: 0.07, power: 0.8, smash: 0.9, aim: 0.6 },
+  { name: "하", speed: 1.6, reaction: 0.36, error: 0.34, power: 0.1, smash: 0.1, aim: 0.25 },
+  { name: "중", speed: 2.2, reaction: 0.26, error: 0.26, power: 0.3, smash: 0.3, aim: 0.38 },
+  { name: "상", speed: 3.2, reaction: 0.15, error: 0.12, power: 0.65, smash: 0.75, aim: 0.55 },
 ];
 
 // 점수 난 이유
@@ -403,7 +403,7 @@ export function makeShot(s, side, intent, off = 0) {
   let top = lerp(spec.top[0], spec.top[1], p);
   let depth = lerp(spec.depth[0], spec.depth[1], p);
   if (intent.type === "block") {
-    speed = clamp(inSpeed * 0.7, 5.5, 10);
+    speed = clamp(inSpeed * 0.7, 4.2, 7.5);
     top = clamp(inTop * 0.25, -40, 50);
   }
   if (intent.type === "block" || intent.type === "cut") depth += Math.max(0, inTop) * 0.0025;      // 탑스핀을 막으면 길게
@@ -415,7 +415,7 @@ export function makeShot(s, side, intent, off = 0) {
   if (depth < 0.12) return aimVelocity(b.p, { x: tx, z: dir * 0.05 }, speed, top);                // 네트에 걸림
   const target = { x: tx, z: -dir * depth };
   let sol = aimVelocity(b.p, target, speed, top);
-  while (sol.netY < NET_H + BALL_R + 0.01 && speed > 3.6) {                                       // 네트를 넘길 만큼 느리게
+  while (sol.netY < NET_H + BALL_R + 0.01 && speed > 3.2) {                                       // 네트를 넘길 만큼 느리게
     speed -= 1;
     sol = aimVelocity(b.p, target, speed, top);
   }
@@ -440,7 +440,7 @@ export function serveVelocity(s, side, intent) {
   const p0 = s.ball.p;
   const p = intent.power;
   const top = intent.type === "drive" ? 40 + 60 * p : intent.type === "cut" ? -(30 + 50 * p) : 0;
-  const base = intent.type === "drive" ? 5.5 + p : 5;
+  const base = intent.type === "drive" ? 4.5 + p : 4.2;
   const tx = clamp(intent.tx, -0.6, 0.6);
   const depth = intent.type === "cut" ? 0.6 : 0.95;
   let sol = null;

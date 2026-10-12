@@ -161,7 +161,7 @@ test("사람 서브: 누르면 나가고, 컴퓨터는 혼자 받아친다", () 
   const s = createMatch({ seed: 5, first: ME, level: 2 });
   run(s, 0.5, () => ({ x: 0.2, z: 1.8 }));
   assert.equal(s.phase, "serve");
-  const events = run(s, 2, (st) => ({ x: 0.2, z: 1.8, serve: st.phase === "serve" }));
+  const events = run(s, 3, (st) => ({ x: 0.2, z: 1.8, serve: st.phase === "serve" }));
   assert.ok(events.some((e) => e.type === "serve" && e.side === ME));
   assert.ok(events.some((e) => e.type === "hit" && e.side === AI));
 });
