@@ -155,7 +155,11 @@ function buildRow(row, prev, next) {
     const pole = box(0.12, 1.2, 0.12, 0x555555, W + 0.8, 0.6, -0.4);
     entry.light = box(0.3, 0.3, 0.1, 0x552222, W + 0.8, 1.25, -0.4, false);
     entry.light.material = new THREE.MeshBasicMaterial({ color: 0x552222 });
-    group.add(pole, entry.light);
+    // 경고 중에는 철길 전체가 빨갛게 깜빡임
+    entry.alarm = new THREE.Mesh(unit, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0, depthWrite: false }));
+    entry.alarm.scale.set(GROUND_W, 0.02, 0.96);
+    entry.alarm.position.y = 0.12;
+    group.add(pole, entry.light, entry.alarm);
   } else if (row.type === "river") {
     group.add(box(GROUND_W, 0.2, 1, 0x4fb3e8, 0, -0.32, 0, false));
     for (const x of row.pads) {
@@ -209,6 +213,7 @@ function syncRows(s, now) {
       if (e.train) e.train.position.set(row.train.x, 0, -row.z);
       const on = row.warn && Math.floor(now / 180) % 2 === 0;
       e.light.material.color.setHex(on ? 0xff3030 : row.train ? 0xff3030 : 0x552222);
+      e.alarm.material.opacity = on ? 0.38 : 0;
     }
     for (const [x, c] of e.coins) {
       if (!row.coins.has(x)) {
@@ -341,6 +346,16 @@ function animateDeath(s, now) {
 }
 
 // ---------- 화면 정보 ----------
+
+let bannerTimer = null;
+// 잠깐 띄우는 알림
+function banner(text) {
+  const el = $("#banner");
+  el.textContent = text;
+  el.classList.add("on");
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => el.classList.remove("on"), 1200);
+}
 
 const hud = {};
 function setText(id, text) {
@@ -485,6 +500,7 @@ function tick(now) {
       for (const e of events) {
         if (e.type === "hop") onHop();
         if (e.type === "coin") coinPop(e.x, e.z);
+        if (e.type === "warn" && Math.abs(e.z - game.z) <= 3) banner("🚂 기차!");
         if (e.type === "over") gameOver(game, now);
       }
     }

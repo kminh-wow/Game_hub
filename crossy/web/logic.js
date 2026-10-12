@@ -143,6 +143,7 @@ export function createGame(seed = Date.now()) {
   const s = {
     seed, rng: makeRng(seed), t: 0, rows: [],
     x: 0, z: 0, maxZ: 0, score: 0, coins: 0,
+    fromX: 0, fromZ: 0,               // 이번 뛰기를 시작한 자리 (뛰는 동안 판정용)
     hop: 0, queue: null, facing: "up", started: false,
     edge: -EDGE_LAG, over: false, cause: null, log: null,
   };
@@ -172,6 +173,8 @@ export function move(s, dir, events = []) {
     if (Math.abs(tx) > W) return false;
     if (target.type === "grass" && target.blocks.has(tx)) return false;           // 나무·바위
   } else if (Math.abs(tx) > W + 0.4) return false;
+  s.fromX = s.x;
+  s.fromZ = s.z;
   s.x = tx;
   s.z += dz;
   s.hop = HOP_TIME;
@@ -252,9 +255,12 @@ export function step(s, dt) {
       die(s, "water", events);
     }
   }
-  // 차·기차에 부딪힘
-  if (here?.type === "road" && overlaps(here.cars, s.x, PLAYER_HALF)) die(s, "car", events);
-  if (here?.type === "rail" && here.train && overlaps([here.train], s.x, PLAYER_HALF)) die(s, "train", events);
+  // 차·기차에 부딪힘 (뛰는 중이면 화면에 보이는 자리로: 앞 절반은 떠난 줄, 뒤 절반은 갈 줄)
+  const k = s.hop > 0 ? 1 - s.hop / HOP_TIME : 1;
+  const hitRow = rowAt(s, k < 0.5 ? s.fromZ : s.z);
+  const hitX = s.fromX + (s.x - s.fromX) * k;
+  if (hitRow?.type === "road" && overlaps(hitRow.cars, hitX, PLAYER_HALF)) die(s, "car", events);
+  if (hitRow?.type === "rail" && hitRow.train && overlaps([hitRow.train], hitX, PLAYER_HALF)) die(s, "train", events);
   // 화면 아래 끝이 올라옴 (가만히 있거나 처지면 독수리)
   if (s.started) s.edge = Math.max(s.edge + CREEP * Math.sqrt(pace(s.maxZ)) * dt, s.maxZ - EDGE_LAG);
   if (s.z < s.edge) die(s, "eagle", events);

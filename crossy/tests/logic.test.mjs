@@ -138,3 +138,27 @@ test("앞으로 갈수록 줄이 계속 생기고, 지나간 줄은 치운다", 
   const types = new Set(s.rows.map((r) => r.type));
   assert.ok(types.size >= 3);
 });
+
+test("뛰는 중에는 화면에 보이는 자리로 판정 (앞 절반은 떠난 줄)", () => {
+  // 철길 위에 서 있다가 기차가 닿기 직전에 뛰면: 너무 늦으면 치이고, 조금 일찍이면 산다
+  const outcome = (before) => {
+    const s = createGame(8);
+    setRow(s, 1, { type: "rail", dir: 1, train: null, wait: 0.5, warn: 0 });
+    setRow(s, 2, grass());
+    move(s, "up");
+    run(s, HOP_TIME + 0.02);
+    let t = 0;
+    while (!s.over && t < 3) {
+      const train = rowAt(s, 1).train;
+      if (train && s.z === 1) {
+        const reach = (Math.abs(train.x - s.x) - (train.len / 2 + 0.32)) / 26;   // 기차가 닭에 닿기까지 남은 시간
+        if (reach <= before) move(s, "up");
+      }
+      step(s, 1 / 240);
+      t += 1 / 240;
+    }
+    return s.cause;
+  };
+  assert.equal(outcome(0.02), "train");          // 화면에선 아직 철길 위
+  assert.notEqual(outcome(0.1), "train");        // 이미 반 넘게 뛰어 나감
+});
