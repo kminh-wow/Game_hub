@@ -4,7 +4,7 @@
 
 **먼저 다섯 개를 나란히 놓으면 승리**
 
-### [▶ 지금 플레이하기](http://52.200.153.207/omok/)
+### [▶ 지금 플레이하기](http://ddanjit.duckdns.org/omok/)
 
 <img src="../docs/images/omok-game.png" alt="오목 게임 화면" width="760">
 

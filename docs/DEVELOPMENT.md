@@ -163,6 +163,7 @@ cd Game_hub
 bash deploy/setup.sh              # 게임 서버는 127.0.0.1:8000, nginx가 80 → 8000 전달
 ```
 
+- 주소: **http://ddanjit.duckdns.org** (무료 DuckDNS). 서버의 cron이 5분마다, 그리고 재부팅 30초 뒤에 `~/duckdns/duck.sh`로 지금 IP를 DuckDNS에 알려서, 인스턴스를 껐다 켜서 공인 IP가 바뀌어도 주소가 따라갑니다. 토큰은 서버의 그 파일에만 있습니다(git에 넣지 않음). nginx는 `server_name _`라 이 주소 그대로 받습니다. HTTPS는 아직 없습니다(필요하면 보안 그룹 443 열고 certbot).
 - 게임 서버는 기본으로 **서버 안(127.0.0.1)에서만** 받습니다. 밖에서는 nginx(80번)로만 들어오므로 보안 그룹에서 8000번을 열 필요가 없습니다.
 - nginx 없이 80번으로 바로 띄우려면: `PORT=80 bash deploy/setup.sh` (이때는 밖에서 직접 받도록 `0.0.0.0`으로 띄웁니다. `HOST=`로 직접 지정할 수도 있습니다)
 - 서버 설정(`/etc/systemd/system/game-hub.service`)은 `setup.sh`가 만듭니다. `update.sh`는 코드만 갱신하므로, 포트나 주소를 바꿀 때는 `setup.sh`를 다시 실행하세요 (여러 번 실행해도 안전합니다).
