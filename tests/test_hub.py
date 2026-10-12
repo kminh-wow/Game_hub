@@ -38,6 +38,8 @@ def client():
         ("/runner/logic.js", "export function step"),
         ("/pingpong/", "탁구"),
         ("/pingpong/game.js", "./logic.js"),
+        ("/crossy/", "길건너기"),
+        ("/crossy/logic.js", "export function step"),
         ("/pingpong/logic.js", "export function step"),
     ],
 )
@@ -47,7 +49,7 @@ def test_pages(client, path, needle):
     assert needle in r.text
 
 
-@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman", "omok", "yacht", "fortress", "shooter", "runner", "pingpong"])
+@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman", "omok", "yacht", "fortress", "shooter", "runner", "pingpong", "crossy"])
 def test_redirect_to_trailing_slash(client, name):
     r = client.get(f"/{name}", follow_redirects=False)
     assert r.status_code in (307, 308)

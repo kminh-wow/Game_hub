@@ -1,0 +1,33 @@
+/* 공통 팔레트 */
+:root { color-scheme:light dark; --bg:#f5f5ed; --panel:#fcfcf7; --text:#173d33; --muted:#53665c; --line:#cdd4c7; --accent:#245442; --on-accent:#fcfcf7; --shadow:0 1px 2px rgba(20,24,35,.05),0 8px 24px rgba(20,24,35,.06); }
+/* 다크 팔레트 */
+@media(prefers-color-scheme:dark) { :root { --bg:#1c2425; --panel:#263032; --text:#edf2e8; --muted:#b6c5bd; --line:#4d6057; --accent:#b9d787; --on-accent:#173d33; --shadow:0 1px 2px #0005; } }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif; min-height:100svh; padding:12px; }
+.game-shell { width:min(920px,100%); margin:auto; }
+header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+header a { color:var(--muted); text-decoration:none; font-size:13px; font-weight:600; }
+header a:hover { color:var(--accent); }
+h1 { margin:0; font-size:24px; letter-spacing:-.5px; display:flex; align-items:center; gap:9px; }
+.title-dot { width:12px; height:12px; border-radius:50%; background:var(--accent); }
+.hidden { display:none !important; }
+
+/* 3D 화면 */
+.board-wrap { position:relative; width:100%; height:clamp(340px,calc(100svh - 130px),900px); border:1px solid var(--line); border-radius:20px; overflow:hidden; background:#8fd3f5; box-shadow:var(--shadow); user-select:none; }
+canvas { display:block; width:100%; height:100%; touch-action:none; }
+
+/* 점수 (왼쪽 위), 동전 (오른쪽 위) */
+.score { position:absolute; left:16px; top:10px; color:#fff; text-shadow:0 2px 0 rgba(0,0,0,.35); pointer-events:none; display:flex; flex-direction:column; }
+.score b { font-size:46px; line-height:1; font-weight:900; }
+.score span { font-size:13px; font-weight:800; opacity:.9; }
+.coins { position:absolute; right:16px; top:14px; display:flex; align-items:center; gap:6px; color:#fff; font-size:22px; font-weight:900; text-shadow:0 2px 0 rgba(0,0,0,.35); pointer-events:none; }
+.coins i { width:18px; height:18px; border-radius:50%; background:#ffd23f; box-shadow:inset 0 -3px 0 #e0a800, 0 2px 0 rgba(0,0,0,.25); }
+
+/* 시작·게임 오버 */
+.panel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(340px,86%); padding:20px 22px; border:1px solid var(--line); border-radius:16px; background:var(--panel); color:var(--text); box-shadow:var(--shadow); text-align:center; }
+.panel h2 { margin:0 0 8px; font-size:22px; }
+.panel p { margin:0 0 14px; color:var(--muted); font-size:14px; line-height:1.6; white-space:pre-line; }
+.panel button { background:var(--accent); color:var(--on-accent); border:0; border-radius:10px; padding:10px 22px; font:inherit; font-weight:800; cursor:pointer; }
+
+.help { color:var(--muted); font-size:11px; line-height:1.7; text-align:center; margin:10px 8px 0; }
+@media(max-width:480px) { body { padding:10px 8px; } h1 { font-size:21px; } .board-wrap { border-radius:16px; height:calc(100svh - 120px); } .score b { font-size:38px; } }

@@ -21,6 +21,7 @@ http://127.0.0.1:8000 을 여세요.
   - 팩맨 규칙: `node --test pacman/tests/logic.test.mjs` (Node 18 이상)
   - 숫자러너 규칙: `node --test runner/tests/logic.test.mjs`
   - 탁구 규칙·공 물리: `node --test pingpong/tests/logic.test.mjs`
+  - 길건너기 규칙: `node --test crossy/tests/logic.test.mjs`
   - 행맨 게임 흐름: `cd hangman && pytest`
 
 ## 구조
@@ -42,6 +43,7 @@ fortress/        포트리스 (FastAPI 앱: fortress/app/main.py)
 shooter/         턴제 FPS (FastAPI 앱: shooter/app/main.py)
 runner/          숫자러너 (FastAPI 앱: runner/app.py, 정적 파일만 제공)
 pingpong/        탁구     (FastAPI 앱: pingpong/app.py, 정적 파일만 제공)
+crossy/          길건너기 (FastAPI 앱: crossy/app.py, 정적 파일만 제공)
 deploy/          서버 설치, 업데이트 스크립트
 docs/            이 문서, README용 스크린샷
 tests/           허브 통합 테스트
@@ -60,6 +62,7 @@ tests/           허브 통합 테스트
 | `/shooter/` | 턴제 FPS |
 | `/runner/` | 숫자러너 |
 | `/pingpong/` | 탁구 |
+| `/crossy/` | 길건너기 |
 | `/common/` | 공통 프론트엔드 파일 (`lobby.js`) |
 
 - 각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
@@ -568,4 +571,29 @@ pingpong/
 - 전적은 `localStorage`의 `pingpong-record`(난이도별 승·패), 고른 난이도는 `pingpong-level`에 저장합니다.
 - 그래픽: 경기장 배경은 Poly Haven HDRI의 사진(`assets/arena.jpg`, `scene.background`)이고, 같은 HDRI(`assets/arena.hdr`)가 반사·조명(`scene.environment`)을 맡습니다. 바닥은 ambientCG 나무 텍스처, 매트·펜스 광고판·탁구대·네트는 캔버스로 그립니다. 에셋을 못 불러오면 예전처럼 캔버스 관중석·방 조명(`buildEnvironment`)·도형 선수로 그대로 돕니다(`loadArena`·`loadFloor`·`loadPlayer`). AI 선수는 Kenney Blocky Characters의 로봇(`assets/kenney/player.glb`)입니다. 라켓은 로직 자리에 따로 그리고, 몸은 라켓 옆 끝선 뒤에 서며, 오른팔 뼈를 매 프레임 라켓 손잡이 쪽으로 돌리고 모자라면 늘립니다(`aimArm`). 움직이면 `walk`, 멈추면 `idle`, 칠 때는 몸을 비틀고, 점수가 나면 `emote-yes`/`emote-no` 동작을 합니다. 공은 보기 쉽게 실제보다 1.8배 크게 그리고 잔상 9개를 남깁니다(판정은 실제 크기). 처음 2초 동안 평균 40fps가 안 나오면 해상도를 1배로, 그래도 느리면 그림자를 끕니다(`adaptQuality`). 캔버스 위 글자 상자에는 `backdrop-filter`를 쓰지 않습니다(매 프레임 다시 합성해서 느려짐).
 - 디버그: 브라우저 콘솔에서 `__pingpong.game`으로 상태를 볼 수 있고, `__pingpong.project(x, y, z)`는 탁구대 좌표를 화면 좌표로 바꿉니다(자동 플레이 테스트용).
+
+---
+
+## 길건너기
+
+브라우저에서만 도는 싱글 게임입니다. 서버(`crossy/app.py`)는 정적 파일만 내려줍니다. 그래픽은 외부 에셋 없이 three.js 상자로 만든 복셀 스타일입니다.
+
+```
+crossy/
+  app.py             정적 파일 서빙
+  web/
+    index.html, style.css   화면
+    logic.js         규칙: 줄 만들기(풀밭·도로·철길·강), 한 칸 뛰기, 차·기차·통나무 움직임, 죽는 조건, 동전 (DOM 없음, 시드 난수)
+    game.js          진행(시작·끝·최고 기록·동전), 입력(키보드·탭·밀기), three.js 그리기(줄 모형, 닭, 독수리, 효과)
+    vendor/three/    three.js r180
+  tests/
+    logic.test.mjs   logic.js 테스트 (node --test)
+```
+
+- 좌표: `x`는 가로 칸(-4~4, 9칸), `z`는 앞으로 간 줄(시작 0). 화면에서는 `z = -줄`. 차와 통나무는 화면 밖 `±SPAN`(13칸)까지 오가다 반대편에서 다시 나옵니다.
+- 줄은 풀밭 1~2줄 사이에 도로(1~5줄)·철길(1~2줄)·강(1~4줄) 묶음이 끼는 식으로 미리 28줄 앞까지 만들고, 지나간 줄은 치웁니다. 풀밭은 나무·바위가 막아도 늘 5칸 이상 걸을 수 있고, 강은 이어지면 흐르는 방향이 번갈아 바뀌며, 땅 바로 다음 강은 가끔 움직이지 않는 연잎 줄입니다.
+- `move(s, 방향)`은 한 칸 뛰기(0.11초)입니다. 뛰는 중에 누른 건 하나만 미리 받아 둡니다. 땅으로 뛰면 칸에 맞춰 서고, 통나무에 오르면 통나무 칸에 맞춰 서서 같이 떠내려갑니다.
+- 죽는 조건: 도로·철길에서 차·기차와 겹침, 강에서 통나무·연잎이 없음(물), 통나무 타고 화면 밖(떠내려감), 가장 멀리 간 줄에서 뒤로 3줄(독수리), 화면 아래 끝(`edge`)에 따라잡힘(독수리). 화면 아래 끝은 첫 걸음 뒤부터 초당 0.42줄씩 올라오고 가장 멀리 간 줄보다 4줄 넘게 처지지 않아서, 가만히 있으면 10초쯤에 독수리가 옵니다.
+- 앞으로 갈수록(`pace`, 220줄에서 2배까지) 차·통나무가 빨라지고 차 간격이 좁아지며 도로·강 묶음이 길어집니다.
+- 디버그: 브라우저 콘솔에서 `__crossy.game`, `__crossy.move("up")`.
 

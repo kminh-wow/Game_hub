@@ -129,6 +129,14 @@
     .pingpong-art .table { position: absolute; left: 10px; right: 10px; bottom: 6px; height: 34px; background: #1f5fa8; border: 2px solid #f4f6f8; border-radius: 3px; transform: perspective(120px) rotateX(35deg); }
     .pingpong-art .table::after { content: ""; position: absolute; top: -6px; bottom: -2px; left: 50%; width: 2px; margin-left: -1px; background: #222; }
     .pingpong-art i { position: absolute; left: 92px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #ffb347; }
+    /* 길건너기 카드 그림 */
+    .crossy-art { display: flex; flex-direction: column; width: 150px; border-radius: 6px; overflow: hidden; }
+    .crossy-art i { display: block; height: 16px; background: #9ddc6f; position: relative; }
+    .crossy-art i.road { background: #4b4f57; }
+    .crossy-art i.river { background: #4fb3e8; }
+    .crossy-art i.road::after { content: ""; position: absolute; left: 30px; top: 3px; width: 26px; height: 10px; background: #e8473f; border-radius: 2px; }
+    .crossy-art i.river::after { content: ""; position: absolute; left: 70px; top: 3px; width: 48px; height: 10px; background: #9b6a3c; border-radius: 2px; }
+    .crossy-art i.hen::after { content: ""; position: absolute; left: 68px; top: 1px; width: 14px; height: 14px; background: #fff; border-radius: 2px; box-shadow: 0 -4px 0 -3px #e23b3b; }
     .pingpong-art b { position: absolute; left: 18px; top: 8px; width: 24px; height: 24px; border-radius: 50%; background: #d8262c; box-shadow: 4px 12px 0 -8px #c79a62; }
 
     footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: 13px; }
@@ -273,6 +281,16 @@
       <h2>탁구</h2>
       <p>라켓을 앞으로 휘둘러 드라이브! 회전이 걸린 공으로 AI(하·중·상)와 11점 승부. 스매시, 커트, 블록까지.</p>
       <div class="tags"><span>1명</span><span>스포츠</span><span>3D</span><span>모바일</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
+    <a class="card" href="crossy/">
+      <div class="art" aria-hidden="true">
+        <div class="crossy-art"><i class="river"></i><i class="road"></i><i class="hen"></i></div>
+      </div>
+      <h2>길건너기</h2>
+      <p>닭을 한 칸씩 뛰게 해서 차와 기차를 피하고, 통나무를 타고 강을 건너요. 멈추면 독수리가 와요!</p>
+      <div class="tags"><span>1명</span><span>아케이드</span><span>3D</span><span>모바일</span></div>
       <span class="play">플레이 →</span>
     </a>
   </main>
