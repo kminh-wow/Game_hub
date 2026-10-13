@@ -23,7 +23,7 @@ test("같은 시드면 같은 길", () => {
   assert.deepEqual(a.rows.map((r) => r.type), b.rows.map((r) => r.type));
 });
 
-test("출발점 근처는 비어 있고, 풀밭 줄은 늘 5칸 이상 걸을 수 있다", () => {
+test("출발점 근처는 비어 있고, 풀밭 줄은 늘 7칸 이상 걸을 수 있다", () => {
   const s = createGame(1);
   for (let z = -1; z <= 3; z++) assert.equal(rowAt(s, z).type, "grass");
   assert.equal(rowAt(s, 0).blocks.has(0), false);
@@ -31,7 +31,7 @@ test("출발점 근처는 비어 있고, 풀밭 줄은 늘 5칸 이상 걸을 �
     for (const r of createGame(seed).rows.filter((r) => r.type === "grass")) {
       let open = 0;
       for (let x = -W; x <= W; x++) if (!r.blocks.has(x)) open++;
-      assert.ok(open >= 5);
+      assert.ok(open >= 7);
     }
   }
 });

@@ -48,12 +48,11 @@ function grassRow(s, z, safe = false) {
   for (let x = -SPAN; x <= SPAN; x++) {
     if (Math.abs(x) > W) {
       if (r.next() < 0.75) blocks.add(x);                       // 걸을 수 없는 바깥은 숲
-    } else if (!safe && r.next() < 0.22) blocks.add(x);
+    } else if (!safe && r.next() < 0.13) blocks.add(x);
   }
-  // 막힌 칸이 너무 많으면 몇 개 비우기 (걸을 칸은 늘 5칸 이상)
+  // 막힌 칸이 너무 많으면 몇 개 비우기 (걸을 칸은 늘 7칸 이상)
   const inside = [...blocks].filter((x) => Math.abs(x) <= W);
-  while (inside.length > 4) blocks.delete(inside.splice(r.int(0, inside.length - 1), 1)[0]);
-  const kinds = {};
+  while (inside.length > 2) blocks.delete(inside.splice(r.int(0, inside.length - 1), 1)[0]);  const kinds = {};
   for (const x of blocks) kinds[x] = r.next() < 0.75 ? "tree" : "rock";
   return { z, type: "grass", blocks, kinds, coins: coinsFor(s, blocks) };
 }
