@@ -24,6 +24,7 @@ http://127.0.0.1:8000 을 여세요.
   - 길건너기 규칙: `node --test crossy/tests/logic.test.mjs`
   - 사과게임 규칙: `node --test apple/tests/logic.test.mjs`
   - 행맨 게임 흐름: `cd hangman && pytest`
+  - 홀덤 족보·진행: `cd holdem && pytest`
 
 ## 구조
 
@@ -43,6 +44,7 @@ omok/            오목     (FastAPI 앱: omok/app/main.py)
 yacht/           요트 다이스 (FastAPI 앱: yacht/app/main.py)
 fortress/        포트리스 (FastAPI 앱: fortress/app/main.py)
 shooter/         턴제 FPS (FastAPI 앱: shooter/app/main.py)
+holdem/          홀덤     (FastAPI 앱: holdem/app/main.py)
 runner/          숫자러너 (FastAPI 앱: runner/app.py, 정적 파일만 제공)
 pingpong/        탁구     (FastAPI 앱: pingpong/app.py, 정적 파일만 제공)
 crossy/          길건너기 (FastAPI 앱: crossy/app.py, 정적 파일만 제공)
@@ -63,6 +65,7 @@ tests/           허브 통합 테스트
 | `/yacht/` | 요트 다이스 |
 | `/fortress/` | 포트리스 |
 | `/shooter/` | 턴제 FPS |
+| `/holdem/` | 홀덤 |
 | `/runner/` | 숫자러너 |
 | `/pingpong/` | 탁구 |
 | `/crossy/` | 길건너기 |
@@ -509,6 +512,34 @@ shooter/
 - 화면 쪽 정보: 처치 알림(오른쪽 위), 맞은 방향(가운데 둘레 빨간 호), 피해 숫자(머리 위), 이동 범위(초록 원), 안전 구역(붉은 벽 + 다음 라운드 흰 원).
 - 화면은 내가 살아 있으면 내 눈, 탈락했거나 관전 중이면 지금 차례인 사람의 눈으로 봅니다. 그래픽은 three.js 기본 도형이라 디자인 작업 때 `soldierMesh`, `buildArena`, 효과 함수들을 바꾸면 됩니다.
 - 검증: `cd shooter && python -m pytest tests`
+
+---
+
+## 홀덤
+
+```
+holdem/
+  app/
+    main.py     GameServer·앱 생성 (게임 메시지: act {action: fold|check|call|raise|allin, amount})
+    room.py     방 설정(시작 칩, 블라인드 오르는 판 수, 행동 시간), 2~8명, 방 우승 횟수
+    game.py     토너먼트 진행: 딜러·블라인드, 베팅 차례, 레이즈 규칙, 시간 초과(자리 비움), 쇼다운, 탈락, 나감
+    rules.py    카드, 족보 판정(7장 중 가장 좋은 5장), 팟 나누기(사이드 팟)
+  static/
+    index.html, style.css
+    app.js      lobby.js + 이름표·베팅 금액·조작 버튼(레이즈 슬라이더)·족보 펼치기/접기
+    table3d.js  three.js 테이블·사람(Kenney)·카드·칩, 캔버스로 그린 카드·칩·펠트, 애니메이션
+    assets/     CC0 에셋 (탁구에서 가져옴, CREDITS.md)
+  tests/        test_rules.py(족보·팟), test_game.py(진행)
+```
+
+- 노리밋 텍사스 홀덤 토너먼트. 모두 `start_chips`로 시작하고 `blind_every`판마다 블라인드가 오릅니다(`BLIND_LEVELS`, 시작 칩 1000 기준 10/20부터, 시작 칩에 비례). 칩이 0이 되면 탈락, 1명이 남으면 끝.
+- 둘이면 딜러가 스몰 블라인드이고 프리플랍에 먼저, 플랍부터는 나중에 행동합니다. 셋 이상이면 딜러 다음이 SB, 그다음이 BB.
+- 레이즈는 `amount`가 "이번 라운드에 낸 총액"입니다. 최소 레이즈는 직전 레이즈 폭(처음엔 BB). 최소에 못 미치는 올인은 이미 행동한 사람에게 레이즈를 다시 열어 주지 않습니다(`can_raise`). 다른 사람이 모두 올인이면 레이즈할 수 없습니다.
+- 쇼다운은 남은 사람 카드를 모두 공개하고, `split_pots`로 메인·사이드 팟을 나눠 팟마다 가장 좋은 패가 가져갑니다. 비기면 나누고, 남는 칩은 딜러 왼쪽부터 줍니다. 더 베팅할 사람이 없으면(모두 올인) 남은 카드를 1.4초 간격으로 펼칩니다.
+- 개인 카드는 본인에게만 보냅니다(`state(viewer)`). 남의 카드는 쇼다운 때만, 관전자에게도 같습니다. 섞기는 `secrets.SystemRandom`.
+- 시간 초과면 체크할 수 있을 땐 체크, 아니면 폴드하고 "자리 비움"이 됩니다. 자리 비움이면 4초 뒤 자동 진행, 아무 행동이나 하면 돌아옵니다. 게임 중에 나가면 폴드하고 탈락(남은 칩은 사라짐)입니다.
+- 화면: 내 자리가 늘 화면 아래. 내 카드는 크게 세워서 보여 주고, "위에서 보기"로 시점을 바꿉니다. 이름표·베팅 금액·팟은 HTML을 3D 자리에 맞춰 매 프레임 옮깁니다(`table.seatScreen`). 키보드: F 폴드, C 체크·콜, R 레이즈.
+- 검증: `cd holdem && python -m pytest`
 
 ---
 

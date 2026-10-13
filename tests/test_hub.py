@@ -41,6 +41,9 @@ def client():
         ("/crossy/", "길건너기"),
         ("/crossy/logic.js", "export function step"),
         ("/apple/", "사과게임"),
+        ("/holdem/", "홀덤"),
+        ("/holdem/static/app.js", "GameLobby.init"),
+        ("/holdem/static/table3d.js", "createTable"),
         ("/apple/logic.js", "export function clear"),
         ("/pingpong/logic.js", "export function step"),
     ],
@@ -51,14 +54,14 @@ def test_pages(client, path, needle):
     assert needle in r.text
 
 
-@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman", "omok", "yacht", "fortress", "shooter", "runner", "pingpong", "crossy", "apple"])
+@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman", "omok", "yacht", "fortress", "shooter", "runner", "pingpong", "crossy", "apple", "holdem"])
 def test_redirect_to_trailing_slash(client, name):
     r = client.get(f"/{name}", follow_redirects=False)
     assert r.status_code in (307, 308)
     assert r.headers["location"] == f"/{name}/"
 
 
-@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/wordchain/docs", "/quoridor/docs", "/pacman/docs", "/hangman/docs", "/omok/docs", "/yacht/docs", "/fortress/docs", "/shooter/docs", "/runner/docs", "/pingpong/docs", "/nothing"])
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/wordchain/docs", "/quoridor/docs", "/pacman/docs", "/hangman/docs", "/omok/docs", "/yacht/docs", "/fortress/docs", "/shooter/docs", "/runner/docs", "/pingpong/docs", "/holdem/docs", "/nothing"])
 def test_hidden_pages(client, path):
     assert client.get(path).status_code == 404
 
@@ -112,6 +115,11 @@ def test_fortress_websocket(client):
 
 def test_shooter_websocket(client):
     with client.websocket_connect("/shooter/ws?name=hubshoot&token=t") as ws:
+        assert ws.receive_json()["type"] == "welcome"
+
+
+def test_holdem_websocket(client):
+    with client.websocket_connect("/holdem/ws?name=hubholdem&token=t") as ws:
         assert ws.receive_json()["type"] == "welcome"
 
 

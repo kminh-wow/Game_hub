@@ -25,6 +25,7 @@ LABELS = {
     "Yacht Dice": "요트",
     "Fortress": "포트리스",
     "Turn FPS": "턴제 FPS",
+    "Holdem": "홀덤",
 }
 
 

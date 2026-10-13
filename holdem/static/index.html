@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>홀덤</title>
+  <link rel="stylesheet" href="static/style.css?v=1">
+  <script type="importmap">{"imports":{"three":"./static/vendor/three/build/three.module.js","three/addons/":"./static/vendor/three/examples/jsm/"}}</script>
+</head>
+<body>
+  <!-- 로그인 -->
+  <section id="screen-login" class="screen">
+    <div class="login-card">
+      <h1>홀덤 <span>Hold'em</span></h1>
+      <p class="muted">2~8명이 같은 칩으로 시작해 마지막 1명이 남을 때까지</p>
+      <form id="login-form">
+        <input id="login-name" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="off" required>
+        <button type="submit">입장</button>
+      </form>
+      <p id="login-error" class="error"></p>
+      <a class="hub-link" href="../">← 다른 게임 고르기</a>
+    </div>
+  </section>
+
+  <!-- 로비 -->
+  <section id="screen-lobby" class="screen hidden">
+    <header class="topbar">
+      <a class="hub-link" href="../" title="게임 목록">← Ddan Jit</a>
+      <h2>로비</h2>
+      <span class="muted">접속: <b id="me-name"></b></span>
+    </header>
+    <div class="layout">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h3>방 목록</h3>
+          <button id="btn-open-create">방 만들기</button>
+        </div>
+        <form id="create-form" class="create-form hidden">
+          <input id="create-title" maxlength="30" placeholder="방 제목" autocomplete="off">
+          <label>인원
+            <select id="create-max">
+              <option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option>
+            </select>
+          </label>
+          <button type="submit">만들기</button>
+          <button type="button" id="btn-cancel-create" class="ghost">취소</button>
+        </form>
+        <ul id="room-list" class="room-list"></ul>
+      </div>
+      <div class="panel side">
+        <h3>접속자 <span id="user-count" class="muted"></span></h3>
+        <ul id="user-list" class="user-list"></ul>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="lobby-chat-log" class="chat-log"></ul>
+      <form id="lobby-chat-form" class="chat-form">
+        <input id="lobby-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 방 -->
+  <section id="screen-room" class="screen hidden">
+    <header class="topbar">
+      <h2 id="room-title"></h2>
+      <span id="room-info" class="muted"></span>
+      <button id="btn-leave" class="ghost">나가기</button>
+    </header>
+    <div class="room-layout">
+      <div class="panel room-game">
+        <!-- 대기 화면 -->
+        <div id="waiting-view">
+          <h3>게임 설정</h3>
+          <form id="settings-form" class="settings">
+            <label>시작 칩
+              <select name="start_chips">
+                <option value="500">500</option><option value="1000">1,000</option><option value="2000">2,000</option>
+                <option value="5000">5,000</option><option value="10000">10,000</option>
+              </select>
+            </label>
+            <label>블라인드 오르는 판 수 <input type="number" name="blind_every" min="3" max="20"></label>
+            <label>한 번 행동 시간(초) <input type="number" name="turn_time" min="10" max="60" step="5"></label>
+            <label>최대 인원 <input type="number" name="max_players" min="2" max="8"></label>
+          </form>
+          <p class="muted">노리밋 텍사스 홀덤 토너먼트. 모두 같은 칩으로 시작해 칩이 떨어지면 탈락, 마지막 1명이 우승이에요. 게임 칩만 써요.</p>
+          <p id="settings-note" class="muted"></p>
+          <button id="btn-ready" class="big"></button>
+        </div>
+
+        <!-- 게임 화면 (끝난 뒤에는 마지막 판을 보여 줌) -->
+        <div id="game-view" class="hidden">
+          <div id="table-host" class="table-wrap">
+            <div id="labels" class="labels"></div>
+            <div id="table-info" class="table-info"></div>
+            <div class="table-tools">
+              <button id="btn-hands" type="button" class="mini" aria-expanded="false">📖 족보 펼치기</button>
+              <button id="btn-view" type="button" class="mini">🔭 위에서 보기</button>
+            </div>
+            <div id="hands-panel" class="hands-panel hidden" aria-label="족보"></div>
+            <div id="table-msg" class="table-msg"></div>
+          </div>
+          <!-- 내 차례 조작 -->
+          <div id="action-bar" class="action-bar">
+            <div class="my-line">
+              <span id="my-hand" class="my-hand"></span>
+              <div class="bar"><div id="time-bar"></div></div>
+              <span id="time-sec" class="time-sec"></span>
+            </div>
+            <div id="actions" class="actions">
+              <button id="btn-fold" type="button" class="act fold">폴드</button>
+              <button id="btn-call" type="button" class="act call">체크</button>
+              <button id="btn-raise" type="button" class="act raise">레이즈</button>
+            </div>
+            <div id="raise-box" class="raise-box hidden">
+              <div class="quick">
+                <button type="button" data-q="min" class="ghost">최소</button>
+                <button type="button" data-q="half" class="ghost">½ 팟</button>
+                <button type="button" data-q="pot" class="ghost">팟</button>
+                <button type="button" data-q="all" class="ghost">올인</button>
+              </div>
+              <input id="raise-range" type="range" min="0" max="100" step="1">
+              <div class="raise-row">
+                <input id="raise-num" type="number" inputmode="numeric">
+                <button id="btn-raise-go" type="button" class="act raise"></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel chat room-chat">
+        <h3>채팅</h3>
+        <ul id="room-chat-log" class="chat-log"></ul>
+        <form id="room-chat-form" class="chat-form">
+          <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+          <button type="submit">전송</button>
+        </form>
+      </div>
+      <!-- 하단 참가자 목록 -->
+      <div class="panel room-players">
+        <h3>참가자 <span class="muted">(방 우승 횟수)</span></h3>
+        <ul id="player-list" class="player-list"></ul>
+        <div id="spectator-box" class="hidden">
+          <h3>관전 <span id="spectator-count" class="muted"></span></h3>
+          <ul id="spectator-list" class="player-list"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 결과 -->
+  <div id="result-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="result-title">게임 결과</h3>
+      <ol id="result-list" class="result-list"></ol>
+      <button id="btn-close-result">확인</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="../common/lobby.js?v=banter"></script>
+  <script type="module" src="static/app.js?v=1"></script>
+</body>
+</html>
