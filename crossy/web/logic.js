@@ -229,12 +229,7 @@ export function step(s, dt) {
       move(s, q, events);
     }
   }
-  // 차·기차·통나무
-  for (const row of s.rows) {
-    if (row.type === "road") slide(row.cars, row.dir, row.speed, dt);
-    else if (row.type === "river" && row.speed) slide(row.logs, row.dir, row.speed, dt);
-    else if (row.type === "rail") rail(s, row, dt, events);
-  }
+  traffic(s, dt, events);
   // 강: 통나무를 타고 떠내려감, 아무것도 없으면 빠짐
   const here = rowAt(s, s.z);
   if (here?.type === "river" && s.hop === 0) {
@@ -267,6 +262,16 @@ export function step(s, dt) {
   // 앞쪽 줄 만들기, 뒤쪽 줄 치우기
   while (s.rows[s.rows.length - 1].z < s.maxZ + AHEAD) nextChunk(s);
   while (s.rows[0].z < s.edge - 10) s.rows.shift();
+  return events;
+}
+
+// 차·기차·통나무 움직임 (죽은 뒤에도 화면에서 계속 지나가게 따로 부름)
+export function traffic(s, dt, events = []) {
+  for (const row of s.rows) {
+    if (row.type === "road") slide(row.cars, row.dir, row.speed, dt);
+    else if (row.type === "river" && row.speed) slide(row.logs, row.dir, row.speed, dt);
+    else if (row.type === "rail") rail(s, row, dt, events);
+  }
   return events;
 }
 

@@ -1,7 +1,7 @@
 // 길건너기 화면: 게임 진행(시작·끝·최고 기록), 입력(키보드·탭·밀기), three.js 복셀 그리기.
 // 규칙은 logic.js 에 있고, 여기서는 그 상태를 매 프레임 그린다. 그래픽은 상자 도형으로 만든 복셀 스타일.
 import * as THREE from "three";
-import { HOP_TIME, SPAN, W, EDGE_LAG, createGame, move, rowAt, step } from "./logic.js";
+import { HOP_TIME, SPAN, W, EDGE_LAG, createGame, move, rowAt, step, traffic } from "./logic.js";
 
 const $ = (sel) => document.querySelector(sel);
 const DT = 1 / 60;
@@ -317,8 +317,7 @@ function deathAnim(cause, now) {
   deathPos.z = -chicken.position.z;
   const body = chicken.userData.body;
   if (cause === "car" || cause === "train") {
-    body.scale.set(1.2, 0.15, 1.2);                                  // 납작
-    if (cause === "train") body.scale.set(1, 1, 1);
+    chicken.position.y = 0.02;                                       // 땅에 붙어서 깔림
   } else if (cause === "water" || cause === "river") {
     splash(deathPos.x, deathPos.z);
   } else if (cause === "eagle") {
@@ -329,10 +328,9 @@ function deathAnim(cause, now) {
 function animateDeath(s, now) {
   const t = (now - deathAt) / 1000;
   if (s.cause === "water" || s.cause === "river") chicken.position.y = -Math.min(1, t * 2);
-  if (s.cause === "train") {
-    chicken.position.x += (s.rows.find((r) => r.z === s.z)?.dir || 1) * 0.4;
-    chicken.position.y = Math.min(3, t * 6);
-    chicken.rotation.z += 0.3;
+  if (s.cause === "car" || s.cause === "train") {
+    const k = Math.min(1, t / 0.08);                                 // 순식간에 납작
+    chicken.userData.body.scale.set(1 + 0.6 * k, 1 - 0.92 * k, 1 + 0.6 * k);
   }
   if (s.cause === "eagle") {
     const k = Math.min(1, t / 0.6);
@@ -503,6 +501,8 @@ function tick(now) {
         if (e.type === "warn" && Math.abs(e.z - game.z) <= 3) banner("🚂 기차!");
         if (e.type === "over") gameOver(game, now);
       }
+    } else if (game && mode === "over") {
+      traffic(game, frame);                                        // 죽은 뒤에도 차는 계속 지나감
     }
     syncRows(s, now);
     drawChicken(s, now, frame);

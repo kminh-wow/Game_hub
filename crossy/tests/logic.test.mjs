@@ -1,7 +1,7 @@
 // 실행: node --test crossy/tests/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BACK_LIMIT, HOP_TIME, W, createGame, move, rowAt, step } from "../web/logic.js";
+import { BACK_LIMIT, HOP_TIME, W, createGame, move, rowAt, step, traffic } from "../web/logic.js";
 
 function run(s, seconds) {
   const events = [];
@@ -67,6 +67,10 @@ test("차에 부딪히면 끝", () => {
   const ev = run(s, 2);
   assert.ok(s.over && s.cause === "car");
   assert.ok(ev.some((e) => e.type === "over"));
+  const car = rowAt(s, 1).cars[0];
+  const x = car.x;
+  traffic(s, 0.5);
+  assert.ok(car.x > x);                                      // 죽은 뒤에도 차는 계속 지나감
 });
 
 test("통나무를 타면 떠내려가고, 물에 떨어지면 빠진다", () => {
