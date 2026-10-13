@@ -1,6 +1,6 @@
 """족보 판정과 팟 나누기."""
 from app.rules import (FLUSH, FULL_HOUSE, HIGH, PAIR, QUADS, STRAIGHT, STRAIGHT_FLUSH, TRIPS, TWO_PAIR,
-                       best_hand, current_name, eval5, hand_name, sort_five, split_pots)
+                       best_hand, current_name, eval5, hand_name, made_info, sort_five, split_pots)
 
 
 def cat(cards: str) -> int:
@@ -37,6 +37,16 @@ def test_names():
     assert current_name(["As", "Kd"]) == "하이카드"
     assert current_name(["As", "Kd", "Ac", "Kh"]) == "투페어"
     assert current_name("As Kd Ac Kh Ad".split()) == "풀하우스"
+
+
+def test_made_info():
+    info = made_info("Jh Jd 5c 5h As".split())
+    assert info["best"] == "투페어" and info["key"] == ["Jh", "Jd", "5c", "5h"]
+    assert info["made"] == ["투페어", "원페어", "하이카드"]
+    info = made_info("7h 7d 7c 2h 2s 9d Kc".split())
+    assert info["best"] == "풀하우스" and {"트리플", "투페어", "원페어"} <= set(info["made"])
+    assert made_info(["As", "Kd"]) == {"best": "하이카드", "key": ["As"], "made": ["하이카드"]}
+    assert made_info("Ts Js Qs Ks As 2d 3c".split())["best"] == "로열 플러시"
 
 
 def test_sort_five():

@@ -11,7 +11,7 @@ import secrets
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from .rules import best_hand, current_name, hand_name, new_deck, sort_five, split_pots
+from .rules import best_hand, hand_name, made_info, new_deck, sort_five, split_pots
 
 if TYPE_CHECKING:
     from common.multiplayer import Player
@@ -146,7 +146,8 @@ class Game:
         me = self.seat_of(viewer) if viewer is not None else None
         mine = None
         if me and me.cards and not me.out:
-            mine = {"hand": current_name(me.cards + self.board), "options": self.options(me)}
+            info = made_info(me.cards + self.board)
+            mine = {"hand": info["best"], "key": info["key"], "made": info["made"], "options": self.options(me)}
         return {
             "seats": seats,
             "board": self.board,

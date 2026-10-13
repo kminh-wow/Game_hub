@@ -184,6 +184,7 @@ export async function createTable(host) {
   // ---------- 배치 ----------
   let count = 2;                     // 앉은 사람 수
   let topView = false;
+  let viewChosen = false;            // 시점 버튼을 눌렀으면 자동으로 안 바꿈
   const angleOf = (k) => Math.PI / 2 + (k * Math.PI * 2) / count;
   const onEllipse = (k, dx, dz = dx) => {
     const t = angleOf(k);
@@ -197,9 +198,10 @@ export async function createTable(host) {
     const side = new THREE.Vector3(-Math.sin(t), 0, Math.cos(t)).multiplyScalar((i - 0.5) * 0.3);
     return { pos: c.add(side).setY(0.01 + i * 0.007), rx: 0, ry: -t + Math.PI / 2, scale: 1 };
   };
-  const betSpot = (k) => onEllipse(k, -1.12, -0.82).setY(0);
-  const potSpot = new THREE.Vector3(0, 0, 0.42);
-  const boardSpot = (i) => new THREE.Vector3((i - 2) * (CARD_W + 0.08), 0.01, -0.25);
+  const betSpot = (k) => (k === 0 && mineBig ? new THREE.Vector3(0.95, 0, B - 0.5) : onEllipse(k, -1.12, -0.82).setY(0));   // 내 칩은 카드 오른쪽
+  const potSpot = new THREE.Vector3(1.05, 0, 0.25);                // 바닥 카드 오른쪽 앞
+  const BOARD_SCALE = 1.25;           // 바닥 카드는 조금 크게
+  const boardSpot = (i) => new THREE.Vector3((i - 2) * (CARD_W * BOARD_SCALE + 0.07), 0.01, -0.3);
   let mineBig = true;
 
   function layout() {
@@ -230,7 +232,7 @@ export async function createTable(host) {
     const half = Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
     const fit = (A + 1.15) / Math.tan(half) + (topView ? 0 : 1.2);
     const dist = Math.max(topView ? 8.6 : 7.8, fit);
-    const tilt = THREE.MathUtils.degToRad(topView ? 84 : narrow ? 58 : 38);
+    const tilt = THREE.MathUtils.degToRad(topView ? 84 : narrow ? 58 : mineBig ? 38 : 52);   // 관전은 조금 위에서
     const target = new THREE.Vector3(0, -0.2, topView ? 0.15 : narrow ? 0.4 : 0.25);
     camera.position.set(0, target.y + Math.sin(tilt) * dist, target.z + Math.cos(tilt) * dist);
     camera.lookAt(target);
@@ -259,7 +261,13 @@ export async function createTable(host) {
     const n = g.seats.length;
     const mineAt = Math.max(0, g.seats.findIndex((s) => s.id === meId));
     order = g.seats.map((_, k) => g.seats[(mineAt + k) % n]);
-    mineBig = g.seats.some((s) => s.id === meId);
+    const seated = g.seats.some((s) => s.id === meId);
+    if (seated !== mineBig || (!viewChosen && topView === seated)) {
+      mineBig = seated;
+      if (!viewChosen) topView = !seated;                             // 관전은 위에서 보기로 시작
+      layout();
+      resize();
+    }
     if (count !== n) {
       count = n;
       layout();
@@ -320,7 +328,7 @@ export async function createTable(host) {
       const mesh = makeCard(g.board[i]);
       mesh.userData.delay = added * 0.14;
       boardCards.push(mesh);
-      tween(mesh, boardSpot(i), { rz: 0, rx: 0, ry: 0, scale: 1 });
+      tween(mesh, boardSpot(i), { rz: 0, rx: 0, ry: 0, scale: BOARD_SCALE });
     }
 
     // 베팅 칩 (라운드가 끝나 0 이 되면 팟으로)
@@ -362,6 +370,10 @@ export async function createTable(host) {
       pot = potAmount > 0 ? makeStack(potAmount, bb) : null;
       if (pot) pot.position.copy(potSpot);
     }
+
+    // 내 족보를 만드는 카드 빛내기
+    const key = new Set(g.me?.key || []);
+    for (const [card, mat] of faceMats) mat.emissive.setHex(key.has(card) ? 0x5a4300 : 0x000000);
 
     // 딜러 버튼·차례 표시
     const dk = order.findIndex((s) => s.dealer);
@@ -440,13 +452,17 @@ export async function createTable(host) {
     onFrame: (fn) => listeners.push(fn),
     // 보이는 자리 k 의 이름표 자리 (머리 위, 내 자리는 카드 아래)
     seatScreen(k) {
-      if (k === 0 && mineBig && !topView) return toScreen(new THREE.Vector3(0, 0.0, B + 0.55));
+      if (k === 0 && mineBig && !topView) return { ...toScreen(new THREE.Vector3(0, 0.0, B + 0.55)), anchor: "top" };
       const p = onEllipse(k, 0.72, 0.7);
-      return toScreen(p.setY(topView ? 0.2 : 0.95));
+      return { ...toScreen(p.setY(topView ? 0.3 : 1.05)), anchor: "bottom" };     // 머리 위로 자람 (카드를 안 가림)
     },
-    betScreen: (k) => toScreen(betSpot(k).setY(0.05)),
-    potScreen: () => toScreen(potSpot.clone().add(new THREE.Vector3(0, 0.35, -0.05))),
+    betScreen: (k) => toScreen(k === 0 && mineBig ? betSpot(0).add(new THREE.Vector3(0, 0.3, 0)) : betSpot(k).multiplyScalar(0.8).setY(0.05)),   // 칩 위·가운데 쪽 (카드를 안 가림)
+    potScreen: () => ({ ...toScreen(potSpot.clone().add(new THREE.Vector3(0, 0.32, 0))), anchor: "bottom" }),
+    get topView() {
+      return topView;
+    },
     toggleView() {
+      viewChosen = true;
       topView = !topView;
       layout();
       resize();

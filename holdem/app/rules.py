@@ -94,6 +94,42 @@ def current_name(cards: list[str]) -> str:
     return "하이카드"
 
 
+# 지금 카드로 가진 족보: 가장 센 것 이름, 그 족보를 만드는 카드, 갖춘 족보 이름 전부
+def made_info(cards: list[str]) -> dict:
+    counts = Counter(c[0] for c in cards)
+    sizes = sorted(counts.values(), reverse=True)
+    made = {HIGH}
+    if sizes[0] >= 2:
+        made.add(PAIR)
+    if sum(1 for n in sizes if n >= 2) >= 2:
+        made.add(TWO_PAIR)
+    if sizes[0] >= 3:
+        made.add(TRIPS)
+    if sizes[0] >= 4:
+        made.add(QUADS)
+    if sizes[0] >= 3 and sum(1 for n in sizes if n >= 2) >= 2:
+        made.add(FULL_HOUSE)
+    if len(cards) >= 5:
+        value, five = best_hand(cards)
+        best = value[0]
+        for combo in combinations(cards, 5):
+            made.add(eval5(list(combo))[0])
+    else:
+        best = max(made)
+        five = cards
+    name = HAND_NAMES[best] if not (best == STRAIGHT_FLUSH and value[1] == 14) else "로열 플러시"
+    if best in (STRAIGHT, FLUSH, FULL_HOUSE, STRAIGHT_FLUSH):
+        key = list(five)
+    elif best == HIGH:
+        key = [max(cards, key=rank_of)]
+    else:
+        group = Counter(c[0] for c in five)
+        need = {PAIR: 1, TWO_PAIR: 2, TRIPS: 1, QUADS: 1}[best]
+        ranks = sorted((r for r, n in group.items() if n >= 2), key=lambda r: (group[r], RANKS.index(r)), reverse=True)[:need]
+        key = [c for c in five if c[0] in ranks]
+    return {"best": name, "key": sort_five(key), "made": [HAND_NAMES[k] for k in sorted(made, reverse=True)]}
+
+
 def split_pots(committed: dict[str, int], live: set[str]) -> list[tuple[int, list[str]]]:
     """낸 칩으로 팟 나누기. committed: 자리 → 이번 판에 낸 총액, live: 폴드 안 한 자리.
 

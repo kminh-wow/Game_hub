@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>홀덤</title>
-  <link rel="stylesheet" href="static/style.css?v=1">
+  <link rel="stylesheet" href="static/style.css?v=2">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/build/three.module.js","three/addons/":"./static/vendor/three/examples/jsm/"}}</script>
 </head>
 <body>
@@ -69,6 +69,11 @@
       <button id="btn-leave" class="ghost">나가기</button>
     </header>
     <div class="room-layout">
+      <!-- 족보 (펼치기·접기) -->
+      <aside id="hands-side" class="panel hands-side">
+        <button id="btn-hands" type="button" class="hands-toggle" aria-expanded="true">📖 족보 접기</button>
+        <div id="hands-panel" class="hands-panel" aria-label="족보"></div>
+      </aside>
       <div class="panel room-game">
         <!-- 대기 화면 -->
         <div id="waiting-view">
@@ -95,14 +100,13 @@
             <div id="labels" class="labels"></div>
             <div id="table-info" class="table-info"></div>
             <div class="table-tools">
-              <button id="btn-hands" type="button" class="mini" aria-expanded="false">📖 족보 펼치기</button>
               <button id="btn-view" type="button" class="mini">🔭 위에서 보기</button>
             </div>
-            <div id="hands-panel" class="hands-panel hidden" aria-label="족보"></div>
             <div id="table-msg" class="table-msg"></div>
           </div>
           <!-- 내 차례 조작 -->
           <div id="action-bar" class="action-bar">
+            <div class="board-line"><span class="muted">바닥</span><span id="board-cards"></span></div>
             <div class="my-line">
               <span id="my-hand" class="my-hand"></span>
               <div class="bar"><div id="time-bar"></div></div>
@@ -161,6 +165,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="../common/lobby.js?v=banter"></script>
-  <script type="module" src="static/app.js?v=1"></script>
+  <script type="module" src="static/app.js?v=2"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 // 홀덤 화면. 로그인·로비·대기실·채팅은 공통 로비(../common/lobby.js)가 맡고,
 // 여기서는 3D 테이블(table3d.js) 위에 이름표·베팅 칩 금액·조작 버튼·족보를 얹는다.
-import { createTable } from "./table3d.js?v=1";
+import { createTable } from "./table3d.js?v=2";
 
 const $ = (sel) => document.querySelector(sel);
 const fmt = (n) => Number(n || 0).toLocaleString();
@@ -61,9 +61,10 @@ const lobby = GameLobby.init({
 
 // ---------- 카드 글자 ----------
 
-function cardChip(card) {
+function cardChip(card, key = null) {
   const rank = card[0] === "T" ? "10" : card[0];
-  return lobby.el("span", { className: `pc ${"hd".includes(card[1]) ? "red" : ""}`, textContent: rank + SUIT[card[1]] });
+  const cls = ["pc", "hd".includes(card[1]) && "red", key?.includes(card) && "key"].filter(Boolean).join(" ");
+  return lobby.el("span", { className: cls, textContent: rank + SUIT[card[1]] });
 }
 
 // ---------- 그리기 ----------
@@ -80,6 +81,7 @@ function ordered(g) {
 
 function renderGame(g, room) {
   table?.update(g, lobby.state.me?.id);
+  if (table) $("#btn-view").textContent = table.topView ? "🪑 자리에서 보기" : "🔭 위에서 보기";
   renderLabels(g);
   renderInfo(g, room);
   renderActions(g, room);
@@ -126,7 +128,8 @@ function place() {
   for (const node of $("#labels").children) {
     const p = node.dataset.k !== undefined ? table.seatScreen(Number(node.dataset.k))
       : node.dataset.bet !== undefined ? table.betScreen(Number(node.dataset.bet)) : table.potScreen();
-    node.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, -50%)`;
+    const dy = p.anchor === "bottom" ? "-100%" : p.anchor === "top" ? "0%" : "-50%";
+    node.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, ${dy})`;
   }
 }
 
@@ -152,13 +155,14 @@ let opts = null;
 function renderActions(g, room) {
   const me = g.me;
   opts = room.playing && me?.options ? me.options : null;
-  $("#action-bar").classList.toggle("hidden", !me);
+  const seated = g.seats.some((s) => lobby.isMe(s.id));
+  $("#board-cards").replaceChildren(...(g.board.length ? g.board.map((c) => cardChip(c, me?.key)) : [lobby.el("span", { className: "muted", textContent: "아직 없음" })]));
+  for (const sel of [".my-line", "#actions"]) document.querySelector(sel).classList.toggle("hidden", !seated);
   $("#my-hand").replaceChildren();
   if (me) {
     const seat = g.seats.find((s) => lobby.isMe(s.id));
-    if (seat?.cards) $("#my-hand").append(...seat.cards.map(cardChip), " ", lobby.el("b", { textContent: me.hand }));
-    else $("#my-hand").textContent = seat?.out ? "탈락했어요 · 구경 중" : "";
-  }
+    if (seat?.cards) $("#my-hand").append(...seat.cards.map((c) => cardChip(c, me.key)), " ", lobby.el("b", { textContent: me.hand }));
+  } else if (seated) $("#my-hand").textContent = "탈락했어요 · 구경 중";
   $("#actions").classList.toggle("off", !opts);
   for (const b of $("#actions").children) b.disabled = !opts;
   if (!opts) {
@@ -187,22 +191,32 @@ function setRaise(value) {
   $("#btn-raise-go").textContent = v >= opts.max_to ? `올인 ${fmt(v)}` : `${opts.bet_word} ${fmt(v)}`;
 }
 
-// 족보 펼치기·접기 (내 지금 족보는 강조)
+// 족보 칸 (지금 내 패와 갖춘 족보 표시)
 function renderHands(g) {
-  const panel = $("#hands-panel");
-  const open = !panel.classList.contains("hidden");
+  const side = $("#hands-side");
+  const open = !side.classList.contains("closed");
   $("#btn-hands").textContent = open ? "📖 족보 접기" : "📖 족보 펼치기";
   $("#btn-hands").setAttribute("aria-expanded", String(open));
   if (!open) return;
-  const mine = g?.me?.hand;
-  panel.replaceChildren(...HANDS.map(([name, desc, cards], i) => lobby.el("div", { className: `hand-row ${name === mine ? "mine" : ""}` },
-    lobby.el("span", { className: "rk", textContent: String(i + 1) }),
-    lobby.el("div", {}, lobby.el("b", { textContent: name }), lobby.el("small", { textContent: desc })),
-    lobby.el("span", { className: "ex" }, ...cards.split(" ").map(cardChip)))));
+  const el = lobby.el;
+  const me = lobby.state.room?.playing ? g?.me : null;
+  const made = new Set(me?.made || []);
+  const now = me ? el("div", { className: "hands-now" },
+    el("b", { textContent: `지금 내 패: ${me.hand}` }), ...(me.key || []).map((c) => cardChip(c))) : "";
+  $("#hands-panel").replaceChildren(now, ...HANDS.map(([name, desc, cards], i) => {
+    const mine = name === me?.hand;
+    const have = made.has(name) || (name === "로열 플러시" && mine);
+    return el("div", { className: ["hand-row", have && "made", mine && "mine"].filter(Boolean).join(" ") },
+      el("span", { className: "rk", textContent: String(i + 1) }),
+      el("b", { textContent: name }),
+      el("span", { className: "have", textContent: mine ? "◀ 지금" : have ? "✓ 있음" : "" }),
+      el("small", { textContent: desc }),
+      el("span", { className: "ex" }, ...cards.split(" ").map((c) => cardChip(c))));
+  }));
 }
 
 function toggleHands(open) {
-  $("#hands-panel").classList.toggle("hidden", !open);
+  $("#hands-side").classList.toggle("closed", !open);
   try {
     localStorage.setItem(HANDS_KEY, open ? "1" : "0");
   } catch {}
@@ -241,15 +255,17 @@ document.querySelector(".quick").onclick = (e) => {
   const to = { min: opts.min_to, half: myBet + opts.to_call + potAfterCall / 2, pot: myBet + opts.to_call + potAfterCall, all: opts.max_to }[q];
   setRaise(to);
 };
-$("#btn-hands").onclick = () => toggleHands($("#hands-panel").classList.contains("hidden"));
+$("#btn-hands").onclick = () => toggleHands($("#hands-side").classList.contains("closed"));
 $("#btn-view").onclick = () => {
   if (!table) return;
   const top = table.toggleView();
-  $("#btn-view").textContent = top ? "🪑 내 자리에서 보기" : "🔭 위에서 보기";
+  $("#btn-view").textContent = top ? "🪑 자리에서 보기" : "🔭 위에서 보기";
 };
 try {
-  if (localStorage.getItem(HANDS_KEY) === "1") toggleHands(true);
-} catch {}
+  toggleHands(localStorage.getItem(HANDS_KEY) !== "0");
+} catch {
+  toggleHands(true);
+}
 
 // 키보드 (F 폴드, C 체크·콜, R 레이즈 열기)
 document.addEventListener("keydown", (e) => {
