@@ -22,6 +22,7 @@ http://127.0.0.1:8000 을 여세요.
   - 숫자러너 규칙: `node --test runner/tests/logic.test.mjs`
   - 탁구 규칙·공 물리: `node --test pingpong/tests/logic.test.mjs`
   - 길건너기 규칙: `node --test crossy/tests/logic.test.mjs`
+  - 사과게임 규칙: `node --test apple/tests/logic.test.mjs`
   - 행맨 게임 흐름: `cd hangman && pytest`
 
 ## 구조
@@ -45,6 +46,7 @@ shooter/         턴제 FPS (FastAPI 앱: shooter/app/main.py)
 runner/          숫자러너 (FastAPI 앱: runner/app.py, 정적 파일만 제공)
 pingpong/        탁구     (FastAPI 앱: pingpong/app.py, 정적 파일만 제공)
 crossy/          길건너기 (FastAPI 앱: crossy/app.py, 정적 파일만 제공)
+apple/           사과게임 (FastAPI 앱: apple/app.py, 정적 파일만 제공)
 deploy/          서버 설치, 업데이트 스크립트
 docs/            이 문서, README용 스크린샷
 tests/           허브 통합 테스트
@@ -64,6 +66,7 @@ tests/           허브 통합 테스트
 | `/runner/` | 숫자러너 |
 | `/pingpong/` | 탁구 |
 | `/crossy/` | 길건너기 |
+| `/apple/` | 사과게임 |
 | `/common/` | 공통 프론트엔드 파일 (`lobby.js`) |
 
 - 각 게임은 독립된 FastAPI 앱이고, 자원과 WebSocket을 **페이지 기준 상대 경로**로 불러옵니다. 그래서 어느 경로에 붙여도 동작합니다.
@@ -602,15 +605,39 @@ crossy/
 
 ---
 
+## 사과게임
+
+원조 Fruit Box 규칙의 1인용 퍼즐입니다. 서버(`apple/app.py`)는 정적 파일만 내려줍니다. 사과 그림은 외부 이미지 없이 캔버스로 직접 그립니다.
+
+```
+apple/
+  app.py             정적 파일 서빙
+  web/
+    index.html, style.css   화면
+    logic.js         규칙: 판 만들기, 네모 안 합, 지우기, 시간, 지울 네모가 남았는지 (DOM 없음, 시드 난수)
+    game.js          진행(시작·끝·최고 기록·순위), 드래그 입력(포인터), 캔버스 그리기(사과·네모·시간 막대·떨어지는 사과)
+  tests/
+    logic.test.mjs   logic.js 테스트 (node --test)
+```
+
+- 판: 17×10, 1~9. 원조처럼 전체 합이 10의 배수인 판만 씁니다(다 지울 수 있다는 보장은 없음).
+- 드래그 네모 안에 **중심이 든** 사과를 묶습니다. 빈칸은 0이고, 중력·보충은 없습니다. 1개 = 1점, 2분.
+- 다 지우거나, 지울 수 있는 네모가 더 없으면(`hasMove`, 누적합으로 모든 네모 확인) 시간 전이라도 끝납니다.
+- 세로 화면에서는 판을 돌려 10×17로 그립니다. 네모는 돌려도 네모라 규칙은 같습니다.
+- "연한 색 사과" 설정과 최고 기록은 브라우저에 저장합니다. 순위표 이름은 `apple`입니다.
+- 디버그: 브라우저 콘솔에서 `__apple.game`, `__apple.view`.
+
+---
+
 ## 순위표
 
-혼자 하는 점수 게임(길건너기, 숫자러너, 팩맨 난이도별)의 이번 주·전체 상위 10명입니다.
+혼자 하는 점수 게임(길건너기, 사과게임, 숫자러너, 팩맨 난이도별)의 이번 주·전체 상위 10명입니다.
 
-- 서버: `hub/leaderboard.py`. `GET /api/leaderboard/{board}`는 `{all, week}`(이름별 최고 점수 상위 10), `POST /api/leaderboard/{board}` `{name, score, duration, token}`은 기록을 쌓고 이번 기록의 순위(`rank`, `week_rank`)와 목록을 돌려줍니다. 순위표 이름은 `crossy`, `runner`, `pacman-easy|normal|midhigh|hard`입니다.
+- 서버: `hub/leaderboard.py`. `GET /api/leaderboard/{board}`는 `{all, week}`(이름별 최고 점수 상위 10), `POST /api/leaderboard/{board}` `{name, score, duration, token}`은 기록을 쌓고 이번 기록의 순위(`rank`, `week_rank`)와 목록을 돌려줍니다. 순위표 이름은 `crossy`, `apple`, `runner`, `pacman-easy|normal|midhigh|hard`입니다.
 - 저장: SQLite 파일 `private/leaderboard.sqlite3`(git에 없음, 환경 변수 `LEADERBOARD_DB`로 바꿀 수 있음). `update.sh`의 `git reset`/`pull`은 이 파일을 건드리지 않습니다.
 - 이번 주: 한국 시간 월요일 0시부터.
-- 점수는 브라우저가 계산해서 보내므로 완벽히 막지는 못합니다. 걸린 시간에 비해 말이 안 되는 점수만 거릅니다(길건너기 초당 9.5칸, 숫자러너 초당 10m + 보스 보너스, 팩맨 초당 500점). 같은 곳에서 2초 안에 다시 올리면 거절합니다. 브라우저 식별값(`token`)도 같이 저장해 두어서, 나중에 이름을 브라우저에 묶을 수 있습니다.
-- 화면: `common/web/leaderboard.js`(`Leaderboard.submit`, `Leaderboard.mount`). 길건너기·숫자러너는 시작·결과 창(`#lb`), 팩맨은 화면 아래 순위 칸, 허브 메인은 아래쪽 🏆 순위에 띄웁니다. 닉네임이 없으면 올리지 않고 안내만 합니다.
+- 점수는 브라우저가 계산해서 보내므로 완벽히 막지는 못합니다. 걸린 시간에 비해 말이 안 되는 점수만 거릅니다(길건너기 초당 9.5칸, 사과게임 초당 20개·최대 170개, 숫자러너 초당 10m + 보스 보너스, 팩맨 초당 500점). 같은 곳에서 2초 안에 다시 올리면 거절합니다. 브라우저 식별값(`token`)도 같이 저장해 두어서, 나중에 이름을 브라우저에 묶을 수 있습니다.
+- 화면: `common/web/leaderboard.js`(`Leaderboard.submit`, `Leaderboard.mount`). 길건너기·사과게임·숫자러너는 시작·결과 창(`#lb`), 팩맨은 화면 아래 순위 칸, 허브 메인은 아래쪽 🏆 순위에 띄웁니다. 닉네임이 없으면 올리지 않고 안내만 합니다.
 - 기록 지우기(서버): `sqlite3 private/leaderboard.sqlite3 "DELETE FROM scores WHERE name = '이름';"`
 - 검증: `pytest tests/test_leaderboard.py`
 

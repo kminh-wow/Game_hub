@@ -137,6 +137,10 @@
     .crossy-art i.road::after { content: ""; position: absolute; left: 30px; top: 3px; width: 26px; height: 10px; background: #e8473f; border-radius: 2px; }
     .crossy-art i.river::after { content: ""; position: absolute; left: 70px; top: 3px; width: 48px; height: 10px; background: #9b6a3c; border-radius: 2px; }
     .crossy-art i.hen::after { content: ""; position: absolute; left: 68px; top: 1px; width: 14px; height: 14px; background: #fff; border-radius: 2px; box-shadow: 0 -4px 0 -3px #e23b3b; }
+    /* 사과게임 카드 그림 */
+    .apple-art { display: grid; grid-template-columns: repeat(5, 26px); gap: 4px; }
+    .apple-art b { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ff8a7a, #f2392b 50%, #b81a12); color: #fff; font-size: 13px; font-weight: 900; }
+    .apple-art b.on { background: radial-gradient(circle at 35% 30%, #fff3a6, #ffcf3a 50%, #e59a00); }
     .pingpong-art b { position: absolute; left: 18px; top: 8px; width: 24px; height: 24px; border-radius: 50%; background: #d8262c; box-shadow: 4px 12px 0 -8px #c79a62; }
 
     /* 순위 */
@@ -300,6 +304,16 @@
       <div class="tags"><span>1명</span><span>아케이드</span><span>3D</span><span>모바일</span></div>
       <span class="play">플레이 →</span>
     </a>
+
+    <a class="card" href="apple/">
+      <div class="art" aria-hidden="true">
+        <div class="apple-art"><b>5</b><b class="on">3</b><b class="on">7</b><b>8</b><b>2</b><b>6</b><b>1</b><b>9</b><b>4</b><b>5</b></div>
+      </div>
+      <h2>사과게임</h2>
+      <p>드래그로 네모를 그려 숫자 합이 딱 10이면 사과가 사라져요. 2분 동안 170개 중 몇 개나 딸 수 있을까?</p>
+      <div class="tags"><span>1명</span><span>퍼즐</span><span>모바일</span></div>
+      <span class="play">플레이 →</span>
+    </a>
   </main>
 
   <!-- 점수 게임 순위 -->
@@ -307,6 +321,7 @@
     <h2>🏆 순위</h2>
     <div class="rank-games">
       <button type="button" data-board="crossy" data-unit="칸">길건너기</button>
+      <button type="button" data-board="apple" data-unit="개">사과게임</button>
       <button type="button" data-board="runner" data-unit="점">숫자러너</button>
       <button type="button" data-board="pacman-easy" data-unit="점">팩맨 쉬움</button>
       <button type="button" data-board="pacman-normal" data-unit="점">팩맨 보통</button>

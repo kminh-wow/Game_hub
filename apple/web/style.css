@@ -1,0 +1,35 @@
+/* 공통 팔레트 */
+:root { color-scheme:light dark; --bg:#f5f5ed; --panel:#fcfcf7; --text:#173d33; --muted:#53665c; --line:#cdd4c7; --accent:#245442; --on-accent:#fcfcf7; --shadow:0 1px 2px rgba(20,24,35,.05),0 8px 24px rgba(20,24,35,.06); }
+/* 다크 팔레트 */
+@media(prefers-color-scheme:dark) { :root { --bg:#1c2425; --panel:#263032; --text:#edf2e8; --muted:#b6c5bd; --line:#4d6057; --accent:#b9d787; --on-accent:#173d33; --shadow:0 1px 2px #0005; } }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif; min-height:100svh; padding:12px; }
+.game-shell { width:min(980px,100%); margin:auto; }
+header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+header a { color:var(--muted); text-decoration:none; font-size:13px; font-weight:600; }
+header a:hover { color:var(--accent); }
+h1 { margin:0; font-size:24px; letter-spacing:-.5px; display:flex; align-items:center; gap:9px; }
+.title-dot { width:12px; height:12px; border-radius:50%; background:#e53b2c; }
+.hidden { display:none !important; }
+
+/* 판 */
+.board-wrap { position:relative; width:100%; height:clamp(320px,calc(100svh - 150px),640px); border:1px solid var(--line); border-radius:20px; overflow:hidden; background:#cfeab4; box-shadow:var(--shadow); user-select:none; -webkit-user-select:none; }
+canvas { display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+
+/* 시작·결과 창 */
+.panel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(340px,86%); max-height:94%; overflow:auto; padding:20px 22px; border:1px solid var(--line); border-radius:16px; background:var(--panel); color:var(--text); box-shadow:var(--shadow); text-align:center; }
+.panel h2 { margin:0 0 8px; font-size:22px; }
+.panel p { margin:0 0 14px; color:var(--muted); font-size:14px; line-height:1.6; white-space:pre-line; }
+.panel button { background:#e53b2c; color:#fff; border:0; border-radius:10px; padding:10px 22px; font:inherit; font-weight:800; cursor:pointer; }
+.opt { display:flex; align-items:center; justify-content:center; gap:6px; margin:0 0 12px; color:var(--muted); font-size:13px; cursor:pointer; }
+
+/* 결과 창 순위표 */
+.panel-lb { margin:0 0 12px; max-height:min(240px,36vh); overflow:auto; }
+.panel-lb:empty { display:none; }
+
+/* 아래 줄: 리셋·도움말 */
+.bar { display:flex; align-items:center; gap:12px; margin:10px 4px 0; }
+.bar button { flex:none; background:transparent; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 14px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.bar button:hover { border-color:var(--accent); }
+.help { margin:0; color:var(--muted); font-size:11px; line-height:1.6; }
+@media(max-width:480px) { body { padding:10px 8px; } h1 { font-size:21px; } .board-wrap { border-radius:16px; height:calc(100svh - 130px); } }

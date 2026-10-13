@@ -38,6 +38,7 @@ def _runner_max(seconds: float) -> float:
 BOARDS: dict[str, tuple[str, Callable[[float], float]]] = {
     "crossy": ("길건너기", lambda sec: sec * 9.5 + 5),            # 한 칸 0.11초
     "runner": ("숫자러너", _runner_max),
+    "apple": ("사과게임", lambda sec: min(170, sec * 20 + 10)),    # 사과 170개, 2분
     **{f"pacman-{lv}": (f"팩맨 · {label}", lambda sec: sec * 500 + 2000)
        for lv, label in (("easy", "쉬움"), ("normal", "보통"), ("midhigh", "중상"), ("hard", "어려움"))},
 }

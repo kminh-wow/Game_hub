@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>사과게임</title>
+  <link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+  <main class="game-shell">
+  <header>
+    <a href="../">← Ddan Jit</a>
+    <h1>사과게임<span class="title-dot" aria-hidden="true"></span></h1>
+  </header>
+
+  <!-- 판과 겹쳐 띄우는 시작·결과 창 -->
+  <div class="board-wrap">
+    <canvas id="board" aria-label="사과게임 판"></canvas>
+    <div id="panel" class="panel">
+      <h2 id="panel-title">사과게임</h2>
+      <p id="panel-text"></p>
+      <div id="lb" class="panel-lb"></div>
+      <label class="opt"><input id="light" type="checkbox"> 연한 색 사과</label>
+      <button id="panel-btn" type="button">시작하기</button>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="reset" type="button">리셋</button>
+    <p class="help">드래그로 네모를 그려 숫자 합이 10이면 사라져요 · 빈칸은 0 · 사과 1개 = 1점 · 2분</p>
+  </div>
+  </main>
+
+  <script src="../common/leaderboard.js?v=1"></script>
+  <script type="module" src="game.js?v=1"></script>
+</body>
+</html>

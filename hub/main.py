@@ -12,6 +12,7 @@
     /runner/     숫자러너
     /pingpong/   탁구
     /crossy/     길건너기
+    /apple/      사과게임
     /common/     게임들이 함께 쓰는 프론트엔드 파일 (lobby.js 등)
     /api/leaderboard/  점수 게임 순위 (hub/leaderboard.py)
 
@@ -48,6 +49,7 @@ GAME_MODULES = {
     "runner": "runner.app",
     "pingpong": "pingpong.app",
     "crossy": "crossy.app",
+    "apple": "apple.app",
 }
 
 
