@@ -12,15 +12,17 @@
     }
   };
 
-  // 브라우저 식별값 (나중에 이름을 브라우저에 묶을 때 쓰려고 같이 보냄)
+  // 브라우저 식별값: 닉네임 주인을 가리는 데 쓰임 (처음 올린 브라우저가 그 닉네임의 주인)
+  let memoryToken = "";
   function token() {
-    let t = read("gamehub-lb-token");
+    let t = read("gamehub-lb-token") || memoryToken;
     if (!t) {
       t = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
       try {
         localStorage.setItem("gamehub-lb-token", t);
       } catch {}
     }
+    memoryToken = t;                                             // 저장소를 못 써도 이 페이지에서는 같은 값
     return t;
   }
 

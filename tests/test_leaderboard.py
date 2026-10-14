@@ -1,4 +1,5 @@
-"""점수 순위: 입장권으로 서버가 시간을 재기, 상한, 재사용·위조 막기, 이름별 최고 점수, 이번 주."""
+"""점수 순위: 입장권으로 서버가 시간을 재기, 상한, 재사용·위조 막기, 닉네임 주인, 이름별 최고 점수, 이번 주, 조회 캐시."""
+import hashlib
 import sqlite3
 import time
 
@@ -16,6 +17,7 @@ def client(tmp_path, monkeypatch):
     lb._last_submit.clear()
     lb._starts.clear()
     lb._key_cache.clear()
+    lb._cache.clear()
     return TestClient(app)
 
 
@@ -24,15 +26,20 @@ def ticket(board, age=60.0):
     return lb.make_ticket(board, time.time() - age)
 
 
-def post(client, board, name, score, age=600.0, **extra):
-    body = {"name": name, "score": score, "ticket": ticket(board, age), "token": "t", **extra}
+def tok(who):
+    """사람마다(브라우저마다) 다른 식별값."""
+    return hashlib.md5(who.encode()).hexdigest()
+
+
+def post(client, board, name, score, age=600.0, token=None, **extra):
+    body = {"name": name, "score": score, "ticket": ticket(board, age), "token": token or tok(name), **extra}
     return client.post(f"/api/leaderboard/{board}", json=body)
 
 
 def test_start_gives_a_ticket_that_works(client):
     t = client.post("/api/leaderboard/crossy/start").json()
     assert t["max_seconds"] > 0
-    r = client.post("/api/leaderboard/crossy", json={"name": "철수", "score": 5, "ticket": t["ticket"]})
+    r = client.post("/api/leaderboard/crossy", json={"name": "철수", "score": 5, "ticket": t["ticket"], "token": tok("철수")})
     assert r.status_code == 200
 
 
@@ -51,32 +58,109 @@ def test_week_only_counts_since_monday(client):
     post(client, "crossy", "지난주", 99)
     with lb._connect() as con:
         con.execute("UPDATE scores SET created = ?", (lb.week_start() - 3600,))
+    lb._cache.clear()
     post(client, "crossy", "이번주", 10)
     data = client.get("/api/leaderboard/crossy").json()
     assert [e["name"] for e in data["all"]] == ["지난주", "이번주"]
     assert [e["name"] for e in data["week"]] == ["이번주"]
 
 
-def test_rejects_bad_names_and_scores(client):
+def test_rejects_bad_scores_and_boards(client):
     assert post(client, "nothing", "a", 1).status_code == 404
     assert client.post("/api/leaderboard/nothing/start").status_code == 404
-    assert post(client, "crossy", "", 10).status_code == 400
-    assert post(client, "crossy", "가" * 13, 10).status_code == 400
     assert post(client, "crossy", "a", 0).status_code == 400
     assert post(client, "crossy", "a", -5).status_code == 400
 
 
+# ---- 닉네임 ----
+
+@pytest.mark.parametrize("bad", ["", "   ", "가" * 13, "철​수", "철‮수", "철\x00수", "‮evil"])
+def test_rejects_bad_names(client, bad):
+    r = post(client, "crossy", bad, 10, token=tok("x"))
+    assert r.status_code == 400, repr(bad)
+
+
+def test_names_are_tidied(client):
+    r = post(client, "crossy", "  철수   바보  ", 10, token=tok("a")).json()
+    assert r["all"][0]["name"] == "철수 바보"
+    r = post(client, "crossy", "a\nb", 10, token=tok("b")).json()                              # 줄바꿈도 공백 한 칸으로
+    assert any(e["name"] == "a b" for e in r["all"])
+
+
+def test_first_browser_owns_the_nickname(client):
+    assert post(client, "crossy", "철수", 10, token=tok("원래")).status_code == 200
+    stolen = post(client, "crossy", "철수", 999, token=tok("도둑"))
+    assert stolen.status_code == 403 and "다른 브라우저" in stolen.json()["detail"]
+    assert post(client, "runner", "철수", 5, token=tok("도둑")).status_code == 403            # 게임이 달라도 같은 주인
+    assert post(client, "crossy", "철수", 20, token=tok("원래")).status_code == 200              # 주인은 계속 올릴 수 있음
+    assert post(client, "runner", "철수", 5, token=tok("원래")).status_code == 200
+    data = client.get("/api/leaderboard/crossy").json()
+    assert data["all"] == [{"name": "철수", "score": 20}]
+
+
+def test_lookalike_names_belong_to_the_same_owner(client):
+    assert post(client, "crossy", "Kim", 10, token=tok("원래")).status_code == 200
+    for variant in ("kim", "KIM", "Ｋｉｍ", " kim "):                                          # 대소문자·전각·공백 차이
+        assert post(client, "crossy", variant, 10, token=tok("도둑")).status_code == 403, variant
+    r = post(client, "crossy", "KIM", 30, token=tok("원래")).json()                            # 주인이 다르게 써도 한 사람으로
+    assert r["all"] == [{"name": "Kim", "score": 30}]
+
+
+def test_token_is_required(client):
+    t = ticket("crossy")
+    for token in ("", "짧음", "x" * 5, "!" * 20, "a" * 65):
+        r = client.post("/api/leaderboard/crossy", json={"name": "a", "score": 5, "ticket": t, "token": token})
+        assert r.status_code == 400, token
+    assert client.post("/api/leaderboard/crossy", json={"name": "a", "score": 5, "ticket": t}).status_code == 400
+
+
+def test_new_names_per_day_are_limited_per_ip(client, monkeypatch):
+    monkeypatch.setattr(lb, "NEW_NAMES_PER_IP", 2)
+    assert post(client, "crossy", "하나", 5).status_code == 200
+    assert post(client, "crossy", "둘", 5).status_code == 200
+    third = post(client, "crossy", "셋", 5)
+    assert third.status_code == 400 and "닉네임" in third.json()["detail"]
+    assert post(client, "crossy", "하나", 6).status_code == 200                                # 이미 가진 이름은 계속 가능
+
+
+def test_name_limit_is_skipped_when_proxy_hides_the_ip(client, monkeypatch):
+    monkeypatch.setattr(lb, "NEW_NAMES_PER_IP", 1)
+    monkeypatch.setattr(lb, "LOOPBACK", {"", "127.0.0.1", "::1", "testclient"})                 # 프록시가 진짜 IP 를 안 넘겨 주는 상태
+    assert all(post(client, "crossy", f"사람{i}", 5).status_code == 200 for i in range(4))
+
+
+def test_old_records_keep_their_owners(client, tmp_path, monkeypatch):
+    path = tmp_path / "old.sqlite3"
+    con = sqlite3.connect(path)
+    con.execute("""CREATE TABLE scores (id INTEGER PRIMARY KEY, board TEXT NOT NULL, name TEXT NOT NULL, score INTEGER NOT NULL,
+        duration REAL NOT NULL, token TEXT, ip TEXT, created REAL NOT NULL)""")
+    rows = [("crossy", "옛주인", 77, 30, tok("옛주인"), "1.1.1.1", 1), ("crossy", "옛주인", 80, 30, tok("다른사람"), "2.2.2.2", 2),
+            ("crossy", "토큰없음", 50, 30, "", "3.3.3.3", 3)]
+    con.executemany("INSERT INTO scores (board, name, score, duration, token, ip, created) VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
+    con.commit()
+    con.close()
+    lb._key_cache.clear()
+    monkeypatch.setenv("LEADERBOARD_DB", str(path))
+    assert post(client, "crossy", "옛주인", 90, token=tok("다른사람")).status_code == 403     # 맨 처음 올린 브라우저가 주인
+    assert post(client, "crossy", "옛주인", 90, token=tok("옛주인")).status_code == 200
+    assert post(client, "crossy", "토큰없음", 60, token=tok("새사람")).status_code == 200       # 주인 없던 이름은 먼저 오는 사람
+    assert post(client, "crossy", "토큰없음", 70, token=tok("또다른")).status_code == 403
+    assert [e["name"] for e in client.get("/api/leaderboard/crossy").json()["all"]] == ["옛주인", "토큰없음"]
+
+
+# ---- 입장권·시간·상한 ----
+
 def test_server_measures_time_not_the_client(client):
     """클라이언트가 시간을 6시간이라고 속여도, 입장권으로 잰 시간(방금 시작)이 기준이다."""
     fresh = ticket("crossy", age=10)
-    r = client.post("/api/leaderboard/crossy", json={"name": "a", "score": 5000, "ticket": fresh, "duration": 21600})
+    r = client.post("/api/leaderboard/crossy", json={"name": "a", "score": 5000, "ticket": fresh, "duration": 21600, "token": tok("a")})
     assert r.status_code == 400 and "너무 높아" in r.json()["detail"]
-    r = client.post("/api/leaderboard/crossy", json={"name": "a", "score": 60, "ticket": ticket("crossy", age=10), "duration": 0.1})
+    r = client.post("/api/leaderboard/crossy", json={"name": "a", "score": 60, "ticket": ticket("crossy", age=10), "duration": 0.1, "token": tok("a")})
     assert r.status_code == 200                                  # 10초에 60칸(초당 6칸)은 사람이 낼 수 있음
 
 
 def test_missing_forged_and_wrong_board_tickets(client):
-    base = {"name": "a", "score": 5}
+    base = {"name": "a", "score": 5, "token": tok("a")}
     assert client.post("/api/leaderboard/crossy", json=base).status_code == 400                       # 입장권 없음
     assert client.post("/api/leaderboard/crossy", json={**base, "ticket": "1.2.3"}).status_code == 400
     assert client.post("/api/leaderboard/crossy", json={**base, "ticket": "abc"}).status_code == 400
@@ -91,18 +175,27 @@ def test_missing_forged_and_wrong_board_tickets(client):
 
 def test_ticket_is_single_use_and_expires(client):
     t = ticket("crossy", age=30)
-    body = {"name": "a", "score": 5, "ticket": t}
+    body = {"name": "a", "score": 5, "ticket": t, "token": tok("a")}
     assert client.post("/api/leaderboard/crossy", json=body).status_code == 200
-    again = client.post("/api/leaderboard/crossy", json={**body, "name": "b", "score": 6})
+    again = client.post("/api/leaderboard/crossy", json={**body, "score": 6})
     assert again.status_code == 400 and "이미" in again.json()["detail"]
     old = ticket("apple", age=lb.BOARDS["apple"][2] + 60)                                              # 판이 이보다 길 수 없음
-    assert client.post("/api/leaderboard/apple", json={"name": "a", "score": 5, "ticket": old}).status_code == 400
+    assert client.post("/api/leaderboard/apple", json={"name": "a", "score": 5, "ticket": old, "token": tok("a")}).status_code == 400
+
+
+def test_failed_submit_does_not_burn_the_nickname_or_ticket(client):
+    t = ticket("crossy", age=30)
+    body = {"name": "새이름", "score": 5, "ticket": t, "token": tok("a")}
+    assert client.post("/api/leaderboard/crossy", json={**body, "score": 999999}).status_code == 400   # 점수 과다로 거절
+    other = client.post("/api/leaderboard/crossy", json={**body, "token": tok("b"), "score": 5})
+    assert other.status_code == 200                                                                   # 거절된 쪽은 이름을 차지하지 못함
+    assert client.post("/api/leaderboard/crossy", json={**body, "ticket": ticket("crossy"), "token": tok("a")}).status_code == 403
 
 
 def test_ticket_survives_restart(client):
     t = client.post("/api/leaderboard/crossy/start").json()["ticket"]
     lb._key_cache.clear()                                                                              # 서버 재시작
-    assert client.post("/api/leaderboard/crossy", json={"name": "a", "score": 3, "ticket": t}).status_code == 200
+    assert client.post("/api/leaderboard/crossy", json={"name": "a", "score": 3, "ticket": t, "token": tok("a")}).status_code == 200
 
 
 def test_caps_are_human_max_times_1_8():
@@ -128,16 +221,18 @@ def test_real_records_pass_and_cheats_do_not():
 
 def test_fresh_ticket_cannot_post_a_big_score_on_any_board(client):
     for board, big in (("crossy", 3000), ("runner", 50000), ("boxhead", 500000), ("apple", 170), ("pacman-hard", 90000)):
-        r = client.post(f"/api/leaderboard/{board}", json={"name": "a", "score": big, "ticket": ticket(board, age=5)})
+        r = client.post(f"/api/leaderboard/{board}", json={"name": "a", "score": big, "ticket": ticket(board, age=5), "token": tok("a")})
         assert r.status_code == 400, board
 
 
 def test_rejections_are_logged(client, caplog):
     with caplog.at_level("WARNING", logger="hub"):
-        client.post("/api/leaderboard/crossy", json={"name": "나쁜사람", "score": 9999, "ticket": ticket("crossy", age=5)})
-        client.post("/api/leaderboard/crossy", json={"name": "나쁜사람", "score": 5})
+        client.post("/api/leaderboard/crossy", json={"name": "나쁜사람", "score": 9999, "ticket": ticket("crossy", age=5), "token": tok("a")})
+        client.post("/api/leaderboard/crossy", json={"name": "나쁜사람", "score": 5, "token": tok("a")})
+        post(client, "crossy", "주인", 5, token=tok("원래"))
+        post(client, "crossy", "주인", 5, token=tok("도둑"))
     text = caplog.text
-    assert "점수 과다" in text and "입장권 없음" in text and "나쁜사람" in text
+    assert "점수 과다" in text and "입장권 없음" in text and "나쁜사람" in text and "닉네임 도용" in text
 
 
 def test_too_fast_submits_and_starts_are_limited(client, monkeypatch):
@@ -150,7 +245,7 @@ def test_too_fast_submits_and_starts_are_limited(client, monkeypatch):
 
 
 def test_old_database_gets_the_ticket_column(client, tmp_path, monkeypatch):
-    path = tmp_path / "old.sqlite3"
+    path = tmp_path / "older.sqlite3"
     con = sqlite3.connect(path)
     con.execute("""CREATE TABLE scores (id INTEGER PRIMARY KEY, board TEXT NOT NULL, name TEXT NOT NULL, score INTEGER NOT NULL,
         duration REAL NOT NULL, token TEXT, ip TEXT, created REAL NOT NULL)""")
@@ -162,6 +257,25 @@ def test_old_database_gets_the_ticket_column(client, tmp_path, monkeypatch):
     assert post(client, "crossy", "새 사람", 50).status_code == 200
     data = client.get("/api/leaderboard/crossy").json()
     assert [e["name"] for e in data["all"]] == ["옛날", "새 사람"]
+
+
+# ---- 조회 캐시 ----
+
+def test_board_reads_are_cached_but_new_scores_show_immediately(client, monkeypatch):
+    post(client, "crossy", "철수", 10)
+    calls = []
+    real = lb._top
+    monkeypatch.setattr(lb, "_top", lambda *a, **k: (calls.append(1), real(*a, **k))[1])
+    first = client.get("/api/leaderboard/crossy").json()
+    n = len(calls)
+    assert client.get("/api/leaderboard/crossy").json() == first
+    assert len(calls) == n                                                       # 두 번째는 기억해 둔 값
+    post(client, "crossy", "영희", 50)                                            # 올리면 바로 갱신
+    assert [e["name"] for e in client.get("/api/leaderboard/crossy").json()["all"]] == ["영희", "철수"]
+    assert client.get("/api/leaderboard/runner").json()["all"] == []             # 다른 게임은 따로
+    monkeypatch.setattr(lb, "CACHE_SECONDS", 0)
+    client.get("/api/leaderboard/crossy")
+    assert len(calls) > n
 
 
 def test_week_start_is_monday_midnight_kst():

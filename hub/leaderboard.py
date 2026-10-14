@@ -8,6 +8,7 @@
 점수는 브라우저가 계산해서 보내므로 믿지 않고, 걸린 시간만 서버가 직접 잰다:
 시작할 때 서명된 입장권(발급 시각, 난수)을 주고, 올릴 때 입장권으로 경과 시간을 계산해
 그 시간에 사람이 낼 수 있는 점수(BOARDS 의 상한)를 넘으면 거절한다. 입장권은 한 번만 쓸 수 있다.
+닉네임은 처음 올린 브라우저(token)의 것이 되고, 다른 브라우저는 같은 닉네임으로 올릴 수 없다.
 """
 from __future__ import annotations
 
@@ -15,10 +16,12 @@ import hashlib
 import hmac
 import logging
 import os
+import re
 import secrets
 import sqlite3
 import threading
 import time
+import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -35,6 +38,10 @@ SUBMIT_GAP = 2.0                      # 같은 곳에서 연달아 올릴 때 �
 START_PER_MINUTE = 300                # 같은 곳에서 1분에 받을 수 있는 입장권 수
 GRACE = 3.0                           # 판이 끝나고 올리기까지의 여유(초)
 HUMAN_MARGIN = 1.8                    # 사람이 낼 수 있는 최대 속도의 이만큼까지 받아 줌
+NEW_NAMES_PER_IP = 5                  # 같은 곳에서 하루에 새로 차지할 수 있는 닉네임 수
+LOOPBACK = {"", "127.0.0.1", "::1"}   # 프록시가 진짜 IP 를 안 넘겨 주면 이렇게 보임 (이땐 위 제한을 안 건다)
+CACHE_SECONDS = 5.0                   # 순위표 조회 결과를 이만큼 기억해 둠 (올리면 바로 지움)
+TOKEN_RE = re.compile(r"^[0-9A-Za-z_-]{16,64}$")
 KST = timezone(timedelta(hours=9))
 
 
@@ -64,6 +71,7 @@ router = APIRouter()
 _lock = threading.Lock()
 _last_submit: dict[str, float] = {}
 _starts: dict[str, list[float]] = {}
+_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
 
 
 def db_path() -> Path:
@@ -137,6 +145,52 @@ def _create(con: sqlite3.Connection) -> None:
         con.execute("ALTER TABLE scores ADD COLUMN ticket TEXT")                      # 예전 DB 에 입장권 열 추가
     con.execute("CREATE INDEX IF NOT EXISTS scores_board ON scores (board, created)")
     con.execute("CREATE UNIQUE INDEX IF NOT EXISTS scores_ticket ON scores (ticket) WHERE ticket IS NOT NULL")   # 한 번만 쓰기
+    con.execute("""CREATE TABLE IF NOT EXISTS names (
+        key TEXT PRIMARY KEY, name TEXT NOT NULL, token TEXT NOT NULL, ip TEXT, created REAL NOT NULL)""")
+    if con.execute("PRAGMA user_version").fetchone()[0] < 1:
+        # 예전 기록의 닉네임은, 그 닉네임으로 맨 처음 올린 브라우저의 것으로 정함
+        for name, token, ip, created in con.execute("SELECT name, token, ip, created FROM scores WHERE token != '' ORDER BY created, id").fetchall():
+            con.execute("INSERT OR IGNORE INTO names (key, name, token, ip, created) VALUES (?, ?, ?, ?, ?)", (_name_key(name), name, token, ip, created))
+        con.execute("PRAGMA user_version = 1")
+
+
+# 닉네임 정리: 안 보이는 글자·제어 문자는 거절, 공백은 한 칸으로. 못 쓰는 이름이면 None
+def clean_name(name: str) -> str | None:
+    name = " ".join(unicodedata.normalize("NFC", name).split())
+    if not 1 <= len(name) <= MAX_NAME:
+        return None
+    if any(unicodedata.category(ch)[0] == "C" for ch in name):
+        return None
+    return name
+
+
+# 같은 닉네임인지 볼 때 쓰는 값 (전각·대소문자 차이를 무시)
+def _name_key(name: str) -> str:
+    return unicodedata.normalize("NFKC", " ".join(name.split())).casefold()
+
+
+class NameTaken(Exception):
+    pass
+
+
+class TooManyNames(Exception):
+    pass
+
+
+# 닉네임 차지하기: 처음 쓰는 이름이면 이 브라우저의 것으로 기록, 이미 주인이 있으면 같은 브라우저일 때만 통과. 기록에 쓸 이름을 돌려줌
+def claim_name(con: sqlite3.Connection, name: str, token: str, ip: str, now: float) -> str:
+    key = _name_key(name)
+    row = con.execute("SELECT name, token FROM names WHERE key = ?", (key,)).fetchone()
+    if row:
+        if not hmac.compare_digest(row[1], token):
+            raise NameTaken
+        return row[0]
+    if ip not in LOOPBACK:
+        count = con.execute("SELECT COUNT(*) FROM names WHERE ip = ? AND created > ?", (ip, now - 86400)).fetchone()[0]
+        if count >= NEW_NAMES_PER_IP:
+            raise TooManyNames
+    con.execute("INSERT INTO names (key, name, token, ip, created) VALUES (?, ?, ?, ?, ?)", (key, name, token, ip, now))
+    return name
 
 
 def week_start(now: float | None = None) -> float:
@@ -168,8 +222,15 @@ def _check_board(board: str) -> None:
 @router.get("/api/leaderboard/{board}")
 def get_board(board: str) -> dict[str, Any]:
     _check_board(board)
+    now = time.time()
+    key = (str(db_path()), board)
+    hit = _cache.get(key)
+    if hit and now - hit[0] < CACHE_SECONDS:
+        return hit[1]
     with _lock, _connect() as con:
-        return {"board": board, "title": BOARDS[board][0], "all": _top(con, board), "week": _top(con, board, week_start())}
+        data = {"board": board, "title": BOARDS[board][0], "all": _top(con, board), "week": _top(con, board, week_start(now))}
+    _cache[key] = (now, data)
+    return data
 
 
 # 판 시작: 입장권 발급 (같은 곳에서 너무 자주 받으면 거절)
@@ -207,12 +268,14 @@ def _reject(board: str, why: str, name: str, ip: str, message: str) -> HTTPExcep
 @router.post("/api/leaderboard/{board}")
 def submit(board: str, body: Submit, request: Request) -> dict[str, Any]:
     _check_board(board)
-    name = body.name.strip()
     ip = request.client.host if request.client else ""
-    if not 1 <= len(name) <= MAX_NAME:
-        raise HTTPException(400, "닉네임은 1~12자예요.")
+    name = clean_name(body.name)
+    if name is None:
+        raise HTTPException(400, "닉네임은 1~12자, 글자와 숫자·기호만 쓸 수 있어요.")
     if body.score <= 0:
         raise HTTPException(400, "0점은 올리지 않아요.")
+    if not TOKEN_RE.match(body.token):
+        raise _reject(board, "브라우저 식별값 없음", name, ip, "브라우저 식별값이 없어요. 페이지를 새로고침하고 다시 해 주세요.")
     try:
         issued, nonce = read_ticket(board, body.ticket)
     except ValueError:
@@ -231,10 +294,18 @@ def submit(board: str, body: Submit, request: Request) -> dict[str, Any]:
         _last_submit[ip] = now
         with _connect() as con:
             try:
+                name = claim_name(con, name, body.token, ip, now)
+            except NameTaken:
+                log.warning("순위 거절 [%s] 닉네임 도용 시도 · %s · %s", board, name, ip)
+                raise HTTPException(403, "이 닉네임은 다른 브라우저에서 쓰고 있어요. 다른 닉네임을 쓰거나, 쓰던 브라우저에서 해 주세요.") from None
+            except TooManyNames:
+                raise _reject(board, "새 닉네임 너무 많음", name, ip, "오늘 새로 만들 수 있는 닉네임을 다 썼어요.") from None
+            try:
                 con.execute("INSERT INTO scores (board, name, score, duration, token, ip, created, ticket) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                            (board, name, body.score, elapsed, body.token[:64], ip, now, f"{board}:{nonce}"))
+                            (board, name, body.score, elapsed, body.token, ip, now, f"{board}:{nonce}"))
             except sqlite3.IntegrityError:
                 raise _reject(board, "입장권 재사용", name, ip, "이미 올린 판이에요.") from None
+            _cache.pop((str(db_path()), board), None)                  # 새 점수가 바로 보이게
             ws = week_start(now)
             return {
                 "board": board, "title": BOARDS[board][0],

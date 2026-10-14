@@ -200,7 +200,7 @@ bash deploy/setup.sh              # 게임 서버는 127.0.0.1:8000, nginx가 80
   - 올린 뒤 `sudo systemctl restart game-hub`
 - 예전에 게임별로 따로 설치한 `word-chain-online`, `quoridor` 서비스는 setup이 자동으로 끄고 지웁니다. `~/word-chain-online`에 사전이 있으면 복사해 옵니다.
 
-nginx를 쓴다면 WebSocket을 넘겨주도록 설정해야 합니다.
+nginx를 쓴다면 WebSocket을 넘겨주도록 설정해야 합니다. **`X-Forwarded-For`도 꼭 넘겨야** 합니다. 없으면 모든 접속이 `127.0.0.1`로 보여서 순위표의 "같은 곳에서 연달아 올리기" 제한이 전체 사용자에게 걸리고, 새 닉네임 하루 제한은 아예 꺼집니다. 서버(uvicorn)는 `--proxy-headers`로 이미 이 값을 받을 준비가 돼 있습니다(같은 컴퓨터의 nginx가 보낸 값만 믿음).
 
 ```nginx
 location / {
@@ -209,9 +209,12 @@ location / {
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_read_timeout 3600s;
 }
 ```
+
+적용: `sudo nano /etc/nginx/sites-available/default`(서버의 실제 설정 파일)에 위 `X-Forwarded-For` 줄을 `location /` 안에 넣고 `sudo nginx -t && sudo systemctl reload nginx`. 확인은 순위 기록 하나를 올린 뒤 `python3 -c "import sqlite3; print(sqlite3.connect('private/leaderboard.sqlite3').execute('select ip, count(*) from scores group by ip').fetchall())"`에서 `127.0.0.1` 말고 진짜 IP가 보이면 됩니다.
 
 ---
 
@@ -704,7 +707,8 @@ boxhead/
 - 이번 주: 한국 시간 월요일 0시부터.
 - **속임수 막기**: 점수는 브라우저가 계산해서 보내므로 믿지 않고, **걸린 시간을 서버가 직접 잽니다.** 입장권은 `발급 시각.난수.서명`(서버 비밀키 `private/leaderboard.key`로 HMAC 서명, 서버를 재시작해도 유효)이고, 올릴 때 `지금 - 발급 시각`이 걸린 시간이 됩니다(클라이언트가 보낸 `duration`은 무시). 그 시간에 사람이 낼 수 있는 점수(`BOARDS`의 상한 = 사람의 최대치 × 1.8)를 넘으면 거절하고, 입장권은 DB의 `ticket` 열(유일)로 한 번만 쓸 수 있습니다. 서명이 틀렸거나 다른 게임 것이거나 판 최대 시간(사과게임 150초, 박스헤드 2시간, 그 밖 2~3시간)을 넘으면 거절합니다. 거절 사유는 서버 로그(`순위 거절 …`)에 남습니다.
   - 상한의 근거(`hub/leaderboard.py` 주석): 길건너기 기록 최대 4.27칸/초 → 7.7칸/초, 사과게임 2.2개/초(170 이하), 팩맨 153점/초, 박스헤드는 완벽 조준·무적 봇의 점수 ≈ 3.4·t^1.5 의 1.8배, 숫자러너는 규칙의 최고 속도(실제 기록의 1.8배보다 낮음). 사람이 더 잘하는 게 확인되면 `BOARDS`의 숫자를 올립니다.
-  - 남는 한계: 입장권만 받고 **진짜 시간을 기다리면** 그 시간의 상한까지는 속일 수 있습니다(비용이 실제 시간). 닉네임은 아직 주인이 없어 남의 이름으로 올릴 수 있습니다. 같은 곳에서 2초 안에 다시 올리면 거절하고 입장권은 1분에 300개까지 줍니다. 단 nginx가 `X-Forwarded-For`를 넘기지 않으면 모든 사용자가 같은 곳(`127.0.0.1`)으로 보여 이 제한이 전체에 걸립니다(`proxy_set_header X-Forwarded-For $remote_addr;` 필요). 브라우저 식별값(`token`)은 저장만 합니다.
+  - **닉네임 주인**: 닉네임은 처음 올린 브라우저(`token`, localStorage `gamehub-lb-token`)의 것이 되고(`names` 표), 다른 브라우저가 같은 닉네임으로 올리면 403입니다. 대소문자·전각·앞뒤 공백 차이는 같은 닉네임으로 보고(`_name_key`), 기록에는 처음 쓴 모양이 남습니다. 안 보이는 글자·제어 문자·방향 바꾸는 문자가 든 닉네임은 거절하고 가운데 공백·줄바꿈은 한 칸으로 정리합니다. 예전 기록의 닉네임은 그 이름으로 맨 처음 올린 브라우저가 주인이 됩니다(토큰이 없던 기록은 먼저 오는 사람). 같은 곳에서 하루에 새로 차지할 수 있는 닉네임은 5개이고, IP가 `127.0.0.1`(프록시가 IP를 안 넘길 때)이면 이 제한은 걸지 않습니다. **한 사람이 폰과 PC 등 브라우저가 둘이면 서로 다른 주인**이라 한쪽에서 쓰던 닉네임은 다른 쪽에서 못 씁니다(저장소를 지워도 마찬가지). 풀어 주려면 서버에서 `DELETE FROM names WHERE key = '닉네임(소문자)'`.
+  - 남는 한계: 입장권만 받고 **진짜 시간을 기다리면** 그 시간의 상한까지는 속일 수 있습니다(비용이 실제 시간). 같은 곳에서 2초 안에 다시 올리면 거절하고 입장권은 1분에 300개까지 줍니다. 순위표 조회(`GET`)는 5초 동안 결과를 기억해 두고, 점수가 올라오면 바로 지웁니다.
 - 화면: `common/web/leaderboard.js`(`Leaderboard.begin(게임)`은 **판을 시작할 때** 입장권을 받아 두고, `Leaderboard.submit(게임, 점수)`가 그 입장권으로 올림, `Leaderboard.mount`). 새 점수 게임은 시작 함수에서 `begin`을 불러야 합니다. 길건너기·사과게임·박스헤드·숫자러너는 시작·결과 창(`#lb`), 팩맨은 화면 아래 순위 칸, 허브 메인은 아래쪽 🏆 순위에 띄웁니다. 닉네임이 없으면 올리지 않고 안내만 합니다. 입장권이 없으면 "새로고침하고 다시 해 주세요"가 나옵니다.
 - 기록 지우기(서버): `sqlite3 private/leaderboard.sqlite3 "DELETE FROM scores WHERE name = '이름';"`
 - 검증: `pytest tests/test_leaderboard.py`
