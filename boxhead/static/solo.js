@@ -36,6 +36,7 @@ function showPanel(title, text, button, withBoard = false) {
 
 // 새 판
 function start() {
+  window.Leaderboard?.begin("boxhead");                                   // 순위 입장권
   game = createGame(Date.now() >>> 0, [{ id: "me", name: "나" }]);
   renderer.clear();
   input.reset();
@@ -66,7 +67,7 @@ function gameOver(e) {
   try {
     localStorage.setItem(BEST_KEY, String(best));
   } catch {}
-  const posted = window.Leaderboard?.submit("boxhead", e.score, e.time);
+  const posted = window.Leaderboard?.submit("boxhead", e.score);
   setTimeout(async () => {
     if (mode !== "over") return;
     showPanel(isBest ? "🏆 최고 기록!" : "쓰러졌어요", `${e.score.toLocaleString()}점 · 레벨 ${e.level} · 처치 ${e.kills}\n최고 ${best.toLocaleString()}점`, "다시 하기");

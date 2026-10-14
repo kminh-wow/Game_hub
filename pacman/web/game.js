@@ -158,7 +158,7 @@ function update(dt) {
         game.lives -= 1;
         if (game.lives <= 0) {
           setPhase("over");
-          window.Leaderboard?.submit(`pacman-${difficulty}`, game.score, game.elapsed).then(showBoard);   // 순위에 올리기
+          window.Leaderboard?.submit(`pacman-${difficulty}`, game.score).then(showBoard);   // 순위에 올리기
         } else {
           resetActors();
           setPhase("ready");
@@ -343,6 +343,7 @@ const KEY_DIRS = {
 };
 
 function startOrRestart() {
+  if (game.phase === "start" || game.phase === "over") window.Leaderboard?.begin(`pacman-${difficulty}`);   // 순위 입장권
   if (game.phase === "start") setPhase("ready");
   else if (game.phase === "over") {
     newGame();

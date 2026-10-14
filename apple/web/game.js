@@ -247,6 +247,7 @@ function showPanel(title, text, button, board) {
 
 // 새 판
 function start() {
+  window.Leaderboard?.begin("apple");                                     // 순위 입장권
   game = createGame(Date.now() >>> 0);
   falling.length = 0;
   drag = null;
@@ -261,7 +262,7 @@ function finish(reason) {
   const isBest = game.score > best;
   best = Math.max(best, game.score);
   writeNum(BEST_KEY, best);
-  const posted = window.Leaderboard?.submit("apple", game.score, TIME - game.left);
+  const posted = window.Leaderboard?.submit("apple", game.score);
   const title = game.score === ROWS * COLS ? "🍎 다 땄어요!" : isBest ? "🏆 최고 기록!" : reason;
   setTimeout(async () => {
     if (mode !== "over") return;

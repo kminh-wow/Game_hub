@@ -627,6 +627,7 @@ function showPanel(title, text, button, board = false) {
 
 // 새 판 (지난 판 물체 정리)
 function start() {
+  window.Leaderboard?.begin("runner");                                    // 순위 입장권
   game = createGame(Date.now() >>> 0);
   for (const m of gateMeshes.values()) scene.remove(m.group);
   gateMeshes.clear();
@@ -658,7 +659,7 @@ function gameOver() {
     `거리 ${Math.floor(game.dist)}m · 점수 ${sc}\n처치 ${game.kills} · 보스 ${game.bossKills} · ${WEAPONS[game.weapon].name} Lv${game.level}`,
     "다시 하기");
   // 순위에 올리고 결과 보여 주기
-  window.Leaderboard?.submit("runner", sc, game.t).then((res) => window.Leaderboard.mount($("#lb"), "runner", { result: res }));
+  window.Leaderboard?.submit("runner", sc).then((res) => window.Leaderboard.mount($("#lb"), "runner", { result: res }));
 }
 
 $("#panel-btn").onclick = () => {

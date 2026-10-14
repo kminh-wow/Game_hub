@@ -1,5 +1,6 @@
-// 점수 순위 (길건너기, 숫자러너, 팩맨이 함께 씀). 허브 닉네임으로 올리고, 이번 주·전체 상위 10명을 보여 준다.
-//   Leaderboard.submit("crossy", 점수, 걸린초)  → 결과(순위·목록) 또는 { error }
+// 점수 순위 (길건너기, 숫자러너, 팩맨, 사과게임, 박스헤드가 함께 씀). 허브 닉네임으로 올리고, 이번 주·전체 상위 10명을 보여 준다.
+//   Leaderboard.begin("crossy")  → 판을 시작할 때 부름. 서버에서 입장권을 받아 둠 (걸린 시간은 서버가 이걸로 잼)
+//   Leaderboard.submit("crossy", 점수)  → 결과(순위·목록) 또는 { error }. 입장권은 한 판에 한 번만 쓸 수 있음
 //   Leaderboard.mount(요소, "crossy", { unit: "칸", result })  → 그 자리에 순위표 그리기
 (() => {
   const API = new URL("../api/leaderboard/", document.currentScript.src);
@@ -29,18 +30,38 @@
     return r.json();
   }
 
+  const tickets = new Map();       // 게임 → 입장권 (판 하나에 하나)
+  const waiting = new Map();       // 게임 → 입장권 받는 중인 요청
+
+  // 판 시작: 서버에서 입장권 받아 두기 (실패해도 게임은 계속, 올릴 때 안내)
+  function begin(board) {
+    tickets.delete(board);
+    const job = fetch(new URL(`${board}/start`, API), { method: "POST" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.ticket) tickets.set(board, d.ticket);
+      })
+      .catch(() => {});
+    waiting.set(board, job);
+    return job;
+  }
+
   // 점수 올리기 (닉네임이 없거나 0점이면 올리지 않음)
-  async function submit(board, score, duration) {
+  async function submit(board, score) {
     const name = read("gamehub-name").trim();
     if (!name) return { error: "허브에서 닉네임을 정하면 순위에 올라가요." };
     if (!(score > 0)) return { error: null };
+    await waiting.get(board);
+    const ticket = tickets.get(board);
+    if (!ticket) return { error: "순위 입장권이 없어요. 페이지를 새로고침하고 다시 해 주세요." };
     try {
       const r = await fetch(new URL(board, API), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, score: Math.floor(score), duration: Math.max(0.1, duration), token: token() }),
+        body: JSON.stringify({ name, score: Math.floor(score), ticket, token: token() }),
       });
       const data = await r.json().catch(() => ({}));
+      if (r.status !== 429) tickets.delete(board);               // 입장권은 한 번만 (너무 빨라서 거절된 경우만 다시 쓸 수 있음)
       if (!r.ok) return { error: data.detail || "순위에 올리지 못했어요." };
       return data;
     } catch {
@@ -118,5 +139,5 @@
     }
   }
 
-  window.Leaderboard = { load, submit, render, mount, name: () => read("gamehub-name").trim() };
+  window.Leaderboard = { load, begin, submit, render, mount, name: () => read("gamehub-name").trim() };
 })();

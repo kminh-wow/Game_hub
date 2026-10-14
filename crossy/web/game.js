@@ -375,6 +375,7 @@ function showPanel(title, text, button, board = false) {
 
 // 새 판 (지난 판 모형 정리)
 function start() {
+  window.Leaderboard?.begin("crossy");                                    // 순위 입장권
   for (const e of rowMeshes.values()) dropRow(e);
   rowMeshes.clear();
   game = createGame(Date.now() >>> 0);
@@ -397,7 +398,7 @@ function gameOver(s, now) {
   const isBest = s.score > best;
   best = Math.max(best, s.score);
   writeNum(BEST_KEY, best);
-  const posted = window.Leaderboard?.submit("crossy", s.score, s.t);          // 순위에 올리기
+  const posted = window.Leaderboard?.submit("crossy", s.score);          // 순위에 올리기
   setTimeout(async () => {
     if (mode !== "over") return;
     showPanel(isBest ? "🏆 최고 기록!" : CAUSES[s.cause] || "끝", `${s.score}칸 건넜어요 · 최고 ${best}\n이번 판 동전 ${s.coins} · 모은 동전 ${bank}`, "다시 하기");

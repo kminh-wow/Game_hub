@@ -699,11 +699,13 @@ boxhead/
 
 혼자 하는 점수 게임(길건너기, 사과게임, 박스헤드, 숫자러너, 팩맨 난이도별)의 이번 주·전체 상위 10명입니다.
 
-- 서버: `hub/leaderboard.py`. `GET /api/leaderboard/{board}`는 `{all, week}`(이름별 최고 점수 상위 10), `POST /api/leaderboard/{board}` `{name, score, duration, token}`은 기록을 쌓고 이번 기록의 순위(`rank`, `week_rank`)와 목록을 돌려줍니다. 순위표 이름은 `crossy`, `apple`, `boxhead`, `runner`, `pacman-easy|normal|midhigh|hard`입니다.
+- 서버: `hub/leaderboard.py`. `POST /api/leaderboard/{board}/start`는 판을 시작할 때 입장권(`ticket`)을 줍니다. `GET /api/leaderboard/{board}`는 `{all, week}`(이름별 최고 점수 상위 10), `POST /api/leaderboard/{board}` `{name, score, ticket, token}`은 기록을 쌓고 이번 기록의 순위(`rank`, `week_rank`)와 목록을 돌려줍니다. 순위표 이름은 `crossy`, `apple`, `boxhead`, `runner`, `pacman-easy|normal|midhigh|hard`입니다.
 - 저장: SQLite 파일 `private/leaderboard.sqlite3`(git에 없음, 환경 변수 `LEADERBOARD_DB`로 바꿀 수 있음). `update.sh`의 `git reset`/`pull`은 이 파일을 건드리지 않습니다.
 - 이번 주: 한국 시간 월요일 0시부터.
-- 점수는 브라우저가 계산해서 보내므로 완벽히 막지는 못합니다. 걸린 시간에 비해 말이 안 되는 점수만 거릅니다(길건너기 초당 9.5칸, 사과게임 초당 20개·최대 170개, 박스헤드 초당 3000점, 숫자러너 초당 10m + 보스 보너스, 팩맨 초당 500점). 같은 곳에서 2초 안에 다시 올리면 거절합니다. 브라우저 식별값(`token`)도 같이 저장해 두어서, 나중에 이름을 브라우저에 묶을 수 있습니다.
-- 화면: `common/web/leaderboard.js`(`Leaderboard.submit`, `Leaderboard.mount`). 길건너기·사과게임·박스헤드·숫자러너는 시작·결과 창(`#lb`), 팩맨은 화면 아래 순위 칸, 허브 메인은 아래쪽 🏆 순위에 띄웁니다. 닉네임이 없으면 올리지 않고 안내만 합니다.
+- **속임수 막기**: 점수는 브라우저가 계산해서 보내므로 믿지 않고, **걸린 시간을 서버가 직접 잽니다.** 입장권은 `발급 시각.난수.서명`(서버 비밀키 `private/leaderboard.key`로 HMAC 서명, 서버를 재시작해도 유효)이고, 올릴 때 `지금 - 발급 시각`이 걸린 시간이 됩니다(클라이언트가 보낸 `duration`은 무시). 그 시간에 사람이 낼 수 있는 점수(`BOARDS`의 상한 = 사람의 최대치 × 1.8)를 넘으면 거절하고, 입장권은 DB의 `ticket` 열(유일)로 한 번만 쓸 수 있습니다. 서명이 틀렸거나 다른 게임 것이거나 판 최대 시간(사과게임 150초, 박스헤드 2시간, 그 밖 2~3시간)을 넘으면 거절합니다. 거절 사유는 서버 로그(`순위 거절 …`)에 남습니다.
+  - 상한의 근거(`hub/leaderboard.py` 주석): 길건너기 기록 최대 4.27칸/초 → 7.7칸/초, 사과게임 2.2개/초(170 이하), 팩맨 153점/초, 박스헤드는 완벽 조준·무적 봇의 점수 ≈ 3.4·t^1.5 의 1.8배, 숫자러너는 규칙의 최고 속도(실제 기록의 1.8배보다 낮음). 사람이 더 잘하는 게 확인되면 `BOARDS`의 숫자를 올립니다.
+  - 남는 한계: 입장권만 받고 **진짜 시간을 기다리면** 그 시간의 상한까지는 속일 수 있습니다(비용이 실제 시간). 닉네임은 아직 주인이 없어 남의 이름으로 올릴 수 있습니다. 같은 곳에서 2초 안에 다시 올리면 거절하고 입장권은 1분에 300개까지 줍니다. 단 nginx가 `X-Forwarded-For`를 넘기지 않으면 모든 사용자가 같은 곳(`127.0.0.1`)으로 보여 이 제한이 전체에 걸립니다(`proxy_set_header X-Forwarded-For $remote_addr;` 필요). 브라우저 식별값(`token`)은 저장만 합니다.
+- 화면: `common/web/leaderboard.js`(`Leaderboard.begin(게임)`은 **판을 시작할 때** 입장권을 받아 두고, `Leaderboard.submit(게임, 점수)`가 그 입장권으로 올림, `Leaderboard.mount`). 새 점수 게임은 시작 함수에서 `begin`을 불러야 합니다. 길건너기·사과게임·박스헤드·숫자러너는 시작·결과 창(`#lb`), 팩맨은 화면 아래 순위 칸, 허브 메인은 아래쪽 🏆 순위에 띄웁니다. 닉네임이 없으면 올리지 않고 안내만 합니다. 입장권이 없으면 "새로고침하고 다시 해 주세요"가 나옵니다.
 - 기록 지우기(서버): `sqlite3 private/leaderboard.sqlite3 "DELETE FROM scores WHERE name = '이름';"`
 - 검증: `pytest tests/test_leaderboard.py`
 
