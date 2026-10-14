@@ -29,8 +29,8 @@ export function createRenderer(canvas, { smooth = false } = {}) {
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
     }
-    const tilesX = w < 560 ? 13 : w < 820 ? 18 : COLS;
-    view.T = tilesX === COLS ? Math.min(w / COLS, (h - 28) / (ROWS * OBL + 1.2)) : w / tilesX;
+    const tilesX = w < 560 ? 13 : w < 820 ? 18 : 24;                       // 맵이 커서 늘 내 캐릭터를 따라감
+    view.T = w / tilesX;
   }
 
   // 카메라: 내 자리를 따라가되 아레나 밖은 안 보이게
@@ -40,7 +40,7 @@ export function createRenderer(canvas, { smooth = false } = {}) {
     const fx0 = me ? me.x : COLS / 2;
     const fy0 = me ? me.y : ROWS / 2;
     view.cx = hw * 2 >= COLS ? COLS / 2 : Math.max(hw, Math.min(COLS - hw, fx0));
-    view.cy = hh * 2 >= ROWS + 1 ? ROWS / 2 - 0.3 : Math.max(hh - 0.6, Math.min(ROWS - hh + 0.2, fy0));
+    view.cy = hh * 2 >= ROWS + 1 ? ROWS / 2 - 0.3 : Math.max(hh - 0.9, Math.min(ROWS - hh + 0.4, fy0));
   }
 
   const sx = (x) => (x - view.cx) * view.T + view.w / 2;
@@ -219,8 +219,12 @@ export function createRenderer(canvas, { smooth = false } = {}) {
     const y0 = sy(0);
     const x1 = sx(COLS);
     const y1 = sy(ROWS);
-    for (let j = 0; j < ROWS; j++) {
-      for (let i = 0; i < COLS; i++) {
+    const i0 = Math.max(0, Math.floor(view.cx - view.w / (2 * T)) - 1);
+    const i1 = Math.min(COLS - 1, Math.ceil(view.cx + view.w / (2 * T)) + 1);
+    const j0 = Math.max(0, Math.floor(view.cy - view.h / (2 * T * OBL)) - 1);
+    const j1 = Math.min(ROWS - 1, Math.ceil(view.cy + view.h / (2 * T * OBL)) + 1);
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
         ctx.fillStyle = (i + j) % 2 ? "#3c3f45" : "#383b41";
         ctx.fillRect(Math.floor(sx(i)), Math.floor(sy(j)), Math.ceil(T) + 1, Math.ceil(T * OBL) + 1);
       }
@@ -228,13 +232,13 @@ export function createRenderer(canvas, { smooth = false } = {}) {
     ctx.strokeStyle = "rgba(0,0,0,.18)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let i = 0; i <= COLS; i++) {
-      ctx.moveTo(sx(i), y0);
-      ctx.lineTo(sx(i), y1);
+    for (let i = i0; i <= i1 + 1; i++) {
+      ctx.moveTo(sx(i), sy(j0));
+      ctx.lineTo(sx(i), sy(j1 + 1));
     }
-    for (let j = 0; j <= ROWS; j++) {
-      ctx.moveTo(x0, sy(j));
-      ctx.lineTo(x1, sy(j));
+    for (let j = j0; j <= j1 + 1; j++) {
+      ctx.moveTo(sx(i0), sy(j));
+      ctx.lineTo(sx(i1 + 1), sy(j));
     }
     ctx.stroke();
     for (const d of decals) {
@@ -250,9 +254,6 @@ export function createRenderer(canvas, { smooth = false } = {}) {
     box(x0 - T * 0.3, y0 - wall, T * 0.3, y1 - y0 + wall + T * 0.3, "#222428");
     box(x1, y0 - wall, T * 0.3, y1 - y0 + wall + T * 0.3, "#222428");
     box(x0 - T * 0.3, y1, x1 - x0 + T * 0.6, T * 0.3, "#222428");
-    // 출입구 표시 (좀비가 나오는 곳)
-    ctx.fillStyle = "rgba(160,30,30,.35)";
-    for (const [x, y] of [[0, 8], [COLS, 8]]) ctx.fillRect(sx(x) - (x ? 0 : T * 0.3), sy(y - 1.2), T * 0.3, T * 2.4 * OBL);
   }
 
   // ---------- 글자와 화면 정보 ----------
@@ -330,6 +331,62 @@ export function createRenderer(canvas, { smooth = false } = {}) {
     }
   }
 
+  // 작은 지도: 맵이 커서 어디에 누가 있는지 보여 줌
+  function minimap(me) {
+    const compact = view.w < 560;
+    const mw = compact ? 92 : 132;
+    const mh = (mw * ROWS) / COLS;
+    const x0 = view.w - mw - (compact ? 8 : 12);
+    const y0 = compact ? 62 : 80;
+    const k = mw / COLS;
+    ctx.globalAlpha = 0.75;
+    box(x0 - 2, y0 - 2, mw + 4, mh + 4, "rgba(0,0,0,.55)");
+    box(x0, y0, mw, mh, "#2d3036");
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#6b543a";
+    for (const b of BLOCKS) ctx.fillRect(x0 + b.x * k, y0 + b.y * k, Math.max(1.5, b.w * k), Math.max(1.5, b.h * k));
+    ctx.fillStyle = "#e5c64a";
+    for (const c of snap.c) ctx.fillRect(x0 + c[1] * k - 1, y0 + c[2] * k - 1, 3, 3);
+    ctx.fillStyle = "#e0584c";
+    for (const z of snap.z) ctx.fillRect(x0 + z[1] * k - 1, y0 + z[2] * k - 1, 2, 2);
+    ctx.fillStyle = "#ff9a2e";
+    for (const d of snap.d) ctx.fillRect(x0 + d[1] * k - 2, y0 + d[2] * k - 2, 4, 4);
+    snap.p.forEach((p, i) => {
+      if (!p.a) return;
+      ctx.fillStyle = p.id === view.localId ? "#ffffff" : SHIRTS[i % 4];
+      ctx.fillRect(x0 + p.x * k - 2, y0 + p.y * k - 2, 5, 5);
+    });
+    const vw = view.w / view.T;
+    const vh = view.h / (view.T * OBL);
+    ctx.strokeStyle = "rgba(255,255,255,.5)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x0 + (view.cx - vw / 2) * k, y0 + (view.cy - vh / 2) * k, vw * k, vh * k);
+  }
+
+  // 마우스 조준 점
+  function reticle(c) {
+    const r = Math.max(9, view.T * 0.32);
+    ctx.strokeStyle = "rgba(255,255,255,.9)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      ctx.moveTo(c.x + dx * r * 0.45, c.y + dy * r * 0.45);
+      ctx.lineTo(c.x + dx * r * 1.35, c.y + dy * r * 1.35);
+    }
+    ctx.stroke();
+    ctx.fillStyle = "#e0483f";
+    ctx.fillRect(c.x - 1.5, c.y - 1.5, 3, 3);
+  }
+
+  // 화면 위의 점(마우스) → 내 캐릭터에서 그 점까지의 방향 (가슴 높이로 맞춤)
+  function aimAngle(mx, my) {
+    if (!view.me) return 0;
+    const wx = view.cx + (mx - view.w / 2) / view.T;
+    const wy = view.cy + (my + view.T * 0.5 - view.h / 2) / (view.T * OBL);
+    return Math.atan2(wy - view.me.y, wx - view.me.x);
+  }
+
   // ---------- 매 프레임 ----------
 
   // 한 프레임 그리기 (opts: localId, names)
@@ -351,7 +408,8 @@ export function createRenderer(canvas, { smooth = false } = {}) {
     for (const p of pos.values()) p.seen = false;
     const me = snap.p.find((p) => p.id === view.localId) || snap.p.find((p) => p.a) || snap.p[0];
     const [mx, my] = me ? shown(me.id, me.x, me.y, dt) : [COLS / 2, ROWS / 2];
-    camera(me ? { x: mx, y: my } : null);
+    view.me = me ? { x: mx, y: my } : null;
+    camera(view.me);
     ctx.save();
     if (shake > 0.1) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
     floor();
@@ -377,7 +435,7 @@ export function createRenderer(canvas, { smooth = false } = {}) {
     }
     snap.p.forEach((p, i) => {
       const [x, y] = p.id === me?.id ? [mx, my] : shown(p.id, p.x, p.y, dt);
-      const angle = Math.atan2(DIRS[p.f][1], DIRS[p.f][0]);
+      const angle = typeof p.ang === "number" ? p.ang : Math.atan2(DIRS[p.f][1], DIRS[p.f][0]);
       items.push([y, () => {
         person(x, y, angle, { skin: "#e8cfa4", hair: "#3a2a1c", shirt: SHIRTS[i % 4], pants: "#2b2f3a", gun: p.w, arms: 0.3, down: !p.a, flash: p.st, walk: false, phase: now / 1000 });
         const px = sx(x);
@@ -452,11 +510,14 @@ export function createRenderer(canvas, { smooth = false } = {}) {
     for (const [id, p] of pos) if (!p.seen) pos.delete(id);
     ctx.restore();
     hud(me, names, now);
+    minimap(me);
+    if (opts.cursor) reticle(opts.cursor);
   }
 
   return {
     push,
     draw,
+    aimAngle,
     clear() {
       snap = null;
       decals.length = 0;

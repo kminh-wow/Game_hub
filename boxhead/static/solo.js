@@ -94,9 +94,12 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   try {
+    const mouse = mode === "play" ? input.mouse() : null;                 // 마우스 조준 중이면 { x, y }
+    board.style.cursor = mouse ? "none" : "crosshair";
     if (game && mode === "play") {
       acc += dt;
       const read = input.read();
+      if (mouse) read.aim = renderer.aimAngle(mouse.x, mouse.y);
       let first = true;
       while (acc >= DT && !game.over) {
         acc -= DT;
@@ -111,7 +114,7 @@ function frame(now) {
     } else if (!game) {
       renderer.push(snapshot(idle));
     }
-    renderer.draw({ localId: "me", names: {} });
+    renderer.draw({ localId: "me", names: {}, cursor: mouse });
   } catch (err) {
     console.error(err);
   }

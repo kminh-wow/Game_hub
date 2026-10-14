@@ -4,13 +4,12 @@
 //   createGame(seed, players, { difficulty }) → 상태, step(s, dt, inputs) → 시간 흘리기, snapshot(s) → 그리기용 값
 // inputs 는 { 플레이어id: { dx, dy, fire, lock, weapon } }. dx·dy 는 -1/0/1 (8방향), lock 은 제자리 방향 바꾸기.
 
-export const COLS = 24;
-export const ROWS = 16;
+export const COLS = 36;
+export const ROWS = 24;
 export const DT = 1 / 60;
 export const MAX_HP = 100;
 export const PLAYER_R = 0.32;
 export const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];   // 0=오른쪽, 시계 방향
-export const BLOCKS = [{ x: 5, y: 4, w: 2, h: 2 }, { x: 17, y: 4, w: 2, h: 2 }, { x: 5, y: 10, w: 2, h: 2 }, { x: 17, y: 10, w: 2, h: 2 }];
 
 export const WEAPONS = [
   { id: "pistol", name: "권총", interval: 0.26, dmg: 1, pellets: 1, spread: 0.03, range: 13, stun: 0.12, knock: 1.2 },
@@ -31,7 +30,6 @@ const REGEN_RATE = 2;
 const COMBO_TIME = 3;
 const INTERMISSION = 6;
 const FIRST_WAIT = 3;
-const SPAWNS = [[0.9, 2], [0.9, 8], [0.9, 14], [23.1, 2], [23.1, 8], [23.1, 14], [8, 0.9], [16, 0.9], [8, 15.1], [16, 15.1]];
 
 // ---- 난수 (시드 고정) ----
 
@@ -46,6 +44,35 @@ export function makeRng(seed) {
   };
   return { next, range: (lo, hi) => lo + (hi - lo) * next(), int: (lo, hi) => Math.floor(lo + (hi - lo + 1) * next()) };
 }
+
+// ---- 아레나: 작은 상자를 흩어 놓음 (고정 시드라 늘 같은 모양) ----
+
+// 상자 배치: 1×1 위주, 가끔 1×2·2×1. 상자끼리 2칸 이상 떼어 놓아 지나갈 길이 늘 있고, 가운데(시작 자리)는 비워 둠
+function makeBlocks() {
+  const r = makeRng(20261014);
+  const out = [];
+  const gap = 2;
+  const near = (a, b) => a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
+  for (let tries = 0; tries < 2000 && out.length < 46; tries++) {
+    const shape = r.next();
+    const w = shape < 0.18 ? 2 : 1;
+    const h = shape >= 0.18 && shape < 0.3 ? 2 : 1;
+    const b = { x: r.int(2, COLS - 2 - w), y: r.int(2, ROWS - 2 - h), w, h };
+    if (Math.abs(b.x + b.w / 2 - COLS / 2) < 5 && Math.abs(b.y + b.h / 2 - ROWS / 2) < 4) continue;
+    if (out.some((o) => near(o, b))) continue;
+    out.push(b);
+  }
+  return out;
+}
+export const BLOCKS = makeBlocks();
+
+// 좀비가 나오는 곳: 가장자리를 따라 5칸마다
+export const SPAWNS = (() => {
+  const pts = [];
+  for (let x = 2; x < COLS - 1; x += 5) pts.push([x, 0.9], [x, ROWS - 0.9]);
+  for (let y = 2; y < ROWS - 1; y += 5) pts.push([0.9, y], [COLS - 0.9, y]);
+  return pts;
+})();
 
 // 방향 (dx, dy: -1/0/1) → 0~7, 0,0 이면 -1
 export function dirIndex(dx, dy) {
@@ -79,7 +106,7 @@ export function createGame(seed, players = [{ id: "me", name: "나" }], opts = {
   };
   players.forEach((p, i) => {
     s.players.push({
-      id: p.id, name: p.name, x: 11.2 + (i % 2) * 1.6, y: 7.4 + Math.floor(i / 2) * 1.2, face: 0, hp: MAX_HP, weapon: 0,
+      id: p.id, name: p.name, x: COLS / 2 - 0.8 + (i % 2) * 1.6, y: ROWS / 2 - 0.6 + Math.floor(i / 2) * 1.2, face: 0, aim: 0, hp: MAX_HP, weapon: 0,
       has: [true, false, false], ammo: [...AMMO_START], cd: 0, stun: 0, calm: 0, alive: true, gone: false, kills: 0,
     });
   });
@@ -97,9 +124,21 @@ export function removePlayer(s, id) {
 
 // ---- 부딪힘 ----
 
+const SOLID = (() => {
+  const grid = new Uint8Array(COLS * ROWS);
+  for (const b of BLOCKS) for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) grid[y * COLS + x] = 1;
+  return grid;
+})();
+
 function hitsBlock(x, y, r) {
   if (x < r || y < r || x > COLS - r || y > ROWS - r) return true;
-  for (const b of BLOCKS) if (x > b.x - r && x < b.x + b.w + r && y > b.y - r && y < b.y + b.h + r) return true;
+  const x1 = Math.ceil(x + r) - 1;
+  const y1 = Math.ceil(y + r) - 1;
+  for (let ty = Math.ceil(y - r) - 1; ty <= y1; ty++) {
+    for (let tx = Math.ceil(x - r) - 1; tx <= x1; tx++) {
+      if (tx >= 0 && ty >= 0 && tx < COLS && ty < ROWS && SOLID[ty * COLS + tx]) return true;
+    }
+  }
   return false;
 }
 
@@ -230,7 +269,7 @@ function freeSpot(s, minDist = 5) {
     if (s.players.some((p) => p.alive && Math.hypot(p.x - x, p.y - y) < minDist)) continue;
     return [x, y];
   }
-  return [12, 8];
+  return [COLS / 2, ROWS / 2];
 }
 
 function nearestPlayer(s, x, y) {
@@ -279,10 +318,19 @@ function clearLevel(s) {
   }
 }
 
+// 나올 자리: 살아 있는 누군가에게서 9~20칸 떨어진 가장자리 (너무 멀면 오는 데 한참 걸림)
+function spawnPoint(s) {
+  const alive = s.players.filter((p) => p.alive);
+  const dist = (x, y) => Math.min(...alive.map((p) => Math.hypot(p.x - x, p.y - y)));
+  let pts = alive.length ? SPAWNS.filter(([x, y]) => dist(x, y) >= 9 && dist(x, y) <= 20) : SPAWNS;
+  if (!pts.length) pts = alive.length ? SPAWNS.filter(([x, y]) => dist(x, y) >= 9) : SPAWNS;
+  if (!pts.length) pts = SPAWNS;
+  return pts[s.rng.int(0, pts.length - 1)];
+}
+
 function spawnZombie(s) {
   const info = s.info;
-  const pts = SPAWNS.filter(([x, y]) => !s.players.some((p) => p.alive && Math.hypot(p.x - x, p.y - y) < 6));
-  const [x, y] = (pts.length ? pts : SPAWNS)[s.rng.int(0, (pts.length || SPAWNS.length) - 1)];
+  const [x, y] = spawnPoint(s);
   s.zs.push({
     id: s.nextId++, x: x + s.rng.range(-0.3, 0.3), y: y + s.rng.range(-0.3, 0.3), hp: info.zHp, max: info.zHp, face: 0,
     speed: info.zSpeed * s.rng.range(0.85, 1.15), stun: 0, cd: 0, kx: 0, ky: 0,
@@ -290,7 +338,7 @@ function spawnZombie(s) {
 }
 
 function spawnDevil(s) {
-  const [x, y] = SPAWNS[s.rng.int(0, SPAWNS.length - 1)];
+  const [x, y] = spawnPoint(s);
   s.devils.push({
     id: s.nextId++, x, y, hp: s.info.dHp, max: s.info.dHp, face: 0, speed: Math.min(2.6, 1.9 + 0.03 * s.level), stun: 0,
     cd: s.rng.range(0.8, 1.6), wind: 0, kx: 0, ky: 0, side: s.rng.next() < 0.5 ? 1 : -1,
@@ -359,7 +407,7 @@ function fire(s, p) {
     p.ammo[p.weapon]--;
   }
   p.cd = w.interval;
-  const base = Math.atan2(DIRS[p.face][1], DIRS[p.face][0]);
+  const base = p.aim;
   const mx = p.x + Math.cos(base) * 0.45;
   const my = p.y + Math.sin(base) * 0.45;
   const rays = [];
@@ -424,7 +472,13 @@ function updatePlayer(s, p, input, dt) {
   const dx = Math.sign(input.dx || 0);
   const dy = Math.sign(input.dy || 0);
   const dir = dirIndex(dx, dy);
-  if (dir >= 0) p.face = dir;
+  if (typeof input.aim === "number" && Number.isFinite(input.aim)) {
+    p.aim = input.aim;                                        // 마우스 조준: 걷는 방향과 따로
+    p.face = Math.round(((input.aim / (Math.PI / 4)) % 8 + 8) % 8) % 8;
+  } else if (dir >= 0) {
+    p.face = dir;
+    p.aim = Math.atan2(DIRS[dir][1], DIRS[dir][0]);
+  }
   if (dir >= 0 && !input.lock) {
     const len = Math.hypot(dx, dy);
     const v = (PLAYER_SPEED * (p.stun > 0 ? 0.35 : 1) * dt) / len;
@@ -608,7 +662,7 @@ export function snapshot(s, drain = true) {
     t: r2(s.t), lv: s.level, ph: s.phase, pt: r2(Math.max(0, s.phaseT)), sc: s.score, kl: s.kills, cb: s.combo, mu: s.mult,
     cbt: r2(Math.max(0, s.comboT) / COMBO_TIME), over: s.over ? 1 : 0, left: s.zLeft + s.zs.length + s.dLeft + s.devils.length,
     p: s.players.filter((p) => !p.gone).map((p) => ({
-      id: p.id, x: r2(p.x), y: r2(p.y), f: p.face, hp: Math.ceil(p.hp), w: p.weapon, a: p.alive ? 1 : 0, st: p.stun > 0 ? 1 : 0,
+      id: p.id, x: r2(p.x), y: r2(p.y), f: p.face, ang: r2(p.aim), hp: Math.ceil(p.hp), w: p.weapon, a: p.alive ? 1 : 0, st: p.stun > 0 ? 1 : 0,
       am: [p.ammo[1], p.ammo[2]], has: p.has.map((h) => (h ? 1 : 0)),
     })),
     z: s.zs.map((z) => [z.id, r2(z.x), r2(z.y), r2(z.face), r2(z.hp / z.max), z.stun > 0 ? 1 : 0]),

@@ -103,6 +103,8 @@ function hostTick(dtSec, now) {
   const myId = lobby.state.me.id;
   acc += dtSec;
   const mine = input.read();
+  const mouse = input.mouse();
+  if (mouse) mine.aim = hostView.aimAngle(mouse.x, mouse.y);
   const inputs = { [myId]: mine };
   for (const [id, r] of remote) inputs[id] = now - r.at > IDLE_INPUT ? {} : { ...r.input };
   let first = true;
@@ -138,8 +140,10 @@ function hostTick(dtSec, now) {
 function guestTick(now) {
   if (!session.playing) return;
   const cur = input.read();
-  const text = JSON.stringify([cur.dx, cur.dy, cur.fire, cur.lock]);
-  if (cur.weapon !== undefined || text !== lastInput.text || now - lastInput.at > INPUT_GAP) {
+  const mouse = input.mouse();
+  if (mouse) cur.aim = Math.round(view.aimAngle(mouse.x, mouse.y) * 30) / 30;       // 마우스 조준 (잘게 바뀌어도 너무 자주 안 보내려고 반올림)
+  const text = JSON.stringify([cur.dx, cur.dy, cur.fire, cur.lock, cur.aim]);
+  if (cur.weapon !== undefined || (text !== lastInput.text && now - lastInput.at > 33) || now - lastInput.at > INPUT_GAP) {
     lastInput = { text, at: now };
     lobby.send("input", { input: cur });
   }
@@ -156,7 +160,9 @@ function frame(now) {
       if (session.host && session.sim && !session.sim.over) hostTick(dt, now);
       else if (!session.host) guestTick(now);
     }
-    view.draw({ localId: lobby.state.me?.id, names: session?.names || {} });
+    const mouse = playing && session.playing ? input.mouse() : null;
+    board.style.cursor = mouse ? "none" : "crosshair";
+    view.draw({ localId: lobby.state.me?.id, names: session?.names || {}, cursor: mouse });
   } catch (err) {
     console.error(err);
   }

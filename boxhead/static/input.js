@@ -1,12 +1,14 @@
 // 박스헤드 입력: 키보드(WASD·방향키 8방향)와 폰 조이스틱·버튼을 하나의 값으로 모은다.
 //   const input = createInput({ board, onPause });  input.read() → { dx, dy, fire, lock, weapon? }
 // 대각선: W+A 같이 누르면 북서. Shift 를 누르고 있으면 걷지 않고 방향만 바꿈. 숫자 1~3, Q/E 로 무기 바꿈.
+// 마우스를 움직이면 마우스로 조준(걷는 방향과 따로), 스페이스·클릭 모두 그쪽으로 발사. 가만두면 이동 방향 조준으로 돌아옴.
 
 const MOVE = {
   KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1],
   KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
 };
 const FIRE = new Set(["Space", "KeyJ", "KeyK"]);
+const AIM_HOLD = 6000;                          // 마우스를 이 시간(ms) 안 움직이면 마우스 조준 끝
 
 export function createInput({ board, onPause = () => {}, weaponCount = 3 }) {
   const keys = new Set();
@@ -31,8 +33,24 @@ export function createInput({ board, onPause = () => {}, weaponCount = 3 }) {
     keys.clear();
     mouse = false;
   });
+  // 마우스 조준: 움직이면 켜지고, 오래 안 움직이면(또는 캔버스를 벗어나면) 이동 방향 조준으로 돌아감
+  const aim = { x: 0, y: 0, at: -1e9 };
+  board.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse") return;
+    const r = board.getBoundingClientRect();
+    aim.x = e.clientX - r.left;
+    aim.y = e.clientY - r.top;
+    aim.at = performance.now();
+  });
+  board.addEventListener("pointerleave", () => (aim.at = -1e9));
   board.addEventListener("mousedown", (e) => {
-    if (e.button === 0) mouse = true;
+    if (e.button === 0) {
+      mouse = true;
+      const r = board.getBoundingClientRect();
+      aim.x = e.clientX - r.left;
+      aim.y = e.clientY - r.top;
+      aim.at = performance.now();
+    }
   });
   window.addEventListener("mouseup", () => (mouse = false));
   board.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -119,6 +137,10 @@ export function createInput({ board, onPause = () => {}, weaponCount = 3 }) {
     },
     setCurrent(w) {
       current = w;
+    },
+    // 마우스 조준이 켜져 있으면 캔버스 안 좌표, 아니면 null
+    mouse() {
+      return performance.now() - aim.at < AIM_HOLD ? { x: aim.x, y: aim.y } : null;
     },
     reset() {
       keys.clear();
