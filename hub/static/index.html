@@ -137,6 +137,13 @@
     .crossy-art i.road::after { content: ""; position: absolute; left: 30px; top: 3px; width: 26px; height: 10px; background: #e8473f; border-radius: 2px; }
     .crossy-art i.river::after { content: ""; position: absolute; left: 70px; top: 3px; width: 48px; height: 10px; background: #9b6a3c; border-radius: 2px; }
     .crossy-art i.hen::after { content: ""; position: absolute; left: 68px; top: 1px; width: 14px; height: 14px; background: #fff; border-radius: 2px; box-shadow: 0 -4px 0 -3px #e23b3b; }
+    /* 박스헤드 카드 그림 */
+    .box-art { display: flex; gap: 14px; align-items: flex-end; }
+    .box-art b, .box-art i { display: block; width: 34px; height: 34px; position: relative; box-shadow: 0 8px 0 -2px #3b6fd8; }
+    .box-art b { background: #e8cfa4; border-top: 6px solid #3a2a1c; }
+    .box-art i { background: #78a857; border-top: 6px solid #4f7a3a; box-shadow: 0 8px 0 -2px #56634c; }
+    .box-art b::before, .box-art i::before { content: ""; position: absolute; left: 7px; top: 12px; width: 6px; height: 6px; background: #111; box-shadow: 14px 0 0 #111; }
+    .box-art i::before { background: #3a0a0a; box-shadow: 14px 0 0 #3a0a0a; }
     /* 홀덤 카드 그림 */
     .holdem-art { display: flex; gap: 6px; align-items: center; }
     .holdem-art b { width: 36px; height: 50px; display: grid; place-items: center; border-radius: 5px; background: #fbfaf5; color: #1b1d22; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,.25); transform: rotate(-6deg); }
@@ -290,6 +297,16 @@
       <span class="play">플레이 →</span>
     </a>
 
+    <a class="card" href="boxhead/">
+      <div class="art" aria-hidden="true">
+        <div class="box-art"><b></b><i></i><i></i></div>
+      </div>
+      <h2>박스헤드</h2>
+      <p>네모난 머리로 몰려오는 좀비와 악마를 권총·샷건·기관총으로 막아요. 혼자서 점수 경쟁, 2~4명 협동도 돼요!</p>
+      <div class="tags"><span>1~4명</span><span>슈팅</span><span>멀티플레이</span><span>모바일</span></div>
+      <span class="play">플레이 →</span>
+    </a>
+
     <a class="card" href="runner/">
       <div class="art" aria-hidden="true">
         <div class="gates-art"><b class="good">×2</b><b class="bad">-15</b></div>
@@ -337,6 +354,7 @@
     <div class="rank-games">
       <button type="button" data-board="crossy" data-unit="칸">길건너기</button>
       <button type="button" data-board="apple" data-unit="개">사과게임</button>
+      <button type="button" data-board="boxhead" data-unit="점">박스헤드</button>
       <button type="button" data-board="runner" data-unit="점">숫자러너</button>
       <button type="button" data-board="pacman-easy" data-unit="점">팩맨 쉬움</button>
       <button type="button" data-board="pacman-normal" data-unit="점">팩맨 보통</button>

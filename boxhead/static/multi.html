@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>박스헤드 같이 하기</title>
+  <link rel="stylesheet" href="static/multi.css?v=1">
+  <link rel="stylesheet" href="static/board.css?v=1">
+</head>
+<body>
+  <!-- 로그인 -->
+  <section id="screen-login" class="screen">
+    <div class="login-card">
+      <h1>박스헤드 <span>같이 하기</span></h1>
+      <p class="muted">2~4명이 함께 좀비를 막아요</p>
+      <form id="login-form">
+        <input id="login-name" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="off" required>
+        <button type="submit">입장</button>
+      </form>
+      <p id="login-error" class="error"></p>
+      <a class="hub-link" href="./">← 혼자 하기</a>
+    </div>
+  </section>
+
+  <!-- 로비 -->
+  <section id="screen-lobby" class="screen hidden">
+    <header class="topbar">
+      <a class="hub-link" href="../" title="게임 목록">← Ddan Jit</a>
+      <h2>로비</h2>
+      <span class="muted">접속: <b id="me-name"></b></span>
+    </header>
+    <div class="layout">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h3>방 목록</h3>
+          <button id="btn-open-create">방 만들기</button>
+        </div>
+        <form id="create-form" class="create-form hidden">
+          <input id="create-title" maxlength="30" placeholder="방 제목" autocomplete="off">
+          <label>인원
+            <select id="create-max">
+              <option>2</option><option>3</option><option selected>4</option>
+            </select>
+          </label>
+          <button type="submit">만들기</button>
+          <button type="button" id="btn-cancel-create" class="ghost">취소</button>
+        </form>
+        <ul id="room-list" class="room-list"></ul>
+      </div>
+      <div class="panel side">
+        <h3>접속자 <span id="user-count" class="muted"></span></h3>
+        <ul id="user-list" class="user-list"></ul>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="lobby-chat-log" class="chat-log"></ul>
+      <form id="lobby-chat-form" class="chat-form">
+        <input id="lobby-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 방 -->
+  <section id="screen-room" class="screen hidden">
+    <header class="topbar">
+      <h2 id="room-title"></h2>
+      <span id="room-info" class="muted"></span>
+      <button id="btn-leave" class="ghost">나가기</button>
+    </header>
+    <div class="room-layout">
+      <div class="panel room-game">
+        <!-- 대기 화면 -->
+        <div id="waiting-view">
+          <h3>게임 설정</h3>
+          <form id="settings-form" class="settings">
+            <label>난이도
+              <select name="difficulty">
+                <option value="0">하</option><option value="1">중</option><option value="2">상</option>
+              </select>
+            </label>
+            <label>최대 인원 <input type="number" name="max_players" min="2" max="4"></label>
+          </form>
+          <p class="muted">몰려오는 좀비와 악마를 함께 막아요. 점수와 탄약 상자는 같이 쓰고, 쓰러져도 다음 레벨에 다시 일어나요. 모두 쓰러지면 끝이에요. 방장 화면에서 계산하니 방장이 나가면 끝나요.</p>
+          <p id="settings-note" class="muted"></p>
+          <button id="btn-ready" class="big"></button>
+        </div>
+
+        <!-- 게임 화면 (끝난 뒤에는 마지막 판을 보여 줌) -->
+        <div id="game-view" class="hidden">
+          <div class="board-wrap">
+            <canvas id="board" aria-label="박스헤드 화면"></canvas>
+            <div id="touch" class="touch">
+              <div id="pad" class="pad"><i></i></div>
+              <button id="t-weapon" type="button" class="tbtn small">무기</button>
+              <button id="t-lock" type="button" class="tbtn small">방향 고정</button>
+              <button id="t-fire" type="button" class="tbtn big">발사</button>
+            </div>
+          </div>
+          <p id="coop-info" class="coop-info"></p>
+          <p class="coop-info">WASD·방향키: 이동 (대각선 가능) · 스페이스·클릭: 발사 · Shift: 방향만 바꾸기 · 1·2·3 / Q·E: 무기</p>
+        </div>
+      </div>
+      <div class="panel chat room-chat">
+        <h3>채팅</h3>
+        <ul id="room-chat-log" class="chat-log"></ul>
+        <form id="room-chat-form" class="chat-form">
+          <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+          <button type="submit">전송</button>
+        </form>
+      </div>
+      <!-- 하단 참가자 목록 -->
+      <div class="panel room-players">
+        <h3>참가자 <span class="muted">(방장이 계산해요)</span></h3>
+        <ul id="player-list" class="player-list"></ul>
+        <div id="spectator-box" class="hidden">
+          <h3>관전 <span id="spectator-count" class="muted"></span></h3>
+          <ul id="spectator-list" class="player-list"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 결과 -->
+  <div id="result-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="result-title">게임 결과</h3>
+      <ol id="result-list" class="result-list"></ol>
+      <button id="btn-close-result">확인</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="../common/lobby.js?v=banter"></script>
+  <script type="module" src="static/multi.js?v=1"></script>
+</body>
+</html>

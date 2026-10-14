@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>박스헤드</title>
+  <link rel="stylesheet" href="static/board.css?v=1">
+  <link rel="stylesheet" href="static/style.css?v=1">
+</head>
+<body>
+  <main class="game-shell">
+  <header>
+    <a href="../">← Ddan Jit</a>
+    <h1>박스헤드<span class="title-dot" aria-hidden="true"></span></h1>
+    <a class="mode-link" href="multi">👥 같이 하기 →</a>
+  </header>
+
+  <!-- 화면과 겹쳐 띄우는 시작·결과 창, 폰 조작 -->
+  <div class="board-wrap">
+    <canvas id="board" aria-label="박스헤드 화면"></canvas>
+    <div id="touch" class="touch">
+      <div id="pad" class="pad"><i></i></div>
+      <button id="t-weapon" type="button" class="tbtn small">무기</button>
+      <button id="t-lock" type="button" class="tbtn small">방향 고정</button>
+      <button id="t-fire" type="button" class="tbtn big">발사</button>
+    </div>
+    <div id="panel" class="panel">
+      <h2 id="panel-title">박스헤드</h2>
+      <p id="panel-text"></p>
+      <div id="lb" class="panel-lb"></div>
+      <button id="panel-btn" type="button">시작하기</button>
+    </div>
+  </div>
+
+  <p class="help">WASD·방향키: 이동 (W+A 처럼 같이 누르면 대각선) · 스페이스·클릭: 발사 · Shift: 걷지 않고 방향만 바꾸기 · 1·2·3 / Q·E: 무기 · Esc: 멈춤</p>
+  </main>
+
+  <script src="../common/leaderboard.js?v=1"></script>
+  <script type="module" src="static/solo.js?v=1"></script>
+</body>
+</html>

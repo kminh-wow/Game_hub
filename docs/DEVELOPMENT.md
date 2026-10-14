@@ -25,6 +25,7 @@ http://127.0.0.1:8000 을 여세요.
   - 사과게임 규칙: `node --test apple/tests/logic.test.mjs`
   - 행맨 게임 흐름: `cd hangman && pytest`
   - 홀덤 족보·진행: `cd holdem && pytest`
+  - 박스헤드 규칙: `node --test boxhead/tests/logic.test.mjs`, 중계: `cd boxhead && pytest`
 
 ## 구조
 
@@ -45,6 +46,7 @@ yacht/           요트 다이스 (FastAPI 앱: yacht/app/main.py)
 fortress/        포트리스 (FastAPI 앱: fortress/app/main.py)
 shooter/         턴제 FPS (FastAPI 앱: shooter/app/main.py)
 holdem/          홀덤     (FastAPI 앱: holdem/app/main.py)
+boxhead/         박스헤드 (FastAPI 앱: boxhead/app/main.py, 혼자 하기는 정적 파일 + 같이 하기는 중계)
 runner/          숫자러너 (FastAPI 앱: runner/app.py, 정적 파일만 제공)
 pingpong/        탁구     (FastAPI 앱: pingpong/app.py, 정적 파일만 제공)
 crossy/          길건너기 (FastAPI 앱: crossy/app.py, 정적 파일만 제공)
@@ -66,6 +68,7 @@ tests/           허브 통합 테스트
 | `/fortress/` | 포트리스 |
 | `/shooter/` | 턴제 FPS |
 | `/holdem/` | 홀덤 |
+| `/boxhead/` | 박스헤드 (`/boxhead/multi` 같이 하기) |
 | `/runner/` | 숫자러너 |
 | `/pingpong/` | 탁구 |
 | `/crossy/` | 길건너기 |
@@ -661,15 +664,46 @@ apple/
 
 ---
 
+## 박스헤드
+
+원작(Sean Cooper의 *Boxhead*)의 방식을 따른 탑다운 좀비 슈팅입니다. 그림은 외부 에셋 없이 캔버스로 직접 그린 상자 도형입니다. 혼자 하기와 같이 하기가 같은 규칙 코드를 씁니다.
+
+```
+boxhead/
+  app/
+    main.py     GameServer·앱 생성 (게임 메시지: input, snap, over), /multi 페이지
+    room.py     방 설정(난이도), 2~4명, 방 최고 점수
+    game.py     방장 중계: 참가자 입력 → 방장, 방장 화면 값(snap) → 나머지·관전자, 끝(over) 알림, 방장 나가면 끝
+  static/
+    index.html, solo.js   혼자 하기 (/boxhead/)
+    multi.html, multi.js  같이 하기 (/boxhead/multi): lobby.js + 방장 계산 루프
+    logic.js     규칙 (DOM 없음, 시드 난수, 1/60초 고정 간격)
+    render.js    캔버스 그리기: 비스듬한 탑다운, 네모 머리 사람, 핏자국·총알 줄·글자 효과, HUD
+    input.js     키보드(WASD 8방향·Shift·1~3·Q/E)와 폰 조이스틱·버튼
+    style.css, board.css, multi.css
+  tests/        logic.test.mjs(규칙), test_relay.py(중계)
+```
+
+- 좌표는 칸 단위, 아레나 24×16, 가운데 쪽 4개 블록(상자). `step(s, dt, inputs)`에 `{플레이어id: {dx, dy, fire, lock, weapon}}`을 넣으면 시간이 흐르고, `snapshot(s)`가 그리기용 값(작은 숫자 배열)과 사건(`shot`, `hit`, `kill`, `hurt`, `pickup`, `level`, `clear`, `over` …)을 돌려줍니다.
+- 방향은 dx·dy 부호로 8방향(`DIRS`, 0이 오른쪽에서 시계 방향). 눌러서 걷는 방향을 보고, `lock`(Shift)이면 걷지 않고 방향만 바꿉니다. 총은 보는 방향으로 즉시 맞는 광선(벽 뒤는 못 맞춤)입니다.
+- 무기: 권총(무한), 샷건(7발 퍼짐, 가까이서 셈), 기관총(빠르고 약함). 처음엔 권총뿐이고 탄약 상자(좀비 8%, 악마 100% 드롭, 레벨 클리어 때 보급 상자)를 먹으면 샷건 → 기관총 순으로 열리고 그다음부터는 탄약이 찹니다. 보급 상자는 체력도 가득 채웁니다.
+- 레벨: 좀비 → 다 잡으면 악마(2레벨부터) → 다 잡으면 클리어(보너스 500×레벨, 6초 쉼). 레벨마다 좀비가 늘고 빨라지고 단단해지며 사람이 많으면 더 많이 나옵니다(`levelInfo`). 연속 킬 3초 안에 이어 가면 4킬마다 점수 배율 +1(최대 30).
+- 좀비 이동: 사이에 벽이 없으면 곧장, 있으면 0.5칸 격자 거리표(`flowFor`, 플레이어마다 0.3초마다 다시 계산)를 따라 돌아옵니다. 악마는 시야가 트이면 거리를 두고 돌며 불덩이(0.55초 예고 뒤 발사)를 쏘고, 시야가 막히면 다가옵니다.
+- 같이 하기는 방장의 브라우저가 `logic.js`를 돌립니다. 서버는 시작할 때 `{host_id, players, seed, difficulty}`를 알려 주고 입력·화면 값만 전달합니다(`snap`은 20번/초, 크기 제한 있음). 참가자는 입력이 바뀔 때와 0.1초마다 입력을 보내고, 방장은 1.5초 넘게 입력이 없으면 가만히 서 있는 걸로 봅니다. 쓰러진 참가자는 다음 레벨 클리어 때 체력 60%로 일어납니다. 방장이 나가면 끝나고, 협동 점수는 서버가 검증하지 않아 순위표에 올리지 않습니다.
+- 순위표(`boxhead`, 혼자 하기만): 초당 3000점 + 1000점을 넘는 점수는 거릅니다.
+- 디버그: 콘솔에서 `__boxhead.game`(혼자 하기), `__boxhead.session.sim`(같이 하기 방장).
+
+---
+
 ## 순위표
 
-혼자 하는 점수 게임(길건너기, 사과게임, 숫자러너, 팩맨 난이도별)의 이번 주·전체 상위 10명입니다.
+혼자 하는 점수 게임(길건너기, 사과게임, 박스헤드, 숫자러너, 팩맨 난이도별)의 이번 주·전체 상위 10명입니다.
 
-- 서버: `hub/leaderboard.py`. `GET /api/leaderboard/{board}`는 `{all, week}`(이름별 최고 점수 상위 10), `POST /api/leaderboard/{board}` `{name, score, duration, token}`은 기록을 쌓고 이번 기록의 순위(`rank`, `week_rank`)와 목록을 돌려줍니다. 순위표 이름은 `crossy`, `apple`, `runner`, `pacman-easy|normal|midhigh|hard`입니다.
+- 서버: `hub/leaderboard.py`. `GET /api/leaderboard/{board}`는 `{all, week}`(이름별 최고 점수 상위 10), `POST /api/leaderboard/{board}` `{name, score, duration, token}`은 기록을 쌓고 이번 기록의 순위(`rank`, `week_rank`)와 목록을 돌려줍니다. 순위표 이름은 `crossy`, `apple`, `boxhead`, `runner`, `pacman-easy|normal|midhigh|hard`입니다.
 - 저장: SQLite 파일 `private/leaderboard.sqlite3`(git에 없음, 환경 변수 `LEADERBOARD_DB`로 바꿀 수 있음). `update.sh`의 `git reset`/`pull`은 이 파일을 건드리지 않습니다.
 - 이번 주: 한국 시간 월요일 0시부터.
-- 점수는 브라우저가 계산해서 보내므로 완벽히 막지는 못합니다. 걸린 시간에 비해 말이 안 되는 점수만 거릅니다(길건너기 초당 9.5칸, 사과게임 초당 20개·최대 170개, 숫자러너 초당 10m + 보스 보너스, 팩맨 초당 500점). 같은 곳에서 2초 안에 다시 올리면 거절합니다. 브라우저 식별값(`token`)도 같이 저장해 두어서, 나중에 이름을 브라우저에 묶을 수 있습니다.
-- 화면: `common/web/leaderboard.js`(`Leaderboard.submit`, `Leaderboard.mount`). 길건너기·사과게임·숫자러너는 시작·결과 창(`#lb`), 팩맨은 화면 아래 순위 칸, 허브 메인은 아래쪽 🏆 순위에 띄웁니다. 닉네임이 없으면 올리지 않고 안내만 합니다.
+- 점수는 브라우저가 계산해서 보내므로 완벽히 막지는 못합니다. 걸린 시간에 비해 말이 안 되는 점수만 거릅니다(길건너기 초당 9.5칸, 사과게임 초당 20개·최대 170개, 박스헤드 초당 3000점, 숫자러너 초당 10m + 보스 보너스, 팩맨 초당 500점). 같은 곳에서 2초 안에 다시 올리면 거절합니다. 브라우저 식별값(`token`)도 같이 저장해 두어서, 나중에 이름을 브라우저에 묶을 수 있습니다.
+- 화면: `common/web/leaderboard.js`(`Leaderboard.submit`, `Leaderboard.mount`). 길건너기·사과게임·박스헤드·숫자러너는 시작·결과 창(`#lb`), 팩맨은 화면 아래 순위 칸, 허브 메인은 아래쪽 🏆 순위에 띄웁니다. 닉네임이 없으면 올리지 않고 안내만 합니다.
 - 기록 지우기(서버): `sqlite3 private/leaderboard.sqlite3 "DELETE FROM scores WHERE name = '이름';"`
 - 검증: `pytest tests/test_leaderboard.py`
 

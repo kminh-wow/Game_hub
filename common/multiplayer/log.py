@@ -26,6 +26,7 @@ LABELS = {
     "Fortress": "포트리스",
     "Turn FPS": "턴제 FPS",
     "Holdem": "홀덤",
+    "Boxhead": "박스헤드",
 }
 
 

@@ -1,0 +1,16 @@
+/* 박스헤드 화면(캔버스)과 폰 조작 — 혼자 하기·같이 하기 공통 */
+/* 화면 */
+.board-wrap { position:relative; width:100%; height:clamp(320px,calc(100svh - 150px),680px); border:1px solid var(--line); border-radius:16px; overflow:hidden; background:#1b1c1f; box-shadow:var(--shadow); user-select:none; -webkit-user-select:none; touch-action:none; }
+canvas { display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+
+/* 폰 조작 (터치 화면에서만) */
+.touch { display:none; position:absolute; inset:0; pointer-events:none; }
+@media (pointer:coarse) { .touch.on { display:block; } }
+.pad { position:absolute; left:18px; bottom:18px; width:132px; height:132px; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(255,255,255,.28); pointer-events:auto; touch-action:none; display:grid; place-items:center; }
+.pad i { width:52px; height:52px; border-radius:50%; background:rgba(255,255,255,.4); display:block; }
+.tbtn { position:absolute; pointer-events:auto; touch-action:none; border:2px solid rgba(255,255,255,.4); background:rgba(0,0,0,.45); color:#fff; font:inherit; font-weight:800; border-radius:50%; -webkit-tap-highlight-color:transparent; }
+.tbtn.big { right:20px; bottom:26px; width:96px; height:96px; font-size:18px; background:rgba(200,50,40,.6); }
+.tbtn.small { width:64px; height:64px; font-size:12px; }
+#t-lock { right:128px; bottom:22px; }
+#t-weapon { right:26px; bottom:134px; }
+.tbtn.on { background:rgba(255,200,60,.7); color:#222; }
