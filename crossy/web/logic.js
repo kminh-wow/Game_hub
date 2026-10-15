@@ -42,7 +42,32 @@ export function pace(z) {
 
 // ---- 줄 만들기 ----
 
-function grassRow(s, z, safe = false) {
+// 한 줄에서 갈 수 있는 칸: 아래 줄에서 올라온 칸(from) 중 서 있을 수 있는 곳 + 그 줄 안에서 옆으로 이어진 칸
+// (풀밭은 나무가 없는 칸, 연잎 줄은 연잎, 통나무 줄·도로·철길은 어디든)
+function reachOf(row, from) {
+  const open = (x) => Math.abs(x) <= W && (row.type === "grass" ? !row.blocks.has(x) : row.type === "river" && row.speed === 0 ? row.pads.has(x) : true);
+  const cells = new Set([...from].filter(open));
+  const queue = [...cells];
+  for (let i = 0; i < queue.length; i++) {
+    for (const dx of [-1, 1]) {
+      const nx = queue[i] + dx;
+      if (!cells.has(nx) && open(nx)) {
+        cells.add(nx);
+        queue.push(nx);
+      }
+    }
+  }
+  return cells;
+}
+
+// 줄을 쌓고, 앞으로 갈 수 있는 칸(s.reach)을 갱신. 새 줄을 만들 때 이 값으로 길이 끊기지 않게 함
+function pushRow(s, row) {
+  s.rows.push(row);
+  s.reach = reachOf(row, s.reach);
+}
+
+// below: 바로 아래 줄. 연잎 줄이면 연잎 바로 위 칸은 열어 둔다 (나무로 막히면 연잎에서 못 나감)
+function grassRow(s, z, safe = false, below = null) {
   const r = s.rng;
   const blocks = new Set();
   for (let x = -SPAN; x <= SPAN; x++) {
@@ -52,7 +77,12 @@ function grassRow(s, z, safe = false) {
   }
   // 막힌 칸이 너무 많으면 몇 개 비우기 (걸을 칸은 늘 7칸 이상)
   const inside = [...blocks].filter((x) => Math.abs(x) <= W);
-  while (inside.length > 2) blocks.delete(inside.splice(r.int(0, inside.length - 1), 1)[0]);  const kinds = {};
+  while (inside.length > 2) blocks.delete(inside.splice(r.int(0, inside.length - 1), 1)[0]);
+  if (below?.type === "river" && below.speed === 0) for (const x of below.pads) blocks.delete(x);
+  // 아래에서 올라온 칸 중 막히지 않은 칸이 하나는 있어야 앞으로 갈 수 있음
+  const reach = [...s.reach];
+  if (reach.length && reach.every((x) => blocks.has(x))) blocks.delete(reach[r.int(0, reach.length - 1)]);
+  const kinds = {};
   for (const x of blocks) kinds[x] = r.next() < 0.75 ? "tree" : "rock";
   return { z, type: "grass", blocks, kinds, coins: coinsFor(s, blocks) };
 }
@@ -99,6 +129,9 @@ function riverRow(s, z, prev) {
     const pads = new Set();
     for (let x = -W; x <= W; x++) if (r.next() < 0.45) pads.add(x);
     if (pads.size < 2) pads.add(r.int(-W, W));
+    // 아래 줄에서 갈 수 있는 칸 위에 연잎이 하나는 있어야 올라설 수 있음
+    const entry = [...s.reach];
+    if (entry.length && !entry.some((x) => pads.has(x))) pads.add(entry[r.int(0, entry.length - 1)]);
     return { z, type: "river", pads, logs: [], dir: 1, speed: 0, coins: new Set() };
   }
   const dir = prev.type === "river" && prev.speed ? -prev.dir : r.next() < 0.5 ? 1 : -1;     // 이어진 강은 번갈아
@@ -107,27 +140,27 @@ function riverRow(s, z, prev) {
 }
 
 // 다음 묶음 (풀밭 사이에 도로·철길·강 묶음)
-function nextChunk(s) {
+export function nextChunk(s) {
   const r = s.rng;
   const z = s.rows.length ? s.rows[s.rows.length - 1].z + 1 : 0;
   const p = pace(z);
   const prev = s.rows[s.rows.length - 1];
   if (prev.type !== "grass") {
-    for (let i = r.int(1, 2); i > 0; i--) s.rows.push(grassRow(s, s.rows[s.rows.length - 1].z + 1));
+    for (let i = r.int(1, 2); i > 0; i--) pushRow(s, grassRow(s, s.rows[s.rows.length - 1].z + 1, false, s.rows[s.rows.length - 1]));
     return;
   }
   const roll = r.next();
   if (roll < 0.45) {
     const n = r.int(1, Math.min(5, 2 + Math.floor(p * 1.5)));
-    for (let i = 0; i < n; i++) s.rows.push(roadRow(s, z + i));
+    for (let i = 0; i < n; i++) pushRow(s, roadRow(s, z + i));
   } else if (roll < 0.62 && z > 6) {
     const n = r.int(1, p > 1.4 ? 2 : 1);
-    for (let i = 0; i < n; i++) s.rows.push(railRow(s, z + i));
+    for (let i = 0; i < n; i++) pushRow(s, railRow(s, z + i));
   } else if (z > 4) {
     const n = r.int(1, Math.min(4, 1 + Math.floor(p * 1.5)));
-    for (let i = 0; i < n; i++) s.rows.push(riverRow(s, z + i, s.rows[s.rows.length - 1]));
+    for (let i = 0; i < n; i++) pushRow(s, riverRow(s, z + i, s.rows[s.rows.length - 1]));
   } else {
-    s.rows.push(grassRow(s, z));
+    pushRow(s, grassRow(s, z));
   }
 }
 
@@ -145,8 +178,9 @@ export function createGame(seed = Date.now()) {
     fromX: 0, fromZ: 0,               // 이번 뛰기를 시작한 자리 (뛰는 동안 판정용)
     hop: 0, queue: null, facing: "up", started: false,
     edge: -EDGE_LAG, over: false, cause: null, log: null,
+    reach: new Set(Array.from({ length: 2 * W + 1 }, (_, i) => i - W)),   // 지금 줄에서 갈 수 있는 칸
   };
-  for (let z = -8; z <= 3; z++) s.rows.push(grassRow(s, z, z >= -1));   // 출발점 근처는 비워 둠
+  for (let z = -8; z <= 3; z++) pushRow(s, grassRow(s, z, z >= -1));   // 출발점 근처는 비워 둠
   while (s.rows[s.rows.length - 1].z < AHEAD) nextChunk(s);
   return s;
 }

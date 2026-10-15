@@ -1,7 +1,7 @@
 // 실행: node --test crossy/tests/logic.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BACK_LIMIT, HOP_TIME, W, createGame, move, rowAt, step, traffic } from "../web/logic.js";
+import { BACK_LIMIT, HOP_TIME, W, createGame, move, nextChunk, rowAt, step, traffic } from "../web/logic.js";
 
 function run(s, seconds) {
   const events = [];
@@ -165,4 +165,31 @@ test("뛰는 중에는 화면에 보이는 자리로 판정 (앞 절반은 떠�
   };
   assert.equal(outcome(0.02), "train");          // 화면에선 아직 철길 위
   assert.notEqual(outcome(0.1), "train");        // 이미 반 넘게 뛰어 나감
+});
+
+test("아무리 멀리 가도 앞으로 갈 길이 늘 있다 (연잎·나무로 막히는 곳 없음)", () => {
+  // 움직이는 차·통나무는 지나갈 수 있다고 보고, 멈춰 있는 나무·연잎만으로 앞으로 이어지는 길이 있는지 본다
+  const far = 700;
+  for (let seed = 1; seed <= 300; seed++) {
+    const s = createGame(seed);
+    while (s.rows[s.rows.length - 1].z < far) nextChunk(s);
+    const open = (row, x) => Math.abs(x) <= W && (row.type === "grass" ? !row.blocks.has(x) : row.type === "river" && row.speed === 0 ? row.pads.has(x) : true);
+    let cells = new Set([0]);
+    for (let z = 0; z < far; z++) {
+      const row = rowAt(s, z);
+      const queue = [...cells];
+      for (let i = 0; i < queue.length; i++) {
+        for (const dx of [-1, 1]) {
+          const nx = queue[i] + dx;
+          if (!cells.has(nx) && open(row, nx)) {
+            cells.add(nx);
+            queue.push(nx);
+          }
+        }
+      }
+      const next = rowAt(s, z + 1);
+      cells = new Set([...cells].filter((x) => open(next, x)));
+      assert.ok(cells.size > 0, `시드 ${seed} 의 ${z + 1}번째 줄(${next.type})에서 길이 막힘`);
+    }
+  }
 });
