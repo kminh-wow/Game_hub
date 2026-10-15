@@ -16,6 +16,14 @@ HIGH, PAIR, TWO_PAIR, TRIPS, STRAIGHT, FLUSH, FULL_HOUSE, QUADS, STRAIGHT_FLUSH 
 HAND_NAMES = ["하이카드", "원페어", "투페어", "트리플", "스트레이트", "플러시", "풀하우스", "포카드", "스트레이트 플러시"]
 
 
+SUIT_SYMBOLS = {"s": "♠", "h": "♥", "d": "♦", "c": "♣"}
+
+
+# 카드 글자 (채팅 기록용): ["Ts", "Kd"] → "10♠ K♦"
+def cards_text(cards: list[str]) -> str:
+    return " ".join(("10" if c[0] == "T" else c[0]) + SUIT_SYMBOLS[c[1]] for c in cards)
+
+
 def new_deck() -> list[str]:
     return [r + s for s in SUITS for r in RANKS]
 

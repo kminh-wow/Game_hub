@@ -224,3 +224,43 @@ def test_leave_mid_hand():
         assert room.over and room.over["winner"]["id"] == "B"
         assert g.seats[1].chips == 1000 + 20           # 걸린 칩(B 10 + C 20)을 가져감
     asyncio.run(main())
+
+
+def test_result_tells_who_won_with_which_cards():
+    top = ["As", "Ad", "Ks", "Kd", "Qs", "Qd", "5c", "2h", "3h", "4c", "6c", "8d", "7c", "9s"]
+
+    async def main():
+        room, g = await new_game(3, top=top)
+        A, B, C = (s.player for s in g.seats)
+        game_mod.SHOWDOWN_PAUSE = 60
+        await g.act(A, "raise", 60)
+        await g.act(B, "call", 0)
+        await g.act(C, "call", 0)
+        await settle()
+        while g.turn is not None:
+            await g.act(cur(g), "check", 0)
+            await settle()
+        win, *rest = g.results
+        assert win["id"] == "A" and win["hand"] == "원페어" and win["amount"] == 180
+        assert win["hole"] == ["As", "Ad"]                                 # 이긴 사람의 손패
+        assert set(win["best"]) >= {"As", "Ad"} and len(win["best"]) == 5  # 쓴 5장에 손패가 들어 있음
+        assert {r["id"] for r in rest} == {"B", "C"} and all(r["amount"] == 0 and r["hole"] for r in rest)   # 진 사람의 패도 보임
+        text = [t for t in room.texts if "가져갔어요" in t][-1]
+        assert "1번째 판" in text and "A♠" in text and "A♦" in text      # 채팅 기록에 판 번호와 카드가 남음
+        await g.finish()
+    asyncio.run(main())
+
+
+def test_fold_win_result_has_no_cards():
+    async def main():
+        room, g = await new_game(3)
+        A, B, C = (s.player for s in g.seats)
+        game_mod.FOLD_WIN_PAUSE = 60
+        await g.act(A, "fold", 0)
+        await g.act(B, "fold", 0)
+        await settle()
+        assert len(g.results) == 1 and g.results[0]["id"] == "C" and g.results[0]["fold"] is True
+        assert "best" not in g.results[0] and "hole" not in g.results[0]    # 폴드로 이기면 카드를 공개하지 않음
+        assert any("모두 폴드" in t and "1번째 판" in t for t in room.texts)
+        await g.finish()
+    asyncio.run(main())

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>홀덤</title>
-  <link rel="stylesheet" href="static/style.css?v=2">
+  <link rel="stylesheet" href="static/style.css?v=3">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/build/three.module.js","three/addons/":"./static/vendor/three/examples/jsm/"}}</script>
 </head>
 <body>
@@ -103,6 +103,12 @@
               <button id="btn-view" type="button" class="mini">🔭 위에서 보기</button>
             </div>
             <div id="table-msg" class="table-msg"></div>
+            <!-- 한 판이 끝나면 누가 어떤 카드로 이겼는지 -->
+            <div id="round-result" class="round-result hidden">
+              <div class="rr-head"><b id="rr-title"></b><button id="rr-close" type="button" aria-label="닫기">✕</button></div>
+              <div id="rr-rows"></div>
+              <p id="rr-note" class="rr-note"></p>
+            </div>
           </div>
           <!-- 내 차례 조작 -->
           <div id="action-bar" class="action-bar">
@@ -165,6 +171,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="../common/lobby.js?v=banter"></script>
-  <script type="module" src="static/app.js?v=2"></script>
+  <script type="module" src="static/app.js?v=4"></script>
 </body>
 </html>

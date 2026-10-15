@@ -371,9 +371,10 @@ export async function createTable(host) {
       if (pot) pot.position.copy(potSpot);
     }
 
-    // 내 족보를 만드는 카드 빛내기
-    const key = new Set(g.me?.key || []);
-    for (const [card, mat] of faceMats) mat.emissive.setHex(key.has(card) ? 0x5a4300 : 0x000000);
+    // 카드 빛내기: 판이 끝나면 이긴 사람의 5장(바닥·손패 모두), 아니면 내 족보를 만드는 카드
+    const winners = (g.results || []).filter((r) => r.amount > 0 && r.best);
+    const key = new Set(winners.length ? winners.flatMap((r) => r.best) : g.me?.key || []);
+    for (const [card, mat] of faceMats) mat.emissive.setHex(key.has(card) ? (winners.length ? 0x8a6a00 : 0x5a4300) : 0x000000);
 
     // 딜러 버튼·차례 표시
     const dk = order.findIndex((s) => s.dealer);

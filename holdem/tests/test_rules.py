@@ -59,3 +59,8 @@ def test_split_pots():
     assert pots == [(350, ["A", "B", "C"]), (400, ["B", "C"]), (200, ["C"])]
     assert sum(p for p, _ in pots) == 950
     assert split_pots({"A": 40, "B": 40, "C": 20}, {"A", "B"}) == [(100, ["A", "B"])]
+
+
+def test_cards_text():
+    from app.rules import cards_text
+    assert cards_text(["Ts", "Kd", "2h", "Ac"]) == "10♠ K♦ 2♥ A♣"

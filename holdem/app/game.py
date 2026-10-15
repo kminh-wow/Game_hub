@@ -11,7 +11,7 @@ import secrets
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from .rules import best_hand, hand_name, made_info, new_deck, sort_five, split_pots
+from .rules import best_hand, cards_text, hand_name, made_info, new_deck, sort_five, split_pots
 
 if TYPE_CHECKING:
     from common.multiplayer import Player
@@ -23,8 +23,8 @@ BLIND_LEVELS = [(10, 20), (15, 30), (25, 50), (50, 100), (75, 150), (100, 200), 
                 (3000, 6000), (5000, 10000)]
 STREET_DELAY = 0.9        # 베팅이 끝나고 다음 카드까지(초)
 RUNOUT_DELAY = 1.4        # 모두 올인일 때 카드 한 장씩 펼치는 간격
-SHOWDOWN_PAUSE = 5.0      # 쇼다운 결과 보여 주는 시간
-FOLD_WIN_PAUSE = 2.5      # 다 폴드해서 끝났을 때
+SHOWDOWN_PAUSE = 8.0      # 쇼다운 결과 보여 주는 시간 (누가 어떤 카드로 이겼는지 읽을 시간)
+FOLD_WIN_PAUSE = 3.5      # 다 폴드해서 끝났을 때
 AWAY_TIME = 4             # 자리 비움이면 이 시간 뒤 자동 체크·폴드
 STREETS = ["preflop", "flop", "turn", "river"]
 STREET_NAMES = {"preflop": "프리플랍", "flop": "플랍", "turn": "턴", "river": "리버", "showdown": "쇼다운"}
@@ -372,8 +372,8 @@ class Game:
         self.turn = None
         won = self.pot
         seat.chips += won
-        self.results = [{"id": seat.id, "name": seat.player.name, "amount": won, "hand": None}]
-        await self.room.system(f"{seat.player.name}님이 {won:,} 칩을 가져갔어요.")
+        self.results = [{"id": seat.id, "name": seat.player.name, "amount": won, "hand": None, "fold": True}]
+        await self.room.system(f"[{self.hand_no}번째 판] 다른 사람이 모두 폴드해서 {seat.player.name}님이 {won:,} 칩을 가져갔어요.")
         self._clear_bets()
         self._run(self._after_hand(FOLD_WIN_PAUSE))
         await self.broadcast_state()
@@ -408,11 +408,12 @@ class Game:
             amount = won.get(s.id, 0)
             s.chips += amount
             s.last = hand_name(value)
-            self.results.append({"id": s.id, "name": s.player.name, "amount": amount, "hand": hand_name(value), "best": sort_five(five)})
+            self.results.append({"id": s.id, "name": s.player.name, "amount": amount, "hand": hand_name(value),
+                                 "best": sort_five(five), "hole": list(s.cards)})
         self.results.sort(key=lambda r: -r["amount"])
         for r in self.results:
             if r["amount"]:
-                await self.room.system(f"{r['name']}님이 {r['hand']}(으)로 {r['amount']:,} 칩을 가져갔어요.")
+                await self.room.system(f"[{self.hand_no}번째 판] {r['name']}님이 {r['hand']}({cards_text(r['best'])})로 {r['amount']:,} 칩을 가져갔어요.")
         self._clear_bets()
         self._run(self._after_hand(SHOWDOWN_PAUSE))
         await self.broadcast_state()

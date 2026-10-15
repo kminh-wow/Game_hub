@@ -1,6 +1,6 @@
 // 홀덤 화면. 로그인·로비·대기실·채팅은 공통 로비(../common/lobby.js)가 맡고,
 // 여기서는 3D 테이블(table3d.js) 위에 이름표·베팅 칩 금액·조작 버튼·족보를 얹는다.
-import { createTable } from "./table3d.js?v=2";
+import { createTable } from "./table3d.js?v=3";
 
 const $ = (sel) => document.querySelector(sel);
 const fmt = (n) => Number(n || 0).toLocaleString();
@@ -63,7 +63,7 @@ const lobby = GameLobby.init({
 
 function cardChip(card, key = null) {
   const rank = card[0] === "T" ? "10" : card[0];
-  const cls = ["pc", "hd".includes(card[1]) && "red", key?.includes(card) && "key"].filter(Boolean).join(" ");
+  const cls = ["pc", "hd".includes(card[1]) && "red", Array.isArray(key) && key.includes(card) && "key"].filter(Boolean).join(" ");
   return lobby.el("span", { className: cls, textContent: rank + SUIT[card[1]] });
 }
 
@@ -102,7 +102,7 @@ function renderLabels(g) {
       el("div", { className: "nm" }, el("b", { textContent: s.name }), badges ? el("i", { textContent: badges }) : ""),
       el("div", { className: "ch", textContent: `${fmt(s.chips)}` }),
       s.last || state ? el("div", { className: "la", textContent: [s.last, state].filter(Boolean).join(" · ") }) : "",
-      s.cards && !lobby.isMe(s.id) ? el("div", { className: "cards" }, ...s.cards.map(cardChip)) : "",
+      s.cards && !lobby.isMe(s.id) ? el("div", { className: "cards" }, ...s.cards.map((c) => cardChip(c))) : "",
       g.turn_id === s.id ? el("div", { className: "tbar" }, el("div", { className: "tfill" })) : "");
     tag.dataset.k = k;
     nodes.push(tag);
@@ -138,16 +138,41 @@ function renderInfo(g, room) {
   const next = g.next_blinds ? ` · ${g.hands_to_next}판 뒤 ${fmt(g.next_blinds[0])}/${fmt(g.next_blinds[1])}` : "";
   $("#table-info").textContent = `${g.hand_no}번째 판 · ${g.street_name || ""} · 블라인드 ${fmt(g.blinds[0])}/${fmt(g.blinds[1])}${next}`;
   const msg = $("#table-msg");
-  const win = (g.results || []).filter((r) => r.amount > 0);
   if (!room.playing && g.finished) {
     const w = g.seats.find((s) => s.id === g.winner_id);
     msg.textContent = w ? `🏆 ${w.name} 우승!` : "게임 끝";
-  } else if (win.length) {
-    msg.replaceChildren(...win.map((r) => lobby.el("div", {},
-      lobby.el("b", { textContent: r.name }), ` ${r.hand ? r.hand + "(으)로 " : ""}+${fmt(r.amount)}`,
-      ...(r.best ? [" ", ...r.best.map(cardChip)] : []))));
   } else msg.textContent = "";
   msg.classList.toggle("on", !!msg.textContent);
+  renderRoundResult(g);
+}
+
+// 한 판 결과: 이긴 사람·족보·그 5장(손패에서 쓴 카드는 노란 테두리), 진 사람의 패도 같이
+let closedHand = 0;
+function renderRoundResult(g) {
+  const box = $("#round-result");
+  const results = g.results || [];
+  if (!results.length || closedHand === g.hand_no) {
+    box.classList.add("hidden");
+    return;
+  }
+  const el = lobby.el;
+  const showdown = results.some((r) => r.best);
+  $("#rr-title").textContent = `${g.hand_no}번째 판 결과${showdown ? " · 쇼다운" : ""}`;
+  $("#rr-rows").replaceChildren(...results.map((r) => {
+    const won = r.amount > 0;
+    const mine = lobby.isMe(r.id);
+    const head = el("div", { className: "rr-who" },
+      el("b", { textContent: `${won ? "🏆 " : ""}${r.name}${mine ? " (나)" : ""}` }),
+      r.hand ? el("span", { className: "rr-hand", textContent: r.hand }) : el("span", { className: "rr-hand", textContent: "다른 사람이 모두 폴드" }),
+      won ? el("span", { className: "rr-gain", textContent: `+${fmt(r.amount)}` }) : "");
+    if (!r.best) return el("div", { className: "rr-row win" }, head);
+    const hole = r.hole || [];
+    return el("div", { className: `rr-row ${won ? "win" : "lose"}` }, head,
+      el("div", { className: "rr-cards" }, ...r.best.map((c) => cardChip(c, hole)),
+        el("span", { className: "rr-hole", textContent: "손패" }), ...(r.hole || []).map((c) => cardChip(c))));
+  }));
+  $("#rr-note").textContent = showdown ? "노란 테두리 = 손패에서 쓴 카드, 나머지는 바닥 카드예요." : "";
+  box.classList.remove("hidden");
 }
 
 // 조작 버튼 (내 차례일 때만)
@@ -254,6 +279,10 @@ document.querySelector(".quick").onclick = (e) => {
   const potAfterCall = g.pot + opts.to_call;
   const to = { min: opts.min_to, half: myBet + opts.to_call + potAfterCall / 2, pot: myBet + opts.to_call + potAfterCall, all: opts.max_to }[q];
   setRaise(to);
+};
+$("#rr-close").onclick = () => {
+  closedHand = lobby.state.game?.hand_no || 0;
+  $("#round-result").classList.add("hidden");
 };
 $("#btn-hands").onclick = () => toggleHands($("#hands-side").classList.contains("closed"));
 $("#btn-view").onclick = () => {

@@ -242,6 +242,23 @@ button.mini { padding: 5px 10px; font-size: 12px; background: rgba(0,0,0,.55); c
 .table-msg.on { opacity: 1; }
 .table-msg div + div { margin-top: 4px; }
 
+/* 한 판 결과 */
+.round-result { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); width: min(560px, calc(100% - 20px)); max-height: calc(100% - 100px); overflow-y: auto; padding: 10px 12px; border-radius: 12px; background: rgba(12,18,18,.93); color: #f3f1e8; box-shadow: 0 6px 24px rgba(0,0,0,.5); z-index: 4; }
+.rr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 15px; }
+.rr-head button { padding: 2px 8px; background: transparent; border: 1px solid rgba(255,255,255,.3); color: #f3f1e8; font-size: 12px; }
+.rr-row { padding: 7px 8px; border-radius: 8px; margin-top: 5px; background: rgba(255,255,255,.06); }
+.rr-row.win { background: rgba(255,214,103,.16); outline: 1px solid #ffd667; }
+.rr-row.lose { opacity: .72; }
+.rr-who { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.rr-who b { font-size: 14px; }
+.rr-hand { color: #b9d7c4; font-size: 13px; font-weight: 700; }
+.rr-gain { margin-left: auto; color: #8fe38f; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rr-cards { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 5px; }
+.rr-cards .pc { font-size: 14px; min-width: 34px; padding: 2px 5px; }
+.rr-hole { margin-left: 10px; color: #b9d7c4; font-size: 11px; }
+.rr-note { margin: 6px 0 0; color: #b9d7c4; font-size: 11px; }
+@media (max-width: 600px) { .round-result { top: 36px; padding: 8px; } .rr-cards .pc { font-size: 12px; min-width: 28px; } }
+
 /* 족보 (게임 화면 왼쪽 칸, 펼치기·접기) */
 .hands-side { width: 260px; align-self: start; display: flex; flex-direction: column; gap: 8px; padding: 10px; max-height: calc(100svh - 120px); }
 .hands-side.closed { width: auto; }
