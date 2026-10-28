@@ -26,6 +26,7 @@ http://127.0.0.1:8000 을 여세요.
   - 행맨 게임 흐름: `cd hangman && pytest`
   - 홀덤 족보·진행: `cd holdem && pytest`
   - 섯다 족보·진행: `cd seotda && pytest`
+  - 고스톱 점수·진행·AI: `cd gostop && pytest`
   - 박스헤드 규칙: `node --test boxhead/tests/logic.test.mjs`, 중계: `cd boxhead && pytest`
 
 ## 구조
@@ -47,6 +48,7 @@ yacht/           요트 다이스 (FastAPI 앱: yacht/app/main.py)
 fortress/        포트리스 (FastAPI 앱: fortress/app/main.py)
 shooter/         턴제 FPS (FastAPI 앱: shooter/app/main.py)
 holdem/          홀덤     (FastAPI 앱: holdem/app/main.py)
+gostop/          고스톱   (FastAPI 앱: gostop/app/main.py)
 seotda/          섯다     (FastAPI 앱: seotda/app/main.py)
 boxhead/         박스헤드 (FastAPI 앱: boxhead/app/main.py, 혼자 하기는 정적 파일 + 같이 하기는 중계)
 runner/          숫자러너 (FastAPI 앱: runner/app.py, 정적 파일만 제공)
@@ -70,6 +72,7 @@ tests/           허브 통합 테스트
 | `/fortress/` | 포트리스 |
 | `/shooter/` | 턴제 FPS |
 | `/holdem/` | 홀덤 |
+| `/gostop/` | 고스톱 |
 | `/seotda/` | 섯다 |
 | `/boxhead/` | 박스헤드 (`/boxhead/multi` 같이 하기) |
 | `/runner/` | 숫자러너 |
@@ -668,6 +671,29 @@ apple/
 - 세로 화면에서는 판을 돌려 10×17로 그립니다. 네모는 돌려도 네모라 규칙은 같습니다.
 - "연한 색 사과" 설정과 최고 기록은 브라우저에 저장합니다. 순위표 이름은 `apple`입니다.
 - 디버그: 브라우저 콘솔에서 `__apple.game`, `__apple.view`.
+
+---
+
+## 고스톱
+
+```
+gostop/
+  app/
+    main.py     GameServer·앱 생성 (게임 메시지: play {card, target, shake, bomb}, gostop {go})
+    room.py     방 설정(방식 2/3명, 시작 칩, 점당 칩, 판 수, 시간), 사람 1~3명, 1등 횟수
+    game.py     진행: 나눠 주기·총통, 내기·뒤집기(쪽·뻑·따닥·쓸·뻑 먹기·폭탄·흔들기), 고·스톱, 정산, 나가리, AI 자리
+    rules.py    카드("3a": 월 + a~d, 종류는 KINDS), 점수(광·열끗·고도리·띠·단·피, 국진 자동), 고 점수, 박
+    ai.py       낼 카드(먹을 패 값어치, 폭탄·흔들기 우선), 고·스톱(손패·상대 점수로)
+  static/       index.html, style.css, app.js (lobby.js + 2D 판, 화투 그림은 common/web/hwatu.js)
+  tests/        test_rules.py(점수·박), test_game.py(특수 상황·정산·나가리·총통·AI 대신·AI끼리 여러 판)
+```
+
+- 자리: 사람(섞어서) + 모자란 만큼 AI(`Bot`, 메시지를 받지 않는 가짜 Player). 맞고는 10장·바닥 8장·더미 20장, 3인은 7장·바닥 6장·더미 21장이라 손패와 더미가 함께 끝납니다. 바닥에 같은 월 4장이면 다시 나눕니다.
+- 한 차례(`_do_turn`): 손패 1장(폭탄이면 3장)을 내고 더미 1장을 뒤집습니다. 낸 카드가 바닥 1장과 짝이고 뒤집은 카드가 같은 월이면 뻑(세 장이 바닥에 남음), 바닥 2장과 짝이고 뒤집은 카드가 같은 월이면 따닥(4장), 짝이 없어 내려놓은 카드와 뒤집은 카드가 같은 월이면 쪽, 바닥에 쌓인 3장을 마저 먹으면 뻑 먹기, 차례가 끝나고 바닥이 비면 쓸. 쪽·따닥·쓸·뻑 먹기·폭탄은 다른 사람 모두에게서 피 1장(일반 피 먼저)을 가져옵니다. 바닥 두 장 중 고르기는 사람이면 `target`, 뒤집은 카드·AI는 값어치 높은 쪽.
+- 점수가 기준(맞고 7점, 3인 3점) 이상이고 지난번 고보다 오르면 고·스톱을 묻습니다(마지막 차례면 바로 스톱). 아무도 못 나고 손패가 다 떨어지면 나가리(다음 판 ×2, 이어지면 계속 2배).
+- 정산(`_settle`): 점수(고 반영 `go_points`) × 2^(흔들기+폭탄) × 나가리 배수 × 2^(박 수) × 점당 칩을 진 사람마다. 3인에서 고 했던 사람이 지면 고박으로 혼자 다 내고, 맞고는 고박 ×2. 가진 칩보다 많이는 못 냅니다. 이긴 사람이 다음 판 선.
+- 시간 초과는 AI 와 같은 방식으로 대신 두고 자리 비움(4초)으로 바뀝니다. 게임 중에 나가면 그 자리를 AI 가 이어서 하고, 사람이 아무도 없으면 끝납니다.
+- 검증: `cd gostop && pytest` (AI끼리 30게임을 끝까지 돌리며 칩 합계와 48장 유지 확인)
 
 ---
 

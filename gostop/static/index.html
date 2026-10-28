@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>고스톱</title>
+  <link rel="stylesheet" href="static/style.css?v=1">
+</head>
+<body>
+  <!-- 로그인 -->
+  <section id="screen-login" class="screen">
+    <div class="login-card">
+      <h1>고스톱 <span>화투</span></h1>
+      <p class="muted">혼자 AI와 맞고, 친구와 3인 고스톱</p>
+      <form id="login-form">
+        <input id="login-name" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="off" required>
+        <button type="submit">입장</button>
+      </form>
+      <p id="login-error" class="error"></p>
+      <a class="hub-link" href="../">← 다른 게임 고르기</a>
+    </div>
+  </section>
+
+  <!-- 로비 -->
+  <section id="screen-lobby" class="screen hidden">
+    <header class="topbar">
+      <a class="hub-link" href="../" title="게임 목록">← Ddan Jit</a>
+      <h2>로비</h2>
+      <span class="muted">접속: <b id="me-name"></b></span>
+    </header>
+    <div class="layout">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h3>방 목록</h3>
+          <button id="btn-open-create">방 만들기</button>
+        </div>
+        <form id="create-form" class="create-form hidden">
+          <input id="create-title" maxlength="30" placeholder="방 제목" autocomplete="off">
+          <label>사람 수
+            <select id="create-max">
+              <option>1</option><option>2</option><option selected>3</option>
+            </select>
+          </label>
+          <button type="submit">만들기</button>
+          <button type="button" id="btn-cancel-create" class="ghost">취소</button>
+        </form>
+        <ul id="room-list" class="room-list"></ul>
+      </div>
+      <div class="panel side">
+        <h3>접속자 <span id="user-count" class="muted"></span></h3>
+        <ul id="user-list" class="user-list"></ul>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="lobby-chat-log" class="chat-log"></ul>
+      <form id="lobby-chat-form" class="chat-form">
+        <input id="lobby-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 방 -->
+  <section id="screen-room" class="screen hidden">
+    <header class="topbar">
+      <h2 id="room-title"></h2>
+      <span id="room-info" class="muted"></span>
+      <button id="btn-leave" class="ghost">나가기</button>
+    </header>
+    <div class="room-layout">
+      <div class="panel room-game">
+        <!-- 대기 화면 -->
+        <div id="waiting-view">
+          <h3>게임 설정</h3>
+          <form id="settings-form" class="settings">
+            <label>방식
+              <select name="size">
+                <option value="2">맞고 (2명 · 7점)</option>
+                <option value="3">고스톱 (3명 · 3점)</option>
+              </select>
+            </label>
+            <label>시작 칩 <input type="number" name="start_chips" min="1000" max="100000" step="1000"></label>
+            <label>점당 칩 <input type="number" name="point_value" min="10" max="1000" step="10"></label>
+            <label>판 수 (0 = 칩이 떨어질 때까지) <input type="number" name="max_rounds" min="0" max="50"></label>
+            <label>한 번 내는 시간(초) <input type="number" name="turn_time" min="10" max="60" step="5"></label>
+            <label>사람 최대 <input type="number" name="max_players" min="1" max="3"></label>
+          </form>
+          <p class="muted">사람이 모자라면 AI가 자리를 채워요. 혼자 시작하면 AI와 해요. 쪽·뻑·따닥·쓸·폭탄·흔들기·총통, 피박·광박·멍박·고박, 나가리까지 들어 있어요. 게임 칩만 써요.</p>
+          <p id="settings-note" class="muted"></p>
+          <button id="btn-ready" class="big"></button>
+        </div>
+
+        <!-- 게임 화면 -->
+        <div id="game-view" class="hidden">
+          <div class="felt gs">
+            <div id="table-info" class="table-info"></div>
+            <div id="opponents" class="opponents"></div>
+            <div class="floor-area">
+              <div class="pile"><div id="pile-card" class="card"></div><b id="pile-count"></b></div>
+              <div id="floor" class="floor"></div>
+            </div>
+            <div id="banner" class="banner"></div>
+            <!-- 고르기·고스톱 -->
+            <div id="prompt" class="prompt hidden">
+              <p id="prompt-text"></p>
+              <div id="prompt-buttons" class="prompt-buttons"></div>
+            </div>
+            <!-- 판 결과 -->
+            <div id="round-result" class="round-result hidden">
+              <div class="rr-head"><b id="rr-title"></b><button id="rr-close" type="button" aria-label="닫기">✕</button></div>
+              <div id="rr-body"></div>
+            </div>
+          </div>
+          <!-- 내 자리 -->
+          <div id="my-area" class="my-area">
+            <div class="my-line">
+              <span id="my-status" class="my-status"></span>
+              <div class="bar"><div id="time-bar"></div></div>
+              <span id="time-sec" class="time-sec"></span>
+            </div>
+            <div id="my-captured" class="captured mine"></div>
+            <div id="my-hand" class="hand"></div>
+          </div>
+          <details class="ranking">
+            <summary>📖 점수 계산 보기</summary>
+            <div class="ranking-list">
+              <div><b>광</b><small>3장 3점 (비광 끼면 2점) · 4장 4점 · 5장 15점</small></div>
+              <div><b>열끗</b><small>5장 1점, 1장마다 +1 · 고도리(2·4·8월 새) 5점</small></div>
+              <div><b>띠</b><small>5장 1점, 1장마다 +1 · 홍단·청단·초단 각 3점</small></div>
+              <div><b>피</b><small>10장 1점, 1장마다 +1 · 쌍피는 2장 · 국진은 열끗·쌍피 중 유리하게</small></div>
+              <div><b>고</b><small>1고 +1 · 2고 +2 · 3고부터 두 배씩</small></div>
+              <div><b>배수</b><small>흔들기·폭탄 ×2 · 나가리 다음 판 ×2</small></div>
+              <div><b>박</b><small>피박(피 5장 이하) · 광박(광 0) · 멍박(열끗 0) 각 ×2 · 고박은 고 한 사람이 다 냄</small></div>
+              <div><b>피 뺏기</b><small>쪽 · 따닥 · 쓸 · 뻑 먹기 · 폭탄: 모두에게서 피 1장</small></div>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div class="panel chat room-chat">
+        <h3>채팅</h3>
+        <ul id="room-chat-log" class="chat-log"></ul>
+        <form id="room-chat-form" class="chat-form">
+          <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+          <button type="submit">전송</button>
+        </form>
+      </div>
+      <!-- 하단 참가자 목록 -->
+      <div class="panel room-players">
+        <h3>참가자 <span class="muted">(방 1등 횟수)</span></h3>
+        <ul id="player-list" class="player-list"></ul>
+        <div id="spectator-box" class="hidden">
+          <h3>관전 <span id="spectator-count" class="muted"></span></h3>
+          <ul id="spectator-list" class="player-list"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 결과 -->
+  <div id="result-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="result-title">게임 결과</h3>
+      <ol id="result-list" class="result-list"></ol>
+      <button id="btn-close-result">확인</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="../common/lobby.js?v=banter"></script>
+  <script src="../common/hwatu.js?v=1"></script>
+  <script src="static/app.js?v=1"></script>
+</body>
+</html>

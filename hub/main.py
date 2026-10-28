@@ -16,6 +16,7 @@
     /holdem/     홀덤
     /boxhead/    박스헤드
     /seotda/     섯다
+    /gostop/     고스톱
     /common/     게임들이 함께 쓰는 프론트엔드 파일 (lobby.js 등)
     /api/leaderboard/  점수 게임 순위 (hub/leaderboard.py)
 
@@ -56,6 +57,7 @@ GAME_MODULES = {
     "holdem": "holdem.app.main",
     "boxhead": "boxhead.app.main",
     "seotda": "seotda.app.main",
+    "gostop": "gostop.app.main",
 }
 
 

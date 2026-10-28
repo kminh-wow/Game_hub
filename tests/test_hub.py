@@ -44,6 +44,8 @@ def client():
         ("/holdem/", "홀덤"),
         ("/boxhead/", "박스헤드"),
         ("/seotda/", "섯다"),
+        ("/gostop/", "고스톱"),
+        ("/gostop/static/app.js", "GameLobby.init"),
         ("/seotda/static/app.js", "GameLobby.init"),
         ("/common/hwatu.js", "window.Hwatu"),
         ("/boxhead/multi", "같이 하기"),
@@ -61,14 +63,14 @@ def test_pages(client, path, needle):
     assert needle in r.text
 
 
-@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman", "omok", "yacht", "fortress", "shooter", "runner", "pingpong", "crossy", "apple", "holdem", "boxhead", "seotda"])
+@pytest.mark.parametrize("name", ["wordchain", "quoridor", "pacman", "hangman", "omok", "yacht", "fortress", "shooter", "runner", "pingpong", "crossy", "apple", "holdem", "boxhead", "seotda", "gostop"])
 def test_redirect_to_trailing_slash(client, name):
     r = client.get(f"/{name}", follow_redirects=False)
     assert r.status_code in (307, 308)
     assert r.headers["location"] == f"/{name}/"
 
 
-@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/wordchain/docs", "/quoridor/docs", "/pacman/docs", "/hangman/docs", "/omok/docs", "/yacht/docs", "/fortress/docs", "/shooter/docs", "/runner/docs", "/pingpong/docs", "/holdem/docs", "/boxhead/docs", "/seotda/docs", "/nothing"])
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/wordchain/docs", "/quoridor/docs", "/pacman/docs", "/hangman/docs", "/omok/docs", "/yacht/docs", "/fortress/docs", "/shooter/docs", "/runner/docs", "/pingpong/docs", "/holdem/docs", "/boxhead/docs", "/seotda/docs", "/gostop/docs", "/nothing"])
 def test_hidden_pages(client, path):
     assert client.get(path).status_code == 404
 
@@ -137,6 +139,11 @@ def test_boxhead_websocket(client):
 
 def test_seotda_websocket(client):
     with client.websocket_connect("/seotda/ws?name=hubseotda&token=t") as ws:
+        assert ws.receive_json()["type"] == "welcome"
+
+
+def test_gostop_websocket(client):
+    with client.websocket_connect("/gostop/ws?name=hubgostop&token=t") as ws:
         assert ws.receive_json()["type"] == "welcome"
 
 
