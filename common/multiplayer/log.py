@@ -27,6 +27,8 @@ LABELS = {
     "Turn FPS": "턴제 FPS",
     "Holdem": "홀덤",
     "Boxhead": "박스헤드",
+    "Seotda": "섯다",
+    "Gostop": "고스톱",
 }
 
 

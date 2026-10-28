@@ -1,0 +1,289 @@
+/* 공통 팔레트 */
+:root {
+  --bg: #f5f5ed;
+  --panel: #fcfcf7;
+  --text: #173d33;
+  --muted: #53665c;
+  --line: #cdd4c7;
+  --accent: #245442;
+  --accent-soft: #e3eacb;
+  --good: #28724f;
+  --bad: #bd3e43;
+  --warn: #a66a17;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  font-size: 15px;
+}
+
+h1, h2, h3 { margin: 0; }
+h3 { font-size: 15px; margin-bottom: 10px; }
+ul, ol { list-style: none; margin: 0; padding: 0; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.error { color: var(--bad); min-height: 1.2em; }
+
+button {
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  padding: 8px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled { opacity: .45; cursor: default; }
+button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+button.big { padding: 12px 28px; font-size: 16px; font-weight: 600; }
+
+/* 입력 필드 */
+input, select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  background: var(--panel);
+  color: inherit;
+}
+input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+
+/* ---- 레이아웃 ---- */
+
+.screen {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100vh;
+}
+
+.topbar { display: flex; align-items: center; gap: 12px; }
+.topbar h2 { font-size: 20px; }
+.topbar button { margin-left: auto; }
+
+.layout { display: flex; gap: 12px; flex: 1; min-height: 0; }
+.panel { background: var(--panel); border-radius: var(--radius); padding: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.panel.grow { flex: 1; min-width: 0; }
+.panel.side { width: 240px; flex-shrink: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.panel-head h3 { margin: 0; }
+
+@media (max-width: 720px) {
+  .layout { flex-direction: column; }
+  .panel.side { width: auto; }
+}
+
+.hub-link { color: var(--muted); text-decoration: none; font-size: 14px; }
+.hub-link:hover { color: var(--accent); }
+.login-card .hub-link { display: inline-block; margin-top: 8px; }
+
+/* ---- 로그인 ---- */
+
+#screen-login { justify-content: center; align-items: center; }
+.login-card { background: var(--panel); padding: 40px; border-radius: 16px; text-align: center; width: min(420px, 100%); }
+.login-card h1 { font-size: 30px; }
+.login-card h1 span { color: var(--accent); }
+.login-card form { display: flex; gap: 8px; margin-top: 24px; }
+.login-card input { flex: 1; min-width: 0; }
+
+/* ---- 로비 ---- */
+
+.create-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; padding: 10px; background: var(--bg); border-radius: 8px; }
+.create-form input { flex: 1; min-width: 140px; }
+
+.room-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.room-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; cursor: pointer; transition: border-color .15s; }
+.room-card:hover { border-color: var(--accent); }
+.room-card.disabled { opacity: .55; cursor: default; }
+.room-card .title { font-weight: 600; margin-bottom: 6px; }
+.room-card .meta { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+.badge.playing { background: #fdecec; color: var(--bad); }
+.empty { color: var(--muted); padding: 20px 0; text-align: center; grid-column: 1 / -1; }
+
+.user-list li { padding: 5px 0; display: flex; justify-content: space-between; }
+.user-list .where { color: var(--muted); font-size: 12px; }
+
+/* ---- 채팅 ---- */
+
+.chat { display: flex; flex-direction: column; gap: 8px; }
+.chat-log { height: 160px; overflow-y: auto; font-size: 14px; }
+.chat-log li { padding: 2px 0; word-break: break-all; }
+.chat-log .who { font-weight: 600; margin-right: 6px; }
+.chat-log .sys { color: var(--muted); }
+.chat-log .fail { color: var(--bad); }
+.chat-form { display: flex; gap: 8px; }
+.chat-form input { flex: 1; min-width: 0; }
+.chat-form.my-turn input { border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+/* ---- 방 ---- */
+
+.player-list li { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; }
+.player-list li.turn { background: var(--accent-soft); outline: 2px solid var(--accent); }
+.player-list .name { font-weight: 600; }
+.player-list .tag { font-size: 12px; color: var(--muted); margin-left: 4px; }
+.player-list .ready { color: var(--good); font-size: 13px; }
+.player-list .score { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.settings label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.settings label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--text); }
+.settings.editable label { color: var(--text); font-weight: 600; }
+.settings.editable input, .settings.editable select { color: var(--text); font-weight: 600; border-color: var(--muted); }
+.settings.editable input:focus, .settings.editable select:focus { border-color: var(--accent); }
+#waiting-view { display: flex; flex-direction: column; }
+#waiting-view .big { align-self: center; margin-top: 12px; }
+.bar-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin: 6px 0; }
+.bar-row > span:first-child { width: 44px; }
+.bar-row > span:last-child { width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+.bar { flex: 1; height: 10px; background: var(--bg); border-radius: 99px; overflow: hidden; }
+.bar > div { height: 100%; width: 0; background: var(--accent); border-radius: 99px; }
+.bar > div.low { background: var(--bad); }
+.bar > div.round { background: var(--warn); }
+.shake { animation: shake .3s; }
+@keyframes shake {
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+/* ---- 모달/토스트 ---- */
+
+/* 결과 창 */
+.modal { position: fixed; inset: 0; background: rgba(23,61,51,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal-card { background: var(--panel); border-radius: 16px; padding: 24px; width: min(360px, 100%); text-align: center; }
+.result-list { margin: 16px 0; text-align: left; }
+.result-list li { display: flex; justify-content: space-between; padding: 8px 10px; border-radius: 8px; }
+.result-list li:first-child { background: var(--accent-soft); font-weight: 700; }
+/* 승패 강조 */
+#result-title { font-size: 22px; }
+#result-title.win { color: var(--good); }
+#result-title.lose { color: var(--bad); }
+.result-list li:first-child { font-size: 17px; padding: 12px; outline: 2px solid var(--accent); }
+
+/* 알림 */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 18px; border-radius: 99px; font-size: 14px; }
+
+/* ---- 방 배치 ---- */
+
+/* 게임과 채팅 배치 */
+.room-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; align-content: start; }
+.room-game { min-width: 0; }
+
+/* 채팅 패널 높이 */
+.room-chat { min-width: 0; height: clamp(300px, 50vh, 560px); align-self: start; }
+.room-chat .chat-log { flex: 1; height: auto; min-height: 0; }
+.room-chat .chat-form button { flex-shrink: 0; }
+
+/* 하단 참가자 목록 */
+.room-players { grid-column: 1 / -1; }
+.room-players .player-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.room-players .player-list li { margin-bottom: 0; gap: 12px; min-width: 0; overflow-wrap: anywhere; }
+
+/* 좁은 화면 배치 */
+@media (max-width: 900px) {
+  .room-layout { grid-template-columns: minmax(0, 1fr); }
+  .room-players { grid-row: 2; }
+  .room-chat { height: 260px; }
+}
+
+/* 관전 */
+#spectator-box { margin-top: 14px; }
+#spectator-box h3 { margin-bottom: 6px; }
+.room-card.watchable .badge { background: #eef3ff; color: var(--accent); }
+.room-card.watchable .badge.playing { background: #fdecec; color: var(--bad); }
+
+/* ---- 화투 테이블 (섯다·고스톱 공통 모양) ---- */
+.screen { max-width: 1240px; }
+.felt { position: relative; height: clamp(360px, calc(100svh - 330px), 600px); border-radius: 18px; background: radial-gradient(ellipse at 50% 45%, #2f7a4f 0%, #1f5c3a 60%, #174a2e 100%); box-shadow: inset 0 0 0 6px #4a2c1c, inset 0 0 0 9px #2b1a10, 0 6px 20px rgba(0,0,0,.18); overflow: hidden; user-select: none; -webkit-user-select: none; }
+.table-info { position: absolute; left: 14px; top: 12px; padding: 4px 10px; border-radius: 99px; background: rgba(0,0,0,.4); color: #f1ead6; font-size: 12px; z-index: 2; }
+.center { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); text-align: center; color: #f6eedb; pointer-events: none; }
+.pot { font-size: 18px; font-weight: 900; text-shadow: 0 2px 4px rgba(0,0,0,.5); }
+.pot small { display: block; font-size: 11px; font-weight: 600; opacity: .8; }
+.notice { margin-top: 6px; max-width: 320px; padding: 6px 12px; border-radius: 10px; background: rgba(0,0,0,.55); font-size: 13px; font-weight: 700; color: #ffd667; }
+.notice:empty { display: none; }
+
+/* 자리 */
+.seats { position: absolute; inset: 0; }
+.seat { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; }
+.seat .tag { padding: 4px 9px; border-radius: 10px; background: rgba(12,20,16,.82); color: #f3f1e8; font-size: 12px; text-align: center; border: 2px solid transparent; min-width: 92px; }
+.seat .tag b { display: block; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat .tag .ch { color: #ffd667; font-weight: 800; font-variant-numeric: tabular-nums; }
+.seat .tag .la { color: #b9d7c4; font-size: 11px; }
+.seat .tag i { font-style: normal; font-size: 10px; font-weight: 800; background: #f3f1e8; color: #1b2324; border-radius: 99px; padding: 0 5px; margin-left: 4px; }
+.seat.turn .tag { border-color: #ffd34d; box-shadow: 0 0 12px rgba(255,211,77,.5); }
+.seat.me .tag { background: rgba(36,84,66,.92); }
+.seat.folded { opacity: .45; }
+.seat.out { opacity: .3; }
+.seat.won .tag { border-color: #6fe39b; box-shadow: 0 0 14px rgba(111,227,155,.6); }
+.seat .bet { padding: 1px 8px; border-radius: 99px; background: rgba(0,0,0,.55); color: #fff; font-size: 11px; font-weight: 800; }
+.seat .bet:empty { display: none; }
+.tbar { height: 4px; margin-top: 4px; background: rgba(255,255,255,.15); border-radius: 99px; overflow: hidden; }
+.tfill { height: 100%; width: 100%; background: #ffd34d; }
+
+/* 카드 */
+.cards { display: flex; gap: 4px; }
+.card { width: 44px; height: 69px; flex: none; border-radius: 5px; box-shadow: 0 3px 6px rgba(0,0,0,.35); }
+.card svg.hwatu { display: block; width: 100%; height: 100%; }
+.card.deal { animation: deal .35s ease-out both; }
+.card.flip { animation: flip .45s ease-out both; }
+.card.win { box-shadow: 0 0 0 2px #ffd667, 0 0 14px rgba(255,214,103,.8); }
+@keyframes deal { from { transform: translateY(-40px) scale(.6) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes flip { 0% { transform: rotateY(90deg); } 100% { transform: rotateY(0); } }
+
+/* 내 패와 조작 */
+.my-area { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.my-hand { display: flex; align-items: center; gap: 12px; }
+.my-cards { display: flex; gap: 6px; min-height: 100px; }
+.my-cards .card { width: 64px; height: 100px; }
+.my-info { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.my-info b { font-size: 18px; }
+.my-info .bar { flex: none; }
+.time-sec { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+.actions { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.actions.off { opacity: .45; }
+button.act { padding: 11px 4px; font-size: 15px; font-weight: 800; }
+button.act.die { background: #8c3b3f; }
+button.act.call { background: #2a6a9a; }
+button.act.raise { background: #b9802a; }
+button.act.allin { background: #6d3a96; }
+button.act small { display: block; font-size: 11px; font-weight: 600; opacity: .9; }
+
+/* 한 판 결과 */
+.round-result { position: absolute; left: 50%; top: 44px; transform: translateX(-50%); width: min(520px, calc(100% - 20px)); max-height: calc(100% - 60px); overflow-y: auto; padding: 10px 12px; border-radius: 12px; background: rgba(12,18,18,.93); color: #f3f1e8; box-shadow: 0 6px 24px rgba(0,0,0,.5); z-index: 5; }
+.rr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 15px; }
+.rr-head button { padding: 2px 8px; background: transparent; border: 1px solid rgba(255,255,255,.3); color: #f3f1e8; font-size: 12px; }
+.rr-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; margin-top: 5px; background: rgba(255,255,255,.06); }
+.rr-row.win { background: rgba(255,214,103,.16); outline: 1px solid #ffd667; }
+.rr-row.lose { opacity: .72; }
+.rr-row .cards .card { width: 34px; height: 53px; }
+.rr-who { flex: 1; min-width: 0; }
+.rr-who b { display: block; font-size: 14px; }
+.rr-hand { color: #b9d7c4; font-size: 13px; font-weight: 700; }
+.rr-gain { color: #8fe38f; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* 족보 */
+.ranking { margin-top: 10px; font-size: 13px; }
+.ranking summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+.ranking-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; margin-top: 8px; }
+.ranking-list div { display: flex; justify-content: space-between; gap: 8px; padding: 3px 6px; border-radius: 6px; background: var(--bg); }
+.ranking-list div.mine { background: #fff1c2; outline: 1px solid #e0b43c; font-weight: 700; }
+.ranking-list small { color: var(--muted); }
+
+@media (max-width: 600px) {
+  .screen { padding: 10px 8px; }
+  .felt { height: clamp(330px, calc(100svh - 300px), 520px); }
+  .seat { min-width: 70px; }
+  .seat .tag { min-width: 70px; padding: 3px 6px; font-size: 11px; }
+  .card { width: 30px; height: 47px; }
+  .my-cards .card { width: 52px; height: 81px; }
+  .actions { grid-template-columns: repeat(3, 1fr); }
+}

@@ -25,6 +25,7 @@ http://127.0.0.1:8000 을 여세요.
   - 사과게임 규칙: `node --test apple/tests/logic.test.mjs`
   - 행맨 게임 흐름: `cd hangman && pytest`
   - 홀덤 족보·진행: `cd holdem && pytest`
+  - 섯다 족보·진행: `cd seotda && pytest`
   - 박스헤드 규칙: `node --test boxhead/tests/logic.test.mjs`, 중계: `cd boxhead && pytest`
 
 ## 구조
@@ -46,6 +47,7 @@ yacht/           요트 다이스 (FastAPI 앱: yacht/app/main.py)
 fortress/        포트리스 (FastAPI 앱: fortress/app/main.py)
 shooter/         턴제 FPS (FastAPI 앱: shooter/app/main.py)
 holdem/          홀덤     (FastAPI 앱: holdem/app/main.py)
+seotda/          섯다     (FastAPI 앱: seotda/app/main.py)
 boxhead/         박스헤드 (FastAPI 앱: boxhead/app/main.py, 혼자 하기는 정적 파일 + 같이 하기는 중계)
 runner/          숫자러너 (FastAPI 앱: runner/app.py, 정적 파일만 제공)
 pingpong/        탁구     (FastAPI 앱: pingpong/app.py, 정적 파일만 제공)
@@ -68,6 +70,7 @@ tests/           허브 통합 테스트
 | `/fortress/` | 포트리스 |
 | `/shooter/` | 턴제 FPS |
 | `/holdem/` | 홀덤 |
+| `/seotda/` | 섯다 |
 | `/boxhead/` | 박스헤드 (`/boxhead/multi` 같이 하기) |
 | `/runner/` | 숫자러너 |
 | `/pingpong/` | 탁구 |
@@ -665,6 +668,28 @@ apple/
 - 세로 화면에서는 판을 돌려 10×17로 그립니다. 네모는 돌려도 네모라 규칙은 같습니다.
 - "연한 색 사과" 설정과 최고 기록은 브라우저에 저장합니다. 순위표 이름은 `apple`입니다.
 - 디버그: 브라우저 콘솔에서 `__apple.game`, `__apple.view`.
+
+---
+
+## 섯다
+
+```
+seotda/
+  app/
+    main.py     GameServer·앱 생성 (게임 메시지: act {action: die|check|call|bbing|half|ddadang|allin})
+    room.py     방 설정(시작 칩, 판돈 오르는 판 수, 행동 시간, 판 수), 2~6명, 방 우승 횟수
+    game.py     진행: 선 이동, 판돈(앤티), 두 장, 베팅 한 바퀴, 공개, 재경기, 탈락, 판 수 끝
+    rules.py    카드("3a": 월 + a 좋은 패/b 나머지), 족보 값, 특수패, 재경기 조건, 팟 나누기
+  static/       index.html, style.css, app.js (lobby.js + 2D 테이블, 화투 그림은 common/web/hwatu.js)
+  tests/        test_rules.py(족보·특수패), test_game.py(진행)
+```
+
+- 베팅 엔진은 홀덤과 같습니다(이번 베팅 총액 기준, 최소 레이즈, 모자란 올인 뒤 레이즈 막기, 사이드 팟). 버튼 금액은 서버가 `options`로 계산해 줍니다: 삥 = 판돈만큼(아무도 안 걸었을 때), 하프 = 콜한 뒤 팟의 절반만큼 더(최소 판돈), 따당 = 지금 베팅의 두 배.
+- 판돈은 시작 칩의 1%에서 `ante_every`판마다 오릅니다(`ANTE_STEPS`). 판돈은 팟에만 들어가고 베팅 금액(`bet`)과는 따로입니다.
+- 족보 값(`evaluate`): 38광땡 1000, 18광땡 990, 13광땡 980, 땡 900+월, 알리 800 … 세륙 750, 끗 700+끗. 특수패는 `effective`에서 판 전체를 보고 정합니다(땡잡이는 가장 센 패가 1~9땡이면 그보다 0.5 위, 암행어사는 13·18광땡이면 0.5 위). 같은 값은 팟을 나눕니다.
+- 재경기(`needs_redeal`): 구사는 가장 센 패가 알리 이하, 멍텅구리 구사는 9땡 이하일 때. 남은 사람에게 새 덱으로 다시 두 장, 팟은 그대로이고 최대 3번까지 합니다.
+- 화투 그림(`common/web/hwatu.js`, `Hwatu.svg(월, 종류)`): 이미지 파일 없이 SVG로 그린 48장(섯다는 그중 20장). 월마다 상징 + 광(光)·열끗·띠(홍단·청단·초단)·쌍피 표시.
+- 검증: `cd seotda && pytest`
 
 ---
 

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>섯다</title>
+  <link rel="stylesheet" href="static/style.css?v=1">
+</head>
+<body>
+  <!-- 로그인 -->
+  <section id="screen-login" class="screen">
+    <div class="login-card">
+      <h1>섯다 <span>화투</span></h1>
+      <p class="muted">2~6명이 같은 칩으로 시작하는 두 장 섯다</p>
+      <form id="login-form">
+        <input id="login-name" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="off" required>
+        <button type="submit">입장</button>
+      </form>
+      <p id="login-error" class="error"></p>
+      <a class="hub-link" href="../">← 다른 게임 고르기</a>
+    </div>
+  </section>
+
+  <!-- 로비 -->
+  <section id="screen-lobby" class="screen hidden">
+    <header class="topbar">
+      <a class="hub-link" href="../" title="게임 목록">← Ddan Jit</a>
+      <h2>로비</h2>
+      <span class="muted">접속: <b id="me-name"></b></span>
+    </header>
+    <div class="layout">
+      <div class="panel grow">
+        <div class="panel-head">
+          <h3>방 목록</h3>
+          <button id="btn-open-create">방 만들기</button>
+        </div>
+        <form id="create-form" class="create-form hidden">
+          <input id="create-title" maxlength="30" placeholder="방 제목" autocomplete="off">
+          <label>인원
+            <select id="create-max">
+              <option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option>
+            </select>
+          </label>
+          <button type="submit">만들기</button>
+          <button type="button" id="btn-cancel-create" class="ghost">취소</button>
+        </form>
+        <ul id="room-list" class="room-list"></ul>
+      </div>
+      <div class="panel side">
+        <h3>접속자 <span id="user-count" class="muted"></span></h3>
+        <ul id="user-list" class="user-list"></ul>
+      </div>
+    </div>
+    <div class="panel chat">
+      <ul id="lobby-chat-log" class="chat-log"></ul>
+      <form id="lobby-chat-form" class="chat-form">
+        <input id="lobby-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+        <button type="submit">전송</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 방 -->
+  <section id="screen-room" class="screen hidden">
+    <header class="topbar">
+      <h2 id="room-title"></h2>
+      <span id="room-info" class="muted"></span>
+      <button id="btn-leave" class="ghost">나가기</button>
+    </header>
+    <div class="room-layout">
+      <div class="panel room-game">
+        <!-- 대기 화면 -->
+        <div id="waiting-view">
+          <h3>게임 설정</h3>
+          <form id="settings-form" class="settings">
+            <label>시작 칩
+              <select name="start_chips">
+                <option value="500">500</option><option value="1000">1,000</option><option value="2000">2,000</option>
+                <option value="5000">5,000</option><option value="10000">10,000</option>
+              </select>
+            </label>
+            <label>판돈 오르는 판 수 <input type="number" name="ante_every" min="3" max="20"></label>
+            <label>한 번 행동 시간(초) <input type="number" name="turn_time" min="10" max="60" step="5"></label>
+            <label>판 수 (0 = 마지막 1명까지) <input type="number" name="max_hands" min="0" max="100" step="5"></label>
+            <label>최대 인원 <input type="number" name="max_players" min="2" max="6"></label>
+          </form>
+          <p class="muted">화투 1~10월 20장으로 하는 두 장 섯다예요. 모두 판돈을 내고 두 장씩 받아 한 바퀴 베팅한 뒤 공개해요. 칩이 떨어지면 탈락. 게임 칩만 써요.</p>
+          <p id="settings-note" class="muted"></p>
+          <button id="btn-ready" class="big"></button>
+        </div>
+
+        <!-- 게임 화면 (끝난 뒤에는 마지막 판을 보여 줌) -->
+        <div id="game-view" class="hidden">
+          <div class="felt">
+            <div id="table-info" class="table-info"></div>
+            <div id="seats" class="seats"></div>
+            <div class="center">
+              <div id="pot" class="pot"></div>
+              <div id="notice" class="notice"></div>
+            </div>
+            <!-- 한 판이 끝나면 누가 어떤 패로 이겼는지 -->
+            <div id="round-result" class="round-result hidden">
+              <div class="rr-head"><b id="rr-title"></b><button id="rr-close" type="button" aria-label="닫기">✕</button></div>
+              <div id="rr-rows"></div>
+            </div>
+          </div>
+          <!-- 내 패와 조작 -->
+          <div id="my-area" class="my-area">
+            <div class="my-hand">
+              <div id="my-cards" class="my-cards"></div>
+              <div class="my-info">
+                <b id="my-name-hand"></b>
+                <div class="bar"><div id="time-bar"></div></div>
+                <span id="time-sec" class="time-sec"></span>
+              </div>
+            </div>
+            <div id="actions" class="actions">
+              <button type="button" data-act="die" class="act die">다이</button>
+              <button type="button" data-act="call" class="act call">체크</button>
+              <button type="button" data-act="bbing" class="act raise">삥</button>
+              <button type="button" data-act="half" class="act raise">하프</button>
+              <button type="button" data-act="ddadang" class="act raise">따당</button>
+              <button type="button" data-act="allin" class="act allin">올인</button>
+            </div>
+          </div>
+          <details class="ranking">
+            <summary>📖 섯다 족보 보기</summary>
+            <div id="ranking-list" class="ranking-list"></div>
+          </details>
+        </div>
+      </div>
+      <div class="panel chat room-chat">
+        <h3>채팅</h3>
+        <ul id="room-chat-log" class="chat-log"></ul>
+        <form id="room-chat-form" class="chat-form">
+          <input id="room-chat-input" maxlength="200" placeholder="채팅" autocomplete="off">
+          <button type="submit">전송</button>
+        </form>
+      </div>
+      <!-- 하단 참가자 목록 -->
+      <div class="panel room-players">
+        <h3>참가자 <span class="muted">(방 우승 횟수)</span></h3>
+        <ul id="player-list" class="player-list"></ul>
+        <div id="spectator-box" class="hidden">
+          <h3>관전 <span id="spectator-count" class="muted"></span></h3>
+          <ul id="spectator-list" class="player-list"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 결과 -->
+  <div id="result-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="result-title">게임 결과</h3>
+      <ol id="result-list" class="result-list"></ol>
+      <button id="btn-close-result">확인</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="../common/lobby.js?v=banter"></script>
+  <script src="../common/hwatu.js?v=1"></script>
+  <script src="static/app.js?v=1"></script>
+</body>
+</html>
