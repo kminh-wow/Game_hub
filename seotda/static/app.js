@@ -1,7 +1,7 @@
 "use strict";
 
 // 섯다 화면. 로그인·로비·대기실·채팅은 공통 로비(../common/lobby.js)가 맡고,
-// 여기서는 위에서 본 테이블에 자리·패·판돈을 그리고, 베팅 버튼과 판 결과를 띄운다. 화투 그림은 ../common/hwatu.js.
+// 여기서는 위에서 본 테이블에 자리·패·판돈을 그리고, 베팅 버튼·세 장 중 두 장 고르기와 판 결과를 띄운다. 화투 그림은 ../common/hwatu.js.
 
 const $ = (sel) => document.querySelector(sel);
 const fmt = (n) => Number(n || 0).toLocaleString();
@@ -17,8 +17,13 @@ const RANKING = [
   ["구사", "4 + 9: 최고가 알리 이하면 재경기"], ["멍텅구리 구사", "4·9 열끗: 최고가 9땡 이하면 재경기"],
 ];
 
+const SPECIAL = { "1,2": "알리", "1,4": "독사", "1,9": "구삥", "1,10": "장삥", "4,10": "장사", "4,6": "세륙" };
+
 let deadline = 0;
 let lastTurn = null;
+let lastChoose = false;
+let dealTag = "";                   // 판·재경기 번호 (바뀌면 카드를 새로 받은 것)
+let picking = [];                   // 고르는 중인 카드
 const shownBefore = new Map();      // 자리 id → 지난번에 그린 카드 (애니메이션용)
 
 const lobby = GameLobby.init({
@@ -29,7 +34,10 @@ const lobby = GameLobby.init({
       const g = msg.game;
       deadline = performance.now() + g.time_left_ms;
       if (g.turn_id && g.turn_id !== lastTurn && lobby.isMe(g.turn_id)) navigator.vibrate?.(60);
+      if (g.me?.choose && !lastChoose) navigator.vibrate?.(60);
       lastTurn = g.turn_id;
+      lastChoose = !!g.me?.choose;
+      dealTag = `${g.hand_no}.${g.redeals}`;
       lobby.setGame(g);
     },
     game_over(msg) {
@@ -71,26 +79,43 @@ function cardEl(code, anim = "") {
   return el;
 }
 
-// 카드 두 장 (지난번과 비교해서 새로 받았으면 날아오고, 공개되면 뒤집힘)
-function cardsFor(id, cards, count, extraClass = "") {
+// 두 장 족보 이름 (고를 때 미리 보기, 서버 rules.evaluate 와 같음)
+function pairName(x, y) {
+  const mon = (c) => Number(c.slice(0, -1));
+  const [a, b] = [x, y].sort((p, q) => mon(p) - mon(q) || (p < q ? -1 : 1));
+  const ma = mon(a), mb = mon(b);
+  const gw = (c) => c.endsWith("a") && GWANG.includes(mon(c));
+  const ye = (c) => c.endsWith("a") && !GWANG.includes(mon(c));
+  if (gw(a) && gw(b)) return ma === 3 ? "38광땡" : mb === 8 ? "18광땡" : "13광땡";
+  if (ma === mb) return ma === 10 ? "장땡" : `${ma}땡`;
+  if (ma === 4 && mb === 7 && ye(a) && ye(b)) return "암행어사";
+  if (ma === 3 && mb === 7 && gw(a) && ye(b)) return "땡잡이";
+  if (ma === 4 && mb === 9) return ye(a) && ye(b) ? "멍텅구리 구사" : "구사";
+  if (SPECIAL[`${ma},${mb}`]) return SPECIAL[`${ma},${mb}`];
+  const k = (ma + mb) % 10;
+  return k === 9 ? "갑오" : k === 0 ? "망통" : `${k}끗`;
+}
+
+// 카드 묶음 (지난번과 비교해서 새로 받은 카드는 날아오고, 공개되면 뒤집힘. 고르지 않은 카드는 흐리게)
+function cardsFor(id, cards, count, extraClass = "", pick = null) {
   const key = cards ? cards.join(",") : count ? `back${count}` : "";
-  const prev = shownBefore.get(id) || "";
-  shownBefore.set(id, key);
+  const before = shownBefore.get(id);
+  const prev = before && before.tag === dealTag ? before.key : "";
+  shownBefore.set(id, { key, tag: dealTag });
   const box = document.createElement("div");
   box.className = "cards";
   if (!key) return box;
-  const anim = prev === key ? "" : prev.startsWith("back") && cards ? "flip" : "deal";
-  if (cards) cards.forEach((c, i) => {
+  const prevBacks = prev.startsWith("back") ? Number(prev.slice(4)) : 0;
+  const prevCards = prev && !prevBacks ? prev.split(",") : [];
+  let delay = 0;
+  (cards || Array(count).fill(null)).forEach((c, i) => {
+    const anim = c ? (prevCards.includes(c) ? "" : i < prevBacks ? "flip" : "deal") : i < prevBacks ? "" : "deal";
     const el = cardEl(c, anim);
-    el.style.animationDelay = `${i * 0.08}s`;
-    if (extraClass) el.classList.add(extraClass);
+    if (anim) el.style.animationDelay = `${delay++ * 0.08}s`;
+    if (c && pick && !pick.includes(c)) el.classList.add("drop");
+    else if (extraClass) el.classList.add(extraClass);
     box.append(el);
   });
-  else for (let i = 0; i < count; i++) {
-    const el = cardEl(null, anim);
-    el.style.animationDelay = `${i * 0.08}s`;
-    box.append(el);
-  }
   return box;
 }
 
@@ -119,11 +144,12 @@ function renderTable(g, room) {
     const x = 50 + Math.cos(t) * 40;
     const y = 50 + Math.sin(t) * (k === 0 ? 40 : 36);
     const mine = lobby.isMe(s.id);
-    const state = s.out ? "탈락" : s.away ? "자리 비움" : s.allin ? "올인" : "";
+    const pickNote = g.phase === "choose" && s.has_cards && !s.folded && !s.out ? (s.picked ? "골랐어요" : "고르는 중…") : "";
+    const state = [s.out ? "탈락" : s.away ? "자리 비움" : s.allin ? "올인" : "", pickNote].filter(Boolean).join(" · ");
     const seat = el("div", { className: ["seat", g.turn_id === s.id && "turn", s.folded && "folded", s.out && "out", mine && "me", winners.has(s.id) && "won"].filter(Boolean).join(" ") });
     seat.style.left = `${x}%`;
     seat.style.top = `${y}%`;
-    const cards = mine ? cardsFor(`${s.id}:mine-small`, null, 0) : cardsFor(s.id, s.cards, s.has_cards ? 2 : 0, winners.has(s.id) ? "win" : "");
+    const cards = mine ? cardsFor(`${s.id}:mine-small`, null, 0) : cardsFor(s.id, s.cards, s.has_cards ? s.n_cards : 0, winners.has(s.id) ? "win" : "", s.pick);
     seat.append(
       cards,
       el("div", { className: "tag" },
@@ -149,9 +175,24 @@ function renderMine(g, room) {
   const seat = g.seats.find((s) => lobby.isMe(s.id));
   $("#my-area").classList.toggle("hidden", !seat);
   opts = room.playing && me?.options ? me.options : null;
+  const choosing = room.playing && !!me?.choose;
+  if (!choosing) picking = [];
   const won = (g.results || []).some((r) => r.id === seat?.id && r.amount > 0);
-  $("#my-cards").replaceChildren(...(seat?.cards ? Array.from(cardsFor(`${seat.id}:mine`, seat.cards, 0, won ? "win" : "").children) : []));
-  $("#my-name-hand").textContent = seat?.out ? "탈락했어요 · 구경 중" : me?.hand ? `내 패: ${me.hand}` : "";
+  const mine = seat?.cards ? Array.from(cardsFor(`${seat.id}:mine`, seat.cards, 0, won ? "win" : "", seat.pick).children) : [];
+  if (choosing) mine.forEach((el, i) => {
+    const code = seat.cards[i];
+    el.classList.add("pickable");
+    el.classList.toggle("sel", picking.includes(code));
+    el.onclick = () => togglePick(code);
+  });
+  $("#my-cards").replaceChildren(...mine);
+  const waiting = g.phase === "choose" && seat?.pick ? " · 다른 사람이 고르는 중" : "";
+  $("#my-name-hand").textContent = seat?.out ? "탈락했어요 · 구경 중"
+    : choosing ? (picking.length === 2 ? `고른 패: ${pairName(...picking)}` : `세 장 중 두 장을 골라요 (${picking.length}/2)`)
+    : me?.hand ? `내 패: ${me.hand}${waiting}` : "";
+  const cb = $("#choose-btn");
+  cb.classList.toggle("hidden", !choosing);
+  cb.disabled = picking.length !== 2;
   const labels = {
     die: "다이",
     call: opts ? (opts.can_check ? "체크" : opts.call_allin ? `올인 콜<small>${fmt(opts.to_call)}</small>` : `콜<small>${fmt(opts.to_call)}</small>`) : "체크",
@@ -184,7 +225,11 @@ function renderResult(g) {
     const won = r.amount > 0;
     const cards = document.createElement("div");
     cards.className = "cards";
-    for (const c of r.cards || []) cards.append(cardEl(c));
+    for (const c of r.all || r.cards || []) {
+      const card = cardEl(c);
+      if (r.cards && !r.cards.includes(c)) card.classList.add("drop");
+      cards.append(card);
+    }
     return el("div", { className: `rr-row ${won ? "win" : "lose"}` }, cards,
       el("div", { className: "rr-who" },
         el("b", { textContent: `${won ? "🏆 " : ""}${r.name}${lobby.isMe(r.id) ? " (나)" : ""}` }),
@@ -204,6 +249,16 @@ function renderRanking(g) {
 
 // ---------- 입력 ----------
 
+// 고를 카드 넣고 빼기 (두 장까지)
+function togglePick(code) {
+  if (!lobby.state.game?.me?.choose) return;
+  picking = picking.includes(code) ? picking.filter((c) => c !== code) : [...picking, code].slice(-2);
+  renderMine(lobby.state.game, lobby.state.room);
+}
+$("#choose-btn").onclick = () => {
+  if (picking.length === 2) lobby.send("choose", { cards: picking });
+};
+
 $("#actions").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b || b.disabled || !opts) return;
@@ -216,7 +271,15 @@ $("#rr-close").onclick = () => {
   $("#round-result").classList.add("hidden");
 };
 document.addEventListener("keydown", (e) => {
-  if (!opts || e.target.closest("input, textarea, select")) return;
+  if (e.target.closest("input, textarea, select")) return;
+  const g = lobby.state.game;
+  if (g?.me?.choose) {
+    const seat = g.seats.find((s) => lobby.isMe(s.id));
+    if (["1", "2", "3"].includes(e.key) && seat?.cards?.[e.key - 1]) togglePick(seat.cards[e.key - 1]);
+    if (e.key === "Enter") $("#choose-btn").click();
+    return;
+  }
+  if (!opts) return;
   const map = { d: "die", c: "call", b: "bbing", h: "half", t: "ddadang" };
   const act = map[e.key.toLowerCase()];
   const btn = act && document.querySelector(`#actions [data-act="${act}"]`);
@@ -230,12 +293,12 @@ function tick() {
   const g = lobby.state.game;
   const left = Math.max(0, deadline - performance.now());
   const total = g?.time_total_ms || 0;
-  const on = g && lobby.state.room?.playing && g.turn_id && total;
+  const on = g && lobby.state.room?.playing && (g.turn_id || g.phase === "choose") && total;
   const pct = on ? (left / total) * 100 : 0;
   const bar = $("#time-bar");
   bar.style.width = `${pct}%`;
   bar.classList.toggle("low", !!on && left < 5000);
-  $("#time-sec").textContent = on && lobby.isMe(g.turn_id) ? `${Math.ceil(left / 1000)}초` : "";
+  $("#time-sec").textContent = on && (lobby.isMe(g.turn_id) || g.me?.choose) ? `${Math.ceil(left / 1000)}초` : "";
   const fill = document.querySelector(".seat.turn .tfill");
   if (fill) fill.style.width = `${pct}%`;
   requestAnimationFrame(tick);

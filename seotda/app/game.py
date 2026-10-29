@@ -1,7 +1,8 @@
 """섯다 한 게임: 모두 같은 칩으로 시작해 판을 이어 간다. 칩이 떨어지면 탈락.
 마지막 1명이 남거나, 정한 판 수가 끝나면 칩이 많은 순으로 순위.
 
-한 판: 모두 판돈(앤티) → 두 장씩 → 베팅 한 바퀴(다이·체크·삥·콜·하프·따당·올인) → 공개해서 승부.
+한 판(세 장 섯다): 모두 판돈(앤티) → 두 장씩 → 첫 베팅(다이·체크·삥·콜·하프·따당·올인)
+→ 한 장 더 → 세 장 중 두 장 고르기(동시에) → 마지막 베팅 → 고른 두 장을 공개해서 승부.
 구사·멍텅구리 구사 조건이면 남은 사람끼리 다시 받아서 한 번 더(재경기, 판돈은 그대로).
 섞기·판정은 서버에서만 하고, 패는 본인에게만 보낸다(공개 때만 모두에게).
 """
@@ -13,7 +14,7 @@ import secrets
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from .rules import evaluate, needs_redeal, new_deck, split_pots, winners
+from .rules import best_pair, evaluate, needs_redeal, new_deck, split_pots, winners
 
 if TYPE_CHECKING:
     from common.multiplayer import Player
@@ -33,6 +34,7 @@ class Seat:
     player: Any
     chips: int
     cards: list[str] = field(default_factory=list)
+    pick: list[str] = field(default_factory=list)      # 세 장 중 고른 두 장
     bet: int = 0              # 이번 베팅에 낸 칩
     total: int = 0            # 이번 판에 낸 칩 (판돈 포함)
     folded: bool = False
@@ -74,7 +76,8 @@ class Game:
         self.min_raise = 0
         self.turn: int | None = None
         self.deadline = 0.0
-        self.phase = "betting"                   # betting → showdown / redeal
+        self.phase = "betting"                   # betting → choose → betting → showdown / redeal
+        self.street = 1                          # 1: 두 장 베팅, 2: 세 장째 받고 마지막 베팅
         self.redeals = 0
         self.notice = ""                         # 화면에 크게 띄울 알림 (재경기 등)
         self.results: list[dict[str, Any]] = []
@@ -93,6 +96,10 @@ class Game:
     @property
     def pot(self) -> int:
         return sum(s.total for s in self.seats)
+
+    # 승부에 쓸 두 장
+    def hand_of(self, seat: Seat) -> list[str]:
+        return seat.pick or best_pair(seat.cards)
 
     def seat_of(self, player: Any) -> Seat | None:
         return next((s for s in self.seats if s.player is player), None)
@@ -140,18 +147,28 @@ class Game:
                 "folded": s.folded, "allin": s.allin, "out": s.out, "away": s.away, "last": s.last,
                 "has_cards": s.in_hand or (bool(s.cards) and s.shown),
                 "cards": s.cards if (mine or s.shown) and s.cards else None,
+                "n_cards": len(s.cards) if s.in_hand or s.shown else 0,
+                "pick": s.pick if (mine or s.shown) and s.pick else None,
+                "picked": bool(s.pick),
                 "dealer": i == self.dealer,
             })
         me = self.seat_of(viewer) if viewer is not None else None
         mine = None
         if me and me.cards and not me.out:
-            mine = {"hand": evaluate(me.cards)[1], "options": self.options(me)}
+            mine = {
+                "hand": evaluate(self.hand_of(me))[1],
+                "options": self.options(me),
+                "choose": self.phase == "choose" and me.in_hand and not me.pick,
+            }
         ante = self.ante()
         next_ante = self.ante(self.hand_no + 1)
+        timed = self.turn is not None or self.phase == "choose"
         return {
             "seats": seats,
             "pot": self.pot,
             "phase": self.phase,
+            "street": self.street,
+            "redeals": self.redeals,
             "current_bet": self.current_bet,
             "turn_id": self.seats[self.turn].id if self.turn is not None and not self.finished else None,
             "hand_no": self.hand_no,
@@ -159,8 +176,8 @@ class Game:
             "ante": ante,
             "next_ante": next_ante if next_ante != ante else None,
             "hands_to_next": self.settings.ante_every - (self.hand_no - 1) % self.settings.ante_every,
-            "time_left_ms": 0 if self.turn is None else max(int((self.deadline - loop.time()) * 1000), 0),
-            "time_total_ms": self._turn_seconds() * 1000 if self.turn is not None else 0,
+            "time_left_ms": max(int((self.deadline - loop.time()) * 1000), 0) if timed else 0,
+            "time_total_ms": self._turn_seconds() * 1000 if timed else 0,
             "notice": self.notice,
             "results": self.results,
             "me": mine,
@@ -205,7 +222,7 @@ class Game:
         self.notice = ""
         self.redeals = 0
         for s in self.seats:
-            s.cards, s.bet, s.total = [], 0, 0
+            s.cards, s.pick, s.bet, s.total = [], [], 0, 0
             s.folded = s.allin = s.acted = s.shown = False
             s.can_raise = True
             s.last = ""
@@ -217,16 +234,23 @@ class Game:
             s.last = f"판돈 {s.total:,}"
         await self._deal()
 
-    # 카드 두 장씩 나누고 베팅 시작
+    # 카드 두 장씩 나누고 첫 베팅
     async def _deal(self) -> None:
         self.deck = new_deck()
         self.rng.shuffle(self.deck)
-        self.phase = "betting"
+        self.street = 1
         for s in self.seats:
             s.shown = False
-            s.bet, s.acted, s.can_raise = 0, False, True
+            s.pick = []
             if not s.out and not s.folded:
                 s.cards = [self.deck.pop(), self.deck.pop()]
+        await self._start_betting()
+
+    # 베팅 한 바퀴 시작 (낸 판돈·베팅은 팟에 그대로)
+    async def _start_betting(self) -> None:
+        self.phase = "betting"
+        for s in self.seats:
+            s.bet, s.acted, s.can_raise = 0, False, True
         self.current_bet = 0
         self.min_raise = self.ante()
         if sum(1 for s in self.seats if s.can_act) >= 2:
@@ -281,15 +305,67 @@ class Game:
             await self.room.system(f"{seat.player.name}님 시간 초과 · 자리 비움 (아무 행동이나 하면 돌아와요)")
         await self._apply(seat, "check" if self.current_bet <= seat.bet else "die")
 
-    # 베팅이 끝나면 잠깐 보여 주고 공개
+    # 베팅이 끝나면 잠깐 보여 주고, 첫 베팅이면 세 장째, 마지막이면 공개
     async def _end_round(self) -> None:
         try:
             await self.broadcast_state()
             await asyncio.sleep(DEAL_DELAY)
             self._task = None
-            await self._showdown()
+            if self.street == 1:
+                await self._third_card()
+            else:
+                await self._showdown()
         except asyncio.CancelledError:
             return
+
+    # 세 장째 나누고 두 장 고르기 (자리 비움이면 바로 가장 센 두 장)
+    async def _third_card(self) -> None:
+        self.street = 2
+        self.phase = "choose"
+        for s in self.seats:
+            if s.in_hand:
+                s.cards.append(self.deck.pop())
+                s.pick = best_pair(s.cards) if s.away else []
+                if not s.allin:
+                    s.last = ""
+        if all(s.pick for s in self.seats if s.in_hand):
+            await self._start_betting()
+            return
+        self.deadline = asyncio.get_running_loop().time() + self.settings.turn_time
+        self._run(self._choose_timer())
+        await self.broadcast_state()
+
+    async def _choose_timer(self) -> None:
+        try:
+            await asyncio.sleep(self.settings.turn_time)
+        except asyncio.CancelledError:
+            return
+        self._task = None
+        for s in self.seats:
+            if s.in_hand and not s.pick:
+                s.pick = best_pair(s.cards)
+                s.away = True
+                await self.room.system(f"{s.player.name}님 시간 초과 · 가장 센 두 장으로 골랐어요")
+        await self._start_betting()
+
+    # 세 장 중 두 장 고르기
+    async def choose(self, player: Player, cards: Any) -> str | None:
+        seat = self.seat_of(player)
+        if self.finished or self.phase != "choose" or seat is None or not seat.in_hand:
+            return "지금은 고를 때가 아니에요."
+        if seat.pick:
+            return "이미 골랐어요."
+        ok = isinstance(cards, list) and len(cards) == 2 and all(isinstance(c, str) and c in seat.cards for c in cards)
+        if not ok or cards[0] == cards[1]:
+            return "카드 두 장을 골라 주세요."
+        seat.pick = [c for c in seat.cards if c in cards]
+        seat.away = False
+        if all(s.pick for s in self.seats if s.in_hand):
+            self._cancel()
+            await self._start_betting()
+        else:
+            await self.broadcast_state()
+        return None
 
     async def act(self, player: Player, action: Any) -> str | None:
         seat = self.seat_of(player)
@@ -352,6 +428,7 @@ class Game:
     # 혼자 남음 (나머지 다이)
     async def _fold_win(self, seat: Seat) -> None:
         self.turn = None
+        self.phase = "showdown"
         won = self.pot
         seat.chips += won
         self.results = [{"id": seat.id, "name": seat.player.name, "amount": won, "hand": None, "fold": True}]
@@ -368,10 +445,11 @@ class Game:
     # 공개: 재경기인지 보고, 아니면 팟마다 가장 센 패가 가져감
     async def _showdown(self) -> None:
         live = [s for s in self.seats if s.in_hand]
-        hands = {s.id: s.cards for s in live}
+        hands = {s.id: self.hand_of(s) for s in live}
         for s in live:
             s.shown = True
-            s.last = evaluate(s.cards)[1]
+            s.pick = hands[s.id]
+            s.last = evaluate(s.pick)[1]
         why = needs_redeal(hands)
         if why and self.redeals < MAX_REDEALS:
             self.redeals += 1
@@ -396,7 +474,7 @@ class Game:
         for s in live:
             amount = won.get(s.id, 0)
             s.chips += amount
-            self.results.append({"id": s.id, "name": s.player.name, "amount": amount, "hand": evaluate(s.cards)[1], "cards": list(s.cards)})
+            self.results.append({"id": s.id, "name": s.player.name, "amount": amount, "hand": evaluate(s.pick)[1], "cards": list(s.pick), "all": list(s.cards)})
         self.results.sort(key=lambda r: -r["amount"])
         for r in self.results:
             if r["amount"]:
@@ -405,7 +483,7 @@ class Game:
         self._run(self._after_hand(SHOWDOWN_PAUSE))
         await self.broadcast_state()
 
-    # 재경기: 잠깐 보여 준 뒤 남은 사람에게 다시 두 장
+    # 재경기: 잠깐 보여 준 뒤 남은 사람에게 다시 두 장부터
     async def _redeal(self) -> None:
         try:
             await asyncio.sleep(REDEAL_PAUSE)
@@ -445,6 +523,17 @@ class Game:
         alive = [s for s in self.seats if not s.out]
         if len(alive) <= 1:
             await self.finish()
+            return
+        if self.phase == "choose":
+            live = [s for s in self.seats if s.in_hand]
+            if len(live) == 1:
+                self._cancel()
+                await self._fold_win(live[0])
+            elif all(s.pick for s in live):
+                self._cancel()
+                await self._start_betting()
+            else:
+                await self.broadcast_state()
             return
         if was_turn:
             self._cancel()

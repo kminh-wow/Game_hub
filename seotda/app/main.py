@@ -15,5 +15,10 @@ async def act(room: Room, player: Player, msg: dict) -> str | None:
     return await room.game.act(player, msg.get("action"))
 
 
-server = GameServer(Room, actions={"act": act})
+# 세 장 중 두 장 고르기
+async def choose(room: Room, player: Player, msg: dict) -> str | None:
+    return await room.game.choose(player, msg.get("cards"))
+
+
+server = GameServer(Room, actions={"act": act, "choose": choose})
 app = create_app(server, STATIC_DIR, "Seotda")

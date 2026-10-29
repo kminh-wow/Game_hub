@@ -1,5 +1,5 @@
 """섯다 족보·특수패·재경기."""
-from app.rules import evaluate, needs_redeal, new_deck, winners
+from app.rules import best_pair, evaluate, needs_redeal, new_deck, winners
 
 
 def name(a, b):
@@ -68,3 +68,10 @@ def test_redeal_rules():
     assert needs_redeal({"A": ["4a", "9a"], "B": ["8a", "8b"]}) == "멍텅구리 구사"     # 9땡 이하
     assert needs_redeal({"A": ["4a", "9a"], "B": ["10a", "10b"]}) is None             # 장땡이면 안 함
     assert needs_redeal({"A": ["2a", "5b"], "B": ["1a", "2b"]}) is None
+
+
+def test_best_pair_of_three():
+    assert best_pair(["3a", "1b", "8a"]) == ["3a", "8a"]          # 38광땡
+    assert best_pair(["4b", "9b", "3b"]) == ["4b", "3b"]          # 구사(703)보다 7끗
+    assert best_pair(["3a", "7a", "2b"]) == ["7a", "2b"]          # 땡잡이(700)보다 갑오
+    assert best_pair(["5a", "5b"]) == ["5a", "5b"]

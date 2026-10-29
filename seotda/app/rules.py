@@ -1,4 +1,4 @@
-"""섯다 규칙: 화투 1~10월 20장, 두 장 족보, 특수패(암행어사·땡잡이·구사), 승패 정하기.
+"""섯다 규칙: 화투 1~10월 20장, 두 장 족보(세 장 중 두 장 고르기), 특수패(암행어사·땡잡이·구사), 승패 정하기.
 
 카드는 "3a"처럼 월(1~10) + 종류 한 글자.
   a: 그 달의 좋은 패 (1·3·8월은 광, 나머지는 열끗)
@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from itertools import combinations
 
 GWANG_MONTHS = (1, 3, 8)
 MONTH_NAMES = {10: "장"}
@@ -58,6 +59,14 @@ def evaluate(cards: Iterable[str]) -> tuple[int, str, str | None]:
         return SPECIAL_VALUES[(ma, mb)], SPECIAL_NAMES[(ma, mb)], None
     k = (ma + mb) % 10
     return KKEUT_BASE + k, ("갑오" if k == 9 else "망통" if k == 0 else f"{k}끗"), None
+
+
+# 세 장 중 가장 센 두 장 (두 장이면 그대로)
+def best_pair(cards: list[str]) -> list[str]:
+    if len(cards) <= 2:
+        return list(cards)
+    best = max(combinations(cards, 2), key=lambda c: evaluate(c)[0])
+    return [c for c in cards if c in best]
 
 
 def needs_redeal(hands: dict[str, list[str]]) -> str | None:

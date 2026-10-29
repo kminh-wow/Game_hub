@@ -702,18 +702,19 @@ gostop/
 ```
 seotda/
   app/
-    main.py     GameServer·앱 생성 (게임 메시지: act {action: die|check|call|bbing|half|ddadang|allin})
+    main.py     GameServer·앱 생성 (게임 메시지: act {action: die|check|call|bbing|half|ddadang|allin}, choose {cards: [두 장]})
     room.py     방 설정(시작 칩, 판돈 오르는 판 수, 행동 시간, 판 수), 2~6명, 방 우승 횟수
-    game.py     진행: 선 이동, 판돈(앤티), 두 장, 베팅 한 바퀴, 공개, 재경기, 탈락, 판 수 끝
-    rules.py    카드("3a": 월 + a 좋은 패/b 나머지), 족보 값, 특수패, 재경기 조건, 팟 나누기
+    game.py     진행: 선 이동, 판돈(앤티), 두 장·첫 베팅, 세 장째·두 장 고르기, 마지막 베팅, 공개, 재경기, 탈락, 판 수 끝
+    rules.py    카드("3a": 월 + a 좋은 패/b 나머지), 족보 값, 세 장 중 가장 센 두 장(`best_pair`), 특수패, 재경기 조건, 팟 나누기
   static/       index.html, style.css, app.js (lobby.js + 2D 테이블, 화투 그림은 common/web/hwatu.js)
   tests/        test_rules.py(족보·특수패), test_game.py(진행)
 ```
 
+- 한 판(세 장 섯다): `_deal`(두 장, `street` 1) → 첫 베팅 → `_end_round` → `_third_card`(남은 사람에게 한 장 더, `phase` "choose") → 모두 `choose`로 두 장을 고르면(시간 초과·자리 비움은 `best_pair`) `_start_betting`(`street` 2, 베팅 금액만 새로, 팟은 그대로) → 마지막 베팅 → `_showdown`은 고른 두 장(`pick`)으로 판정. 첫 베팅에서 모두 다이하면 세 장째 없이 끝나고, 올인한 사람도 고릅니다. 고른 카드는 공개 전까지 본인만 봅니다(`picked`만 모두에게).
 - 베팅 엔진은 홀덤과 같습니다(이번 베팅 총액 기준, 최소 레이즈, 모자란 올인 뒤 레이즈 막기, 사이드 팟). 버튼 금액은 서버가 `options`로 계산해 줍니다: 삥 = 판돈만큼(아무도 안 걸었을 때), 하프 = 콜한 뒤 팟의 절반만큼 더(최소 판돈), 따당 = 지금 베팅의 두 배.
 - 판돈은 시작 칩의 1%에서 `ante_every`판마다 오릅니다(`ANTE_STEPS`). 판돈은 팟에만 들어가고 베팅 금액(`bet`)과는 따로입니다.
 - 족보 값(`evaluate`): 38광땡 1000, 18광땡 990, 13광땡 980, 땡 900+월, 알리 800 … 세륙 750, 끗 700+끗. 특수패는 `effective`에서 판 전체를 보고 정합니다(땡잡이는 가장 센 패가 1~9땡이면 그보다 0.5 위, 암행어사는 13·18광땡이면 0.5 위). 같은 값은 팟을 나눕니다.
-- 재경기(`needs_redeal`): 구사는 가장 센 패가 알리 이하, 멍텅구리 구사는 9땡 이하일 때. 남은 사람에게 새 덱으로 다시 두 장, 팟은 그대로이고 최대 3번까지 합니다.
+- 재경기(`needs_redeal`): 구사는 가장 센 패가 알리 이하, 멍텅구리 구사는 9땡 이하일 때. 남은 사람에게 새 덱으로 두 장부터 다시(첫 베팅·세 장째·고르기 모두), 팟은 그대로이고 최대 3번까지 합니다.
 - 화투 그림(`common/web/hwatu.js`, `Hwatu.svg(월, 종류)`): 이미지 파일 없이 SVG로 그린 48장(섯다는 그중 20장). 월마다 상징 + 광(光)·열끗·띠(홍단·청단·초단)·쌍피 표시.
 - 검증: `cd seotda && pytest`
 
