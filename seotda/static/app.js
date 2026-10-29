@@ -24,6 +24,7 @@ let lastTurn = null;
 let lastChoose = false;
 let dealTag = "";                   // 판·재경기 번호 (바뀌면 카드를 새로 받은 것)
 let picking = [];                   // 고르는 중인 카드
+let pickedFor = "";                 // 추천 패를 미리 골라 둔 판
 const shownBefore = new Map();      // 자리 id → 지난번에 그린 카드 (애니메이션용)
 
 const lobby = GameLobby.init({
@@ -79,21 +80,41 @@ function cardEl(code, anim = "") {
   return el;
 }
 
-// 두 장 족보 이름 (고를 때 미리 보기, 서버 rules.evaluate 와 같음)
-function pairName(x, y) {
+const SPECIAL_VALUE = { "1,2": 800, "1,4": 790, "1,9": 780, "1,10": 770, "4,10": 760, "4,6": 750 };
+const SPECIAL_TIP = {
+  "땡잡이": "상대 최고가 1~9땡이면 이겨요",
+  "암행어사": "상대 최고가 13·18광땡이면 이겨요",
+  "구사": "가장 센 패가 알리 이하면 재경기",
+  "멍텅구리 구사": "가장 센 패가 9땡 이하면 재경기",
+};
+
+// 두 장 족보 [값, 이름] (서버 rules.evaluate 와 같음)
+function pairEval(x, y) {
   const mon = (c) => Number(c.slice(0, -1));
   const [a, b] = [x, y].sort((p, q) => mon(p) - mon(q) || (p < q ? -1 : 1));
   const ma = mon(a), mb = mon(b);
   const gw = (c) => c.endsWith("a") && GWANG.includes(mon(c));
   const ye = (c) => c.endsWith("a") && !GWANG.includes(mon(c));
-  if (gw(a) && gw(b)) return ma === 3 ? "38광땡" : mb === 8 ? "18광땡" : "13광땡";
-  if (ma === mb) return ma === 10 ? "장땡" : `${ma}땡`;
-  if (ma === 4 && mb === 7 && ye(a) && ye(b)) return "암행어사";
-  if (ma === 3 && mb === 7 && gw(a) && ye(b)) return "땡잡이";
-  if (ma === 4 && mb === 9) return ye(a) && ye(b) ? "멍텅구리 구사" : "구사";
-  if (SPECIAL[`${ma},${mb}`]) return SPECIAL[`${ma},${mb}`];
+  if (gw(a) && gw(b)) return ma === 3 ? [1000, "38광땡"] : mb === 8 ? [990, "18광땡"] : [980, "13광땡"];
+  if (ma === mb) return [900 + ma, ma === 10 ? "장땡" : `${ma}땡`];
+  if (ma === 4 && mb === 7 && ye(a) && ye(b)) return [701, "암행어사"];
+  if (ma === 3 && mb === 7 && gw(a) && ye(b)) return [700, "땡잡이"];
+  if (ma === 4 && mb === 9) return [703, ye(a) && ye(b) ? "멍텅구리 구사" : "구사"];
+  if (SPECIAL[`${ma},${mb}`]) return [SPECIAL_VALUE[`${ma},${mb}`], SPECIAL[`${ma},${mb}`]];
   const k = (ma + mb) % 10;
-  return k === 9 ? "갑오" : k === 0 ? "망통" : `${k}끗`;
+  return [700 + k, k === 9 ? "갑오" : k === 0 ? "망통" : `${k}끗`];
+}
+const pairName = (x, y) => pairEval(x, y)[1];
+
+// 세 장으로 만들 수 있는 두 장 조합 (센 것부터, 첫 번째가 추천)
+function pairOptions(cards) {
+  const out = [];
+  for (let i = 0; i < cards.length; i++)
+    for (let j = i + 1; j < cards.length; j++) {
+      const [value, name] = pairEval(cards[i], cards[j]);
+      out.push({ cards: [cards[i], cards[j]], value, name });
+    }
+  return out.sort((p, q) => q.value - p.value);
 }
 
 // 카드 묶음 (지난번과 비교해서 새로 받은 카드는 날아오고, 공개되면 뒤집힘. 고르지 않은 카드는 흐리게)
@@ -176,7 +197,12 @@ function renderMine(g, room) {
   $("#my-area").classList.toggle("hidden", !seat);
   opts = room.playing && me?.options ? me.options : null;
   const choosing = room.playing && !!me?.choose;
+  const combos = choosing && seat?.cards?.length === 3 ? pairOptions(seat.cards) : [];
   if (!choosing) picking = [];
+  else if (pickedFor !== dealTag && combos.length) {
+    picking = [...combos[0].cards];
+    pickedFor = dealTag;
+  }
   const won = (g.results || []).some((r) => r.id === seat?.id && r.amount > 0);
   const mine = seat?.cards ? Array.from(cardsFor(`${seat.id}:mine`, seat.cards, 0, won ? "win" : "", seat.pick).children) : [];
   if (choosing) mine.forEach((el, i) => {
@@ -193,6 +219,7 @@ function renderMine(g, room) {
   const cb = $("#choose-btn");
   cb.classList.toggle("hidden", !choosing);
   cb.disabled = picking.length !== 2;
+  renderCombos(combos);
   const labels = {
     die: "다이",
     call: opts ? (opts.can_check ? "체크" : opts.call_allin ? `올인 콜<small>${fmt(opts.to_call)}</small>` : `콜<small>${fmt(opts.to_call)}</small>`) : "체크",
@@ -208,6 +235,26 @@ function renderMine(g, room) {
     b.disabled = !ok;
   }
   $("#actions").classList.toggle("off", !opts);
+}
+
+// 두 장 조합 고르기 (추천 표시, 특수패는 노림수 설명)
+function renderCombos(combos) {
+  const el = lobby.el;
+  const key = picking.slice().sort().join(",");
+  $("#combos").replaceChildren(...combos.map((c, i) => {
+    const tip = SPECIAL_TIP[c.name];
+    const b = el("button", { type: "button", className: ["combo", i === 0 && "best", c.cards.slice().sort().join(",") === key && "on"].filter(Boolean).join(" ") },
+      el("span", { className: "combo-cards" }, ...c.cards.map((code) => cardEl(code))),
+      el("b", { textContent: c.name }),
+      i === 0 ? el("em", { textContent: "추천" }) : tip ? el("em", { className: "gamble", textContent: "노림수" }) : "",
+      tip ? el("small", { textContent: tip }) : "");
+    b.onclick = () => {
+      picking = [...c.cards];
+      renderMine(lobby.state.game, lobby.state.room);
+    };
+    return b;
+  }));
+  $("#combos").classList.toggle("hidden", !combos.length);
 }
 
 // 판 결과 카드

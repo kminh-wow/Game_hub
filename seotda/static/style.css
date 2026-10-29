@@ -244,6 +244,15 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .my-cards .card.pickable:hover { translate: 0 -4px; }
 .my-cards .card.sel { translate: 0 -12px; box-shadow: 0 0 0 3px #ffd34d, 0 8px 14px rgba(0,0,0,.35); }
 .choose-btn { align-self: flex-start; padding: 9px 16px; }
+.combos { display: flex; flex-wrap: wrap; gap: 6px; }
+.combo { position: relative; display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; align-items: center; gap: 0 8px; padding: 5px 10px 5px 6px; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); color: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.combo .combo-cards { grid-row: span 2; display: flex; gap: 2px; }
+.combo .combo-cards .card { width: 22px; height: 34px; border-radius: 3px; box-shadow: none; }
+.combo b { font-size: 14px; }
+.combo em { position: absolute; top: -8px; right: 6px; padding: 0 6px; border-radius: 99px; background: #2f8a55; color: #fff; font-size: 10px; font-style: normal; font-weight: 800; }
+.combo em.gamble { background: #b9802a; }
+.combo small { color: var(--muted); font-size: 11px; max-width: 150px; }
+.combo.on { border-color: #e0a92a; background: #fff6d8; }
 @keyframes deal { from { transform: translateY(-40px) scale(.6) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes flip { 0% { transform: rotateY(90deg); } 100% { transform: rotateY(0); } }
 
@@ -294,5 +303,11 @@ button.act small { display: block; font-size: 11px; font-weight: 600; opacity: .
   .card { width: 30px; height: 47px; }
   .my-cards .card { width: 52px; height: 81px; }
   .seat .card + .card { margin-left: -8px; }
+  .my-hand:has(.combos:not(.hidden)) { flex-wrap: wrap; }
+  .my-hand:has(.combos:not(.hidden)) .my-info { flex-basis: 100%; }
+  .combos { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .combo { grid-template-columns: 1fr; justify-items: center; padding: 6px 4px; text-align: center; }
+  .combo .combo-cards { grid-row: auto; }
+  .combo small { display: none; }
   .actions { grid-template-columns: repeat(3, 1fr); }
 }
