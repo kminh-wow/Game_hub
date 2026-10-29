@@ -132,6 +132,7 @@ def test_third_card_and_choose():
         assert g.seats[0].pick == [three[0], three[2]]
         assert await g.choose(A, three[:2]) == "이미 골랐어요."
         assert g.state(B)["seats"][0]["picked"] and g.state(B)["seats"][0]["pick"] is None   # 고른 건 안 보임
+        assert g.state(B)["seats"][0]["discard"] == three[1] and g.state(B)["seats"][1]["discard"] is None   # 버린 건 모두에게
         assert await g.act(B, "check") == "지금은 내 차례가 아니에요."
         await pick_all(g)
         assert g.phase == "betting" and g.street == 2 and cur(g).id == "B" and g.current_bet == 0

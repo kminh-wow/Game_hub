@@ -2,7 +2,7 @@
 마지막 1명이 남거나, 정한 판 수가 끝나면 칩이 많은 순으로 순위.
 
 한 판(세 장 섯다): 모두 판돈(앤티) → 두 장씩 → 첫 베팅(다이·체크·삥·콜·하프·따당·올인)
-→ 한 장 더 → 세 장 중 두 장 고르기(동시에) → 마지막 베팅 → 고른 두 장을 공개해서 승부.
+→ 한 장 더 → 세 장 중 두 장 고르기(동시에, 버린 한 장은 모두에게 공개) → 마지막 베팅 → 고른 두 장을 공개해서 승부.
 구사·멍텅구리 구사 조건이면 남은 사람끼리 다시 받아서 한 번 더(재경기, 판돈은 그대로).
 섞기·판정은 서버에서만 하고, 패는 본인에게만 보낸다(공개 때만 모두에게).
 """
@@ -150,6 +150,7 @@ class Game:
                 "n_cards": len(s.cards) if s.in_hand or s.shown else 0,
                 "pick": s.pick if (mine or s.shown) and s.pick else None,
                 "picked": bool(s.pick),
+                "discard": next((c for c in s.cards if c not in s.pick), None) if s.pick and len(s.cards) == 3 and s.in_hand else None,
                 "dealer": i == self.dealer,
             })
         me = self.seat_of(viewer) if viewer is not None else None

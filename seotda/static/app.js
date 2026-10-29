@@ -117,20 +117,20 @@ function pairOptions(cards) {
   return out.sort((p, q) => q.value - p.value);
 }
 
-// 카드 묶음 (지난번과 비교해서 새로 받은 카드는 날아오고, 공개되면 뒤집힘. 고르지 않은 카드는 흐리게)
+// 카드 묶음 (null 은 뒷면. 지난번과 비교해서 새로 받은 카드는 날아오고, 공개되면 뒤집힘. 고르지 않은 카드는 흐리게)
 function cardsFor(id, cards, count, extraClass = "", pick = null) {
-  const key = cards ? cards.join(",") : count ? `back${count}` : "";
+  const list = cards || Array(count).fill(null);
+  const key = list.map((c) => c || "?").join(",");
   const before = shownBefore.get(id);
   const prev = before && before.tag === dealTag ? before.key : "";
   shownBefore.set(id, { key, tag: dealTag });
   const box = document.createElement("div");
   box.className = "cards";
   if (!key) return box;
-  const prevBacks = prev.startsWith("back") ? Number(prev.slice(4)) : 0;
-  const prevCards = prev && !prevBacks ? prev.split(",") : [];
+  const prevList = prev ? prev.split(",") : [];
   let delay = 0;
-  (cards || Array(count).fill(null)).forEach((c, i) => {
-    const anim = c ? (prevCards.includes(c) ? "" : i < prevBacks ? "flip" : "deal") : i < prevBacks ? "" : "deal";
+  list.forEach((c, i) => {
+    const anim = c ? (prevList.includes(c) ? "" : prevList.includes("?") ? "flip" : "deal") : i < prevList.length ? "" : "deal";
     const el = cardEl(c, anim);
     if (anim) el.style.animationDelay = `${delay++ * 0.08}s`;
     if (c && pick && !pick.includes(c)) el.classList.add("drop");
@@ -170,7 +170,7 @@ function renderTable(g, room) {
     const seat = el("div", { className: ["seat", g.turn_id === s.id && "turn", s.folded && "folded", s.out && "out", mine && "me", winners.has(s.id) && "won"].filter(Boolean).join(" ") });
     seat.style.left = `${x}%`;
     seat.style.top = `${y}%`;
-    const cards = mine ? cardsFor(`${s.id}:mine-small`, null, 0) : cardsFor(s.id, s.cards, s.has_cards ? s.n_cards : 0, winners.has(s.id) ? "win" : "", s.pick);
+    const cards = mine ? cardsFor(`${s.id}:mine-small`, null, 0) : cardsFor(s.id, s.cards || (s.discard ? [null, null, s.discard] : null), s.has_cards ? s.n_cards : 0, winners.has(s.id) ? "win" : "", s.pick);
     seat.append(
       cards,
       el("div", { className: "tag" },
