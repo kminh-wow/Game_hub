@@ -66,10 +66,10 @@ const lobby = GameLobby.init({
 
 // ---------- 카드 ----------
 
-// 섯다 카드 "3a" → 화투 그림 (a: 광 또는 열끗, b: 띠 또는 피)
+// 섯다 카드 "3a" → 화투 그림 (a: 광 또는 열끗, b: 띠, 8월 b 는 기러기 열끗)
 function cardSvg(code) {
   const m = Number(code.slice(0, -1));
-  const kind = code.endsWith("a") ? (GWANG.includes(m) ? "gwang" : "yeol") : TTI[m] || "pi";
+  const kind = code.endsWith("a") ? (GWANG.includes(m) ? "gwang" : "yeol") : m === 8 ? "yeol" : TTI[m] || "pi";
   return Hwatu.svg(m, kind);
 }
 
@@ -333,6 +333,7 @@ document.addEventListener("keydown", (e) => {
   if (btn && !btn.disabled) btn.click();
 });
 renderRanking(null);
+Hwatu.preload();
 
 // ---------- 타이머 ----------
 

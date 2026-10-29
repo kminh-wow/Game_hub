@@ -60,10 +60,16 @@ const lobby = GameLobby.init({
 
 // ---------- 카드 ----------
 
+// 같은 월·같은 종류 중 몇 번째 카드인지 (피 두 장 그림 구분)
+function kindNo(code) {
+  const at = "abcd".indexOf(code.slice(-1));
+  return [..."abcd".slice(0, at)].filter((l) => kindOf(month(code) + l) === kindOf(code)).length;
+}
+
 function cardEl(code, cls = "") {
   const el = document.createElement("div");
   el.className = `card ${cls}`.trim();
-  el.innerHTML = code ? Hwatu.svg(month(code), kindOf(code)) : Hwatu.back();
+  el.innerHTML = code ? Hwatu.svg(month(code), kindOf(code), kindNo(code)) : Hwatu.back();
   if (code) el.dataset.card = code;
   return el;
 }
@@ -301,3 +307,4 @@ function tick() {
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
+Hwatu.preload();

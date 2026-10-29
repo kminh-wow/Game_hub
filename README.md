@@ -241,6 +241,7 @@ AI가 한 수 한 수를 어떻게 평가하는지 보여주는 **학습 모드*
 | 날짜 | 내용 |
 |---|---|
 | 2026-10-28 | 🌸 **고스톱 추가** (맞고·3인, AI 채우기, 쪽·뻑·따닥·쓸·폭탄·흔들기·총통, 박·고박·나가리, PC·모바일) |
+| 2026-10-29 | 🌸 **화투 그림 교체** (Louie Mantia 하나후다 그림, CC BY-SA 4.0) · 섯다 두 장 고를 때 **추천 조합**·노림수 표시 |
 | 2026-10-29 | 🎴 **섯다를 세 장 섯다로** (두 장 받고 첫 베팅 → 한 장 더 → 세 장 중 두 장 고르기 → 마지막 베팅, 고를 때 족보 미리 보기) |
 | 2026-10-28 | 🎴 **섯다 추가** (2~6명, 두 장 섯다, 특수패·재경기, 화투 그림, PC·모바일) |
 | 2026-10-14 | 🧟 **박스헤드 추가** (혼자 점수 경쟁·순위표, 2~4명 협동, 좀비·악마, 권총·샷건·기관총, PC·모바일) |
@@ -288,6 +289,7 @@ AI가 한 수 한 수를 어떻게 평가하는지 보여주는 **학습 모드*
 - 끝말잇기 사전: 국립국어원 [표준국어대사전](https://stdict.korean.go.kr), [KKuTu](https://github.com/JJoriping/KKuTu) 단어 DB (GPL v3, 단어만 사용)
 - 행맨 영어 사전: ENABLE word list (퍼블릭 도메인)
 - 3D 렌더링: [three.js](https://threejs.org) (MIT License)
+- 화투 그림 (섯다·고스톱): [Louie Mantia](https://commons.wikimedia.org/wiki/User:Louiemantia) 하나후다 그림, Wikimedia Commons ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), [자세히](common/web/hwatu/README.md))
 - 탁구 에셋: 경기장 HDRI [Poly Haven](https://polyhaven.com/a/circus_arena), 나무 바닥 [ambientCG](https://ambientcg.com), 로봇 선수 [Kenney Blocky Characters](https://kenney.nl/assets/blocky-characters) (모두 CC0, [자세히](pingpong/web/assets/CREDITS.md))
 
 <br>

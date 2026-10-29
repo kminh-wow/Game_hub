@@ -145,14 +145,11 @@
     .box-art b::before, .box-art i::before { content: ""; position: absolute; left: 7px; top: 12px; width: 6px; height: 6px; background: #111; box-shadow: 14px 0 0 #111; }
     .box-art i::before { background: #3a0a0a; box-shadow: 14px 0 0 #3a0a0a; }
     /* 화투 카드 그림 (섯다·고스톱) */
-    .hwatu-art { display: flex; gap: 6px; align-items: center; }
-    .hwatu-art b { width: 34px; height: 54px; border-radius: 4px; background: #f6ead2; border: 3px solid #2b1d16; position: relative; transform: rotate(-6deg); box-shadow: 0 2px 4px rgba(0,0,0,.25); }
-    .hwatu-art b + b { transform: rotate(6deg); }
-    .hwatu-art b.gw::before { content: "光"; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #d9342b; color: #fff; font-size: 10px; display: grid; place-items: center; }
-    .hwatu-art b.gw::after { content: ""; position: absolute; left: 7px; right: 7px; bottom: 6px; height: 16px; border-radius: 50%; background: #2f5d3a; }
-    .hwatu-art b.dan::after { content: ""; position: absolute; left: 11px; top: 12px; width: 10px; height: 26px; background: #d9342b; transform: rotate(-8deg); }
-    .hwatu-art b.back { background: #b3261e; border-color: #7d1410; }
-    .hwatu-art b.back::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: #e8b04a; }
+    .hwatu-art { display: flex; gap: 4px; align-items: center; }
+    .hwatu-art img, .hwatu-art b { width: 36px; height: 59px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,.25); transform: rotate(-6deg); }
+    .hwatu-art img + img, .hwatu-art img + b { transform: rotate(6deg); }
+    .hwatu-art b { background: #b3261e; border: 3px solid #7d1410; position: relative; box-sizing: border-box; }
+    .hwatu-art b::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: #e8b04a; }
     /* 홀덤 카드 그림 */
     .holdem-art { display: flex; gap: 6px; align-items: center; }
     .holdem-art b { width: 36px; height: 50px; display: grid; place-items: center; border-radius: 5px; background: #fbfaf5; color: #1b1d22; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,.25); transform: rotate(-6deg); }
@@ -318,7 +315,7 @@
 
     <a class="card" href="seotda/">
       <div class="art" aria-hidden="true">
-        <div class="hwatu-art"><b class="gw"></b><b class="gw"></b><b class="back"></b></div>
+        <div class="hwatu-art"><img src="common/hwatu/3-1.svg" alt=""><img src="common/hwatu/8-1.svg" alt=""><b></b></div>
       </div>
       <h2>섯다</h2>
       <p>세 장 받아 두 장 고르는 섯다. 38광땡부터 망통까지, 땡잡이·암행어사·구사 재경기까지! 삥·하프·따당으로 베팅해요.</p>
@@ -328,7 +325,7 @@
 
     <a class="card" href="gostop/">
       <div class="art" aria-hidden="true">
-        <div class="hwatu-art"><b class="gw"></b><b class="dan"></b><b class="dan"></b><b class="back"></b></div>
+        <div class="hwatu-art"><img src="common/hwatu/1-1.svg" alt=""><img src="common/hwatu/2-2.svg" alt=""><img src="common/hwatu/6-2.svg" alt=""><b></b></div>
       </div>
       <h2>고스톱</h2>
       <p>혼자 AI와 맞고, 친구와 3인 고스톱. 쪽·뻑·따닥·쓸·폭탄·흔들기, 피박·광박까지! 점수가 나면 고? 스톱?</p>

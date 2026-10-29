@@ -48,6 +48,7 @@ def client():
         ("/gostop/static/app.js", "GameLobby.init"),
         ("/seotda/static/app.js", "GameLobby.init"),
         ("/common/hwatu.js", "window.Hwatu"),
+        ("/common/hwatu/12-4.svg", "<svg"),
         ("/boxhead/multi", "같이 하기"),
         ("/boxhead/static/logic.js", "export function step"),
         ("/boxhead/static/multi.js", "GameLobby.init"),
