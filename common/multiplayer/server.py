@@ -22,6 +22,7 @@ MAX_TITLE = 30
 MAX_CHAT = 200
 MAX_TOKEN = 64
 MAX_CLIENT_ERRORS = 20   # 접속 하나당 기록할 브라우저 오류 수
+BUILD = uuid.uuid4().hex[:12]   # 서버를 띄울 때마다 바뀌는 값 (배포 뒤 옛 화면을 새로 고치게)
 
 # WebSocket 종료 코드 (클라이언트가 안내 문구를 고르는 데 쓴다)
 CLOSE_INVALID_NAME = 4000
@@ -91,7 +92,7 @@ class GameServer:
         player = Player(id=uuid.uuid4().hex[:8], name=name, ws=ws, token=token)
         self.players[player.id] = player
         log.info("%s 접속 %s (지금 %d명)", tag(self.label), name, len(self.players))
-        await player.send({"type": "welcome", "player": player.public(), **self.welcome_info()})
+        await player.send({"type": "welcome", "player": player.public(), "build": BUILD, **self.welcome_info()})
         await self.broadcast_lobby()
         return player
 

@@ -148,6 +148,12 @@ const GameLobby = (() => {
 
   const baseHandlers = {
     welcome(msg) {
+      // 서버가 새로 떠 있으면(배포) 옛 화면 대신 새로 고침 (닉네임이 있으면 다시 자동 입장)
+      if (state.build && msg.build && msg.build !== state.build) {
+        location.reload();
+        return;
+      }
+      state.build = msg.build;
       state.me = msg.player;
       $("#me-name").textContent = msg.player.name;
       $("#login-error").textContent = "";

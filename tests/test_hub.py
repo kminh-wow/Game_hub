@@ -84,7 +84,7 @@ def test_quoridor_glb_asset(client):
 def test_wordchain_websocket(client):
     with client.websocket_connect("/wordchain/ws?name=tester") as ws:
         msg = ws.receive_json()
-        assert msg["type"] == "welcome"
+        assert msg["type"] == "welcome" and msg["build"]
         assert msg["player"]["name"] == "tester"
 
 
